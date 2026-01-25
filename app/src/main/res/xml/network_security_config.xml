@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Allow cleartext for Monero daemon connections (some nodes use HTTP) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- Public nodes that may use HTTP -->
+        <domain includeSubdomains="true">xmr-de.boldsuck.org</domain>
+        <domain includeSubdomains="true">xmr-node.cakewallet.com</domain>
+        <domain includeSubdomains="true">node.monerodevs.org</domain>
+        <domain includeSubdomains="true">xmr.agor.ist</domain>
+        <domain includeSubdomains="true">monero.ds-jetzt.de</domain>
+        <domain includeSubdomains="true">nodex.monerujo.io</domain>
+        <domain includeSubdomains="true">node.sethforprivacy.com</domain>
+        <domain includeSubdomains="true">monero.stackwallet.com</domain>
+        <domain includeSubdomains="true">xmr.stormycloud.org</domain>
+        <domain includeSubdomains="true">monero.10z.com.ar</domain>
+        <domain includeSubdomains="true">node.xmr.rocks</domain>
+        <domain includeSubdomains="true">opennode.xmr-tw.org</domain>
+    </domain-config>
+</network-security-config>

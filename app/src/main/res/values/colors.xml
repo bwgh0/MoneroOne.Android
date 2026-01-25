@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Monero Brand Colors -->
+    <color name="monero_orange">#FFFF7500</color>
+    <color name="monero_orange_light">#FFFF9933</color>
+    <color name="monero_orange_dark">#FFCC5C00</color>
+
+    <!-- Status Colors -->
+    <color name="success_green">#FF34C759</color>
+    <color name="error_red">#FFFF3B30</color>
+    <color name="warning_yellow">#FFFFCC00</color>
+    <color name="testnet_cyan">#FF00BCD4</color>
+
+    <!-- Background Colors -->
+    <color name="background_light">#FFFFFFFF</color>
+    <color name="background_dark">#FF121212</color>
+    <color name="surface_light">#FFF5F5F5</color>
+    <color name="surface_dark">#FF1E1E1E</color>
+
+    <!-- Glass Effect Colors -->
+    <color name="glass_background_light">#80FFFFFF</color>
+    <color name="glass_background_dark">#40FFFFFF</color>
+</resources>

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MoneroOne</string>
+
+    <!-- Onboarding -->
+    <string name="welcome_title">Welcome to\nMoneroOne</string>
+    <string name="welcome_subtitle">Your gateway to private, decentralized money</string>
+    <string name="create_wallet">Create New Wallet</string>
+    <string name="restore_wallet">Restore Wallet</string>
+
+    <!-- Create Wallet -->
+    <string name="create_wallet_title">Create Wallet</string>
+    <string name="seed_type_title">Choose Seed Type</string>
+    <string name="polyseed_title">Polyseed (16 words)</string>
+    <string name="polyseed_description">Modern, compact seed format with built-in birthday</string>
+    <string name="legacy_seed_title">Legacy (25 words)</string>
+    <string name="legacy_seed_description">Traditional Monero seed format</string>
+    <string name="your_seed_phrase">Your Seed Phrase</string>
+    <string name="seed_warning">Write down these words in order. Never share them with anyone. This is the only way to recover your wallet.</string>
+    <string name="i_saved_my_seed">I\'ve Saved My Seed</string>
+
+    <!-- Restore Wallet -->
+    <string name="restore_wallet_title">Restore Wallet</string>
+    <string name="enter_seed_phrase">Enter your seed phrase</string>
+    <string name="restore_height_hint">Restore height (optional)</string>
+    <string name="restore_date_hint">Or restore date (YYYY-MM-DD)</string>
+    <string name="restore">Restore</string>
+
+    <!-- PIN -->
+    <string name="set_pin_title">Set PIN</string>
+    <string name="confirm_pin_title">Confirm PIN</string>
+    <string name="enter_pin">Enter PIN</string>
+    <string name="pin_mismatch">PINs don\'t match</string>
+    <string name="enable_biometrics">Enable Biometric Login</string>
+    <string name="biometrics_description">Use fingerprint or face unlock for quick access</string>
+
+    <!-- Unlock -->
+    <string name="unlock_title">Welcome Back</string>
+    <string name="use_biometrics">Use Biometrics</string>
+    <string name="forgot_pin">Forgot PIN?</string>
+
+    <!-- Wallet -->
+    <string name="balance">Balance</string>
+    <string name="unlocked_balance">Unlocked</string>
+    <string name="send">Send</string>
+    <string name="receive">Receive</string>
+    <string name="recent_activity">Recent Activity</string>
+    <string name="see_all">See All</string>
+    <string name="no_transactions">No transactions yet</string>
+    <string name="syncing">Syncing...</string>
+    <string name="synced">Synced</string>
+
+    <!-- Send -->
+    <string name="send_xmr">Send XMR</string>
+    <string name="recipient_address">Recipient Address</string>
+    <string name="amount">Amount</string>
+    <string name="max">MAX</string>
+    <string name="fee">Fee</string>
+    <string name="total">Total</string>
+    <string name="confirm_send">Confirm Send</string>
+    <string name="scan_qr">Scan QR</string>
+
+    <!-- Receive -->
+    <string name="receive_xmr">Receive XMR</string>
+    <string name="your_address">Your Address</string>
+    <string name="copy_address">Copy Address</string>
+    <string name="share_address">Share Address</string>
+    <string name="new_subaddress">New Subaddress</string>
+
+    <!-- Transactions -->
+    <string name="transactions">Transactions</string>
+    <string name="received">Received</string>
+    <string name="sent">Sent</string>
+    <string name="pending">Pending</string>
+    <string name="confirmed">Confirmed</string>
+    <string name="failed">Failed</string>
+    <string name="confirmations">Confirmations</string>
+    <string name="transaction_id">Transaction ID</string>
+    <string name="view_on_explorer">View on Explorer</string>
+
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="security">Security</string>
+    <string name="change_pin">Change PIN</string>
+    <string name="biometric_login">Biometric Login</string>
+    <string name="backup">Backup</string>
+    <string name="view_seed">View Seed Phrase</string>
+    <string name="network">Network</string>
+    <string name="node_settings">Node Settings</string>
+    <string name="current_node">Current Node</string>
+    <string name="about">About</string>
+    <string name="version">Version</string>
+    <string name="delete_wallet">Delete Wallet</string>
+    <string name="delete_wallet_warning">This will permanently delete your wallet. Make sure you have backed up your seed phrase!</string>
+
+    <!-- Common -->
+    <string name="continue_button">Continue</string>
+    <string name="cancel">Cancel</string>
+    <string name="done">Done</string>
+    <string name="error">Error</string>
+    <string name="success">Success</string>
+    <string name="copied">Copied to clipboard</string>
+    <string name="xmr">XMR</string>
+
+    <!-- Errors -->
+    <string name="invalid_address">Invalid address</string>
+    <string name="invalid_amount">Invalid amount</string>
+    <string name="insufficient_balance">Insufficient balance</string>
+    <string name="connection_error">Connection error</string>
+    <string name="sync_error">Sync error</string>
+</resources>
