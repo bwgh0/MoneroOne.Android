@@ -7,40 +7,47 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,29 +60,79 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
+import androidx.compose.ui.graphics.toArgb
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
+import one.monero.moneroone.R
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.PrimaryButton
+import one.monero.moneroone.ui.components.SecondaryButton
 import one.monero.moneroone.ui.theme.MoneroOrange
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReceiveScreen(
     walletViewModel: WalletViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSelectAddress: (() -> Unit)? = null
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
     val context = LocalContext.current
-    val address = walletState.receiveAddress
+    val prefs = remember { context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE) }
+
+    // Use a refresh key to force re-read from prefs when screen resumes
+    var refreshKey by remember { mutableIntStateOf(0) }
+    val selectedAddressIndex = remember(refreshKey) {
+        prefs.getInt("selected_address_index", 0)
+    }
+
+    // Re-read when screen resumes (e.g., returning from AddressPickerScreen)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshKey++
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Get the address based on selected index
+    val subaddresses = walletViewModel.getSubaddresses()
+    val address = remember(selectedAddressIndex, walletState.receiveAddress, subaddresses) {
+        if (selectedAddressIndex == 0) {
+            walletState.receiveAddress
+        } else {
+            subaddresses.getOrNull(selectedAddressIndex - 1)?.address ?: walletState.receiveAddress
+        }
+    }
+
+    val addressLabel = remember(selectedAddressIndex) {
+        if (selectedAddressIndex == 0) "Main Address" else "Subaddress #$selectedAddressIndex"
+    }
 
     val qrBitmap = remember(address) {
         if (address.isNotBlank()) {
-            generateSimpleQRCode(address, 512)
+            generateQRCode(address, 512, context)
         } else null
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Receive XMR") },
+                title = {
+                    Text(
+                        text = "Receive XMR",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -83,7 +140,8 @@ fun ReceiveScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
-                )
+                ),
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
             )
         }
     ) { padding ->
@@ -116,12 +174,13 @@ fun ReceiveScreen(
 
             // QR Code
             GlassCard(
-                modifier = Modifier.size(250.dp)
+                modifier = Modifier.size(280.dp),
+                cornerRadius = 20.dp
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
+                        .padding(20.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     if (qrBitmap != null) {
@@ -130,7 +189,7 @@ fun ReceiveScreen(
                             contentDescription = "QR Code",
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(12.dp))
                         )
                     } else {
                         Text(
@@ -143,25 +202,49 @@ fun ReceiveScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Address display
+            // Address display with selector
             GlassCard(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onSelectAddress
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Text(
-                        text = "Your Address",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = addressLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MoneroOrange,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Tap to change address",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                        if (onSelectAddress != null) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = "Select address",
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = address.ifBlank { "Loading..." },
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
                     )
                 }
             }
@@ -173,7 +256,7 @@ fun ReceiveScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(
+                PrimaryButton(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("Monero Address", address)
@@ -182,24 +265,32 @@ fun ReceiveScreen(
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MoneroOrange,
-                        contentColor = Color.White
-                    ),
-                    enabled = address.isNotBlank()
+                        .height(52.dp),
+                    enabled = address.isNotBlank(),
+                    color = MoneroOrange
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Copy")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Copy",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                    }
                 }
 
-                OutlinedButton(
+                SecondaryButton(
                     onClick = {
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
@@ -209,20 +300,29 @@ fun ReceiveScreen(
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MoneroOrange
-                    ),
-                    enabled = address.isNotBlank()
+                        .height(52.dp),
+                    enabled = address.isNotBlank(),
+                    borderColor = MoneroOrange
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Share")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MoneroOrange
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Share",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MoneroOrange
+                        )
+                    }
                 }
             }
 
@@ -231,60 +331,66 @@ fun ReceiveScreen(
     }
 }
 
-/**
- * Simple QR code generation without external library issues
- */
-private fun generateSimpleQRCode(data: String, size: Int): Bitmap {
-    // Create a simple placeholder bitmap with the address hash pattern
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-
-    // Fill with white background
-    for (x in 0 until size) {
-        for (y in 0 until size) {
-            bitmap.setPixel(x, y, android.graphics.Color.WHITE)
-        }
-    }
-
-    // Create a simple pattern based on the data hash
-    val hash = data.hashCode()
-    val moduleCount = 33 // Standard QR code size
-    val moduleSize = size / moduleCount
-
-    // Add position patterns (corners)
-    drawPositionPattern(bitmap, 0, 0, moduleSize)
-    drawPositionPattern(bitmap, (moduleCount - 7) * moduleSize, 0, moduleSize)
-    drawPositionPattern(bitmap, 0, (moduleCount - 7) * moduleSize, moduleSize)
-
-    // Add some data modules based on hash
-    for (i in 8 until moduleCount - 8) {
-        for (j in 8 until moduleCount - 8) {
-            val shouldDraw = ((hash + i * 17 + j * 31) % 3) == 0
-            if (shouldDraw) {
-                fillModule(bitmap, i * moduleSize, j * moduleSize, moduleSize)
+private fun generateQRCode(data: String, size: Int, context: Context): Bitmap? {
+    return try {
+        val hints = mapOf(
+            EncodeHintType.MARGIN to 1,
+            EncodeHintType.CHARACTER_SET to "UTF-8",
+            EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.H // High error correction for logo overlay
+        )
+        val writer = QRCodeWriter()
+        val bitMatrix = writer.encode(data, BarcodeFormat.QR_CODE, size, size, hints)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        for (x in 0 until size) {
+            for (y in 0 until size) {
+                bitmap.setPixel(
+                    x, y,
+                    if (bitMatrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                )
             }
         }
-    }
 
-    return bitmap
-}
-
-private fun drawPositionPattern(bitmap: Bitmap, startX: Int, startY: Int, moduleSize: Int) {
-    // Draw 7x7 position pattern
-    for (i in 0 until 7) {
-        for (j in 0 until 7) {
-            val shouldFill = i == 0 || i == 6 || j == 0 || j == 6 ||
-                (i in 2..4 && j in 2..4)
-            if (shouldFill) {
-                fillModule(bitmap, startX + i * moduleSize, startY + j * moduleSize, moduleSize)
-            }
-        }
+        // Add Monero logo overlay in center (22% of QR size)
+        addMoneroLogoOverlay(bitmap, context)
+    } catch (e: Exception) {
+        null
     }
 }
 
-private fun fillModule(bitmap: Bitmap, startX: Int, startY: Int, size: Int) {
-    for (x in startX until minOf(startX + size, bitmap.width)) {
-        for (y in startY until minOf(startY + size, bitmap.height)) {
-            bitmap.setPixel(x, y, android.graphics.Color.BLACK)
-        }
+private fun addMoneroLogoOverlay(qrBitmap: Bitmap, context: Context): Bitmap {
+    val size = qrBitmap.width
+    val logoSize = (size * 0.22).toInt()
+    val logoOffset = (size - logoSize) / 2
+
+    val result = qrBitmap.copy(Bitmap.Config.ARGB_8888, true)
+    val canvas = android.graphics.Canvas(result)
+
+    // Draw white circle background (slightly larger for border)
+    val paint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        color = android.graphics.Color.WHITE
     }
+    val centerX = size / 2f
+    val centerY = size / 2f
+    val circleRadius = logoSize / 2f + 4
+    canvas.drawCircle(centerX, centerY, circleRadius, paint)
+
+    // Load and draw logo - simple scaledToFill approach like iOS
+    val logoDrawable = ContextCompat.getDrawable(context, R.drawable.monero_logo)
+    if (logoDrawable != null) {
+        // Draw at logoSize and clip to circle (no 2.2x scale)
+        val logoBitmap = logoDrawable.toBitmap(logoSize, logoSize, Bitmap.Config.ARGB_8888)
+
+        // Create circular clipped version
+        val circularBitmap = Bitmap.createBitmap(logoSize, logoSize, Bitmap.Config.ARGB_8888)
+        val circleCanvas = android.graphics.Canvas(circularBitmap)
+        val circlePaint = android.graphics.Paint().apply { isAntiAlias = true }
+        circleCanvas.drawCircle(logoSize / 2f, logoSize / 2f, logoSize / 2f, circlePaint)
+        circlePaint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+        circleCanvas.drawBitmap(logoBitmap, 0f, 0f, circlePaint)
+
+        canvas.drawBitmap(circularBitmap, logoOffset.toFloat(), logoOffset.toFloat(), null)
+    }
+
+    return result
 }

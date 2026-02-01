@@ -27,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,8 +48,10 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.delay
+import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
+import one.monero.moneroone.ui.components.MoneroLogo
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 
@@ -71,8 +72,11 @@ fun UnlockScreen(
 
     val biometricAvailable = remember {
         val biometricManager = BiometricManager.from(context)
-        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+        val deviceSupports = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
             BiometricManager.BIOMETRIC_SUCCESS
+        val userEnabled = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+            .getBoolean("biometrics_enabled", false)
+        deviceSupports && userEnabled
     }
 
     fun onDigitPress(digit: String) {
@@ -114,7 +118,7 @@ fun UnlockScreen(
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     // For biometric unlock, we trust the OS authentication
-                    // In a real app, you'd decrypt stored credentials here
+                    walletViewModel.unlockWithBiometrics()
                     onUnlocked()
                 }
 
@@ -145,9 +149,10 @@ fun UnlockScreen(
         }
     }
 
-    // Try biometric on first load if available
+    // Try biometric on first load if available (with delay to ensure UI is ready)
     LaunchedEffect(Unit) {
         if (biometricAvailable) {
+            delay(300) // Small delay for UI to be fully ready
             showBiometricPrompt()
         }
     }
@@ -161,21 +166,8 @@ fun UnlockScreen(
     ) {
         Spacer(modifier = Modifier.weight(0.5f))
 
-        // Logo placeholder
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .clip(CircleShape)
-                .background(MoneroOrange.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "M",
-                fontSize = 36.sp,
-                fontWeight = FontWeight.Bold,
-                color = MoneroOrange
-            )
-        }
+        // Monero logo
+        MoneroLogo(size = 80.dp)
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -228,16 +220,7 @@ fun UnlockScreen(
             onBiometric = if (biometricAvailable) ::showBiometricPrompt else null
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        TextButton(onClick = { /* TODO: Implement forgot PIN flow */ }) {
-            Text(
-                text = "Forgot PIN?",
-                color = MoneroOrange
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 

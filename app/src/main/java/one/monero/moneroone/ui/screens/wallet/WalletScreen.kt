@@ -1,28 +1,37 @@
 package one.monero.moneroone.ui.screens.wallet
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,21 +40,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.SyncState
 import io.horizontalsystems.monerokit.model.TransactionInfo
+import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
-import one.monero.moneroone.ui.components.GradientCard
+import one.monero.moneroone.ui.components.MoneroLogo
+import one.monero.moneroone.ui.components.StatusDot
+import one.monero.moneroone.ui.components.SyncStatus
+import one.monero.moneroone.ui.components.SyncStatusIndicator
+import one.monero.moneroone.ui.components.TestnetBanner
+import one.monero.moneroone.ui.components.TransactionStatus
+import one.monero.moneroone.ui.components.TransactionStatusIndicator
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -53,23 +72,41 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun WalletScreen(
     walletViewModel: WalletViewModel,
+    isTestnet: Boolean,
     onSendClick: () -> Unit,
     onReceiveClick: () -> Unit,
-    onTransactionClick: (TransactionInfo) -> Unit
+    onTransactionClick: (TransactionInfo) -> Unit,
+    onSeeAllTransactionsClick: () -> Unit,
+    onBalanceClick: (() -> Unit)? = null
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
+    val currentPrice by walletViewModel.currentPrice.collectAsState()
+
+    // Calculate fiat value from balance × current price
+    val fiatValue = currentPrice?.price?.let { price ->
+        val balanceXmr = walletState.balance.all.toDouble() / 1_000_000_000_000.0
+        "≈ $${String.format("%.2f", balanceXmr * price)}"
+    }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        item { Spacer(modifier = Modifier.height(8.dp)) }
+        item { Spacer(modifier = Modifier.height(12.dp)) }
 
         // Greeting header
         item {
             GreetingHeader()
+        }
+
+        // Testnet banner
+        if (isTestnet) {
+            item {
+                TestnetBanner()
+            }
         }
 
         // Balance card
@@ -77,9 +114,15 @@ fun WalletScreen(
             BalanceCard(
                 balance = walletViewModel.formatXmr(walletState.balance.all),
                 unlockedBalance = walletViewModel.formatXmr(walletState.balance.unlocked),
-                syncState = walletState.syncState
+                fiatValue = fiatValue,
+                syncState = walletState.syncState,
+                priceChange24h = currentPrice?.change24h,
+                onClick = onBalanceClick
             )
         }
+
+        // Extra space before buttons
+        item { Spacer(modifier = Modifier.height(4.dp)) }
 
         // Action buttons
         item {
@@ -120,7 +163,8 @@ fun WalletScreen(
                     Text(
                         text = "See All",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MoneroOrange
+                        color = MoneroOrange,
+                        modifier = Modifier.clickable { onSeeAllTransactionsClick() }
                     )
                 }
             }
@@ -153,121 +197,123 @@ fun WalletScreen(
 
 @Composable
 private fun GreetingHeader() {
-    val greeting = when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
+    val greeting = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
         in 0..11 -> "Good Morning"
         in 12..16 -> "Good Afternoon"
         else -> "Good Evening"
     }
 
-    Text(
-        text = greeting,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = greeting,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        // Wallet icon (matching iOS - same background as GlassCard)
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .shadow(4.dp, RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.AccountBalanceWallet,
+                contentDescription = "Wallet",
+                tint = MoneroOrange,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
 }
 
 @Composable
 private fun BalanceCard(
     balance: String,
     unlockedBalance: String,
-    syncState: SyncState
+    fiatValue: String?,
+    syncState: SyncState,
+    priceChange24h: Double? = null,
+    onClick: (() -> Unit)? = null
 ) {
-    GradientCard(
-        modifier = Modifier.fillMaxWidth()
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
-            // Sync status
+            // Top row with sync status and price change (matching iOS)
             Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                when (syncState) {
-                    is SyncState.Synced -> {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(SuccessGreen)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Synced",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
-                    is SyncState.Syncing -> {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(12.dp),
-                            strokeWidth = 2.dp,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val progressPercent = ((syncState.progress ?: 0.0) * 100).toInt()
-                        Text(
-                            text = "Syncing $progressPercent%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
-                    is SyncState.Connecting -> {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(12.dp),
-                            strokeWidth = 2.dp,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Connecting...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
-                    is SyncState.NotSynced -> {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(ErrorRed)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Not connected",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
+                // Sync status
+                val status = when (syncState) {
+                    is SyncState.Synced -> SyncStatus.Synced
+                    is SyncState.Syncing -> SyncStatus.Syncing
+                    is SyncState.Connecting -> SyncStatus.Connecting
+                    is SyncState.NotSynced -> SyncStatus.NotConnected
+                }
+                val progress = (syncState as? SyncState.Syncing)?.progress
+
+                SyncStatusIndicator(
+                    status = status,
+                    progress = progress
+                )
+
+                // Price change indicator (moved from bottom to top right like iOS)
+                if (priceChange24h != null) {
+                    PriceChangeIndicator(priceChange = priceChange24h)
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Balance
-            Text(
-                text = "Balance",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.7f)
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
+            // Balance row with Monero logo on left (matching iOS)
             Row(
-                verticalAlignment = Alignment.Bottom
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = balance,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "XMR",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
+                // Monero logo on left of balance
+                MoneroLogo(size = 48.dp)
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Balance amount
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = balance,
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "XMR",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
+
+                    // Fiat value below balance
+                    if (fiatValue != null) {
+                        Text(
+                            text = fiatValue,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
             }
 
             // Unlocked balance if different
@@ -276,10 +322,53 @@ private fun BalanceCard(
                 Text(
                     text = "Unlocked: $unlockedBalance XMR",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+
+            // Sync progress bar
+            if (syncState is SyncState.Syncing) {
+                Spacer(modifier = Modifier.height(12.dp))
+                LinearProgressIndicator(
+                    progress = { (syncState.progress?.toFloat() ?: 0f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = MoneroOrange,
+                    trackColor = MoneroOrange.copy(alpha = 0.3f),
+                    strokeCap = StrokeCap.Round
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PriceChangeIndicator(priceChange: Double) {
+    val isPositive = priceChange >= 0
+    val color = if (isPositive) SuccessGreen else ErrorRed
+    val icon = if (isPositive) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(color.copy(alpha = 0.2f))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = String.format("%.1f%%", kotlin.math.abs(priceChange)),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = color
+        )
     }
 }
 
@@ -298,7 +387,7 @@ private fun ActionButton(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 14.dp),
+                .padding(vertical = 18.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -333,7 +422,8 @@ private fun EmptyTransactionsCard(isSyncing: Boolean) {
             if (isSyncing) {
                 CircularProgressIndicator(
                     color = MoneroOrange,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(32.dp),
+                    strokeWidth = 3.dp
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
@@ -385,7 +475,7 @@ private fun TransactionCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon
+            // Direction icon
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -429,27 +519,14 @@ private fun TransactionCard(
                 Spacer(modifier = Modifier.height(2.dp))
 
                 // Status indicator
-                val (statusText, statusColor) = when {
-                    transaction.isFailed -> "Failed" to ErrorRed
-                    transaction.confirmations == 0L -> "Pending" to MoneroOrange
-                    transaction.confirmations < 10 -> "Locked" to MoneroOrange
-                    else -> "Confirmed" to SuccessGreen
+                val status = when {
+                    transaction.isFailed -> TransactionStatus.Failed
+                    transaction.confirmations == 0L -> TransactionStatus.Pending
+                    transaction.confirmations < 10 -> TransactionStatus.Locked
+                    else -> TransactionStatus.Confirmed
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(statusColor)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = statusText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = statusColor
-                    )
-                }
+                TransactionStatusIndicator(status = status)
             }
 
             Spacer(modifier = Modifier.width(8.dp))

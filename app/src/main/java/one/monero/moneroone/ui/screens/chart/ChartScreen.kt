@@ -1,69 +1,85 @@
 package one.monero.moneroone.ui.screens.chart
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import one.monero.moneroone.data.model.PriceDataPoint
+import one.monero.moneroone.data.util.calculateChartIndex
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.GlassSegmentedPicker
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.Currency
+import java.util.Date
 import java.util.Locale
-import kotlin.random.Random
 
 enum class TimeRange(val label: String, val days: Int) {
     DAY("24H", 1),
-    WEEK("7D", 7),
-    MONTH("30D", 30),
-    YEAR("1Y", 365)
+    WEEK("1W", 7),
+    MONTH("1M", 30),
+    YEAR("1Y", 365),
+    ALL("All", 1825)
 }
 
 @Composable
-fun ChartScreen() {
-    var selectedRange by remember { mutableStateOf(TimeRange.WEEK) }
-    var currentPrice by remember { mutableStateOf(150.0) }
-    var priceChange by remember { mutableStateOf(2.5) }
-    var priceData by remember { mutableStateOf<List<Double>>(emptyList()) }
-
-    // Simulate loading price data
-    LaunchedEffect(selectedRange) {
-        withContext(Dispatchers.IO) {
-            val prices = generateMockPriceData(selectedRange.days)
-            currentPrice = prices.last()
-            priceChange = ((prices.last() - prices.first()) / prices.first()) * 100
-            priceData = prices
-        }
-    }
+fun ChartScreen(
+    viewModel: ChartViewModel = viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val selectedRange by viewModel.selectedTimeRange.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -77,131 +93,160 @@ fun ChartScreen() {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Price display
+        // Price display card
         GlassCard(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(20.dp)
+                modifier = Modifier
+                    .padding(20.dp)
+                    .animateContentSize(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    )
             ) {
+                val selectedPoint = uiState.selectedPoint
+                val isShowingSelection = selectedPoint != null
+
                 Text(
-                    text = "Current Price",
+                    text = if (isShowingSelection) formatDate(selectedPoint!!.timestamp, selectedRange) else "Current Price",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Text(
-                    text = formatCurrency(currentPrice),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                // Show selected point price, or current price, or fall back to latest chart price
+                val displayPrice = selectedPoint?.price ?: uiState.currentPrice ?: uiState.close
+                if (displayPrice != null) {
+                    Text(
+                        text = formatCurrency(displayPrice),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else if (uiState.isLoading) {
+                    Text(
+                        text = "Loading...",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val changeColor = if (priceChange >= 0) SuccessGreen else ErrorRed
-                val changePrefix = if (priceChange >= 0) "+" else ""
+                val priceChange = uiState.priceChange
+                if (priceChange != null) {
+                    val changeColor = if (priceChange >= 0) SuccessGreen else ErrorRed
+                    val changePrefix = if (priceChange >= 0) "+" else ""
 
-                Text(
-                    text = "$changePrefix${String.format("%.2f", priceChange)}%",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = changeColor
-                )
+                    Text(
+                        text = "$changePrefix${String.format(Locale.US, "%.2f", priceChange)}% (${selectedRange.label})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = changeColor
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // Time range selector
-        Row(
+        GlassSegmentedPicker(
+            options = TimeRange.entries.toList(),
+            selectedOption = selectedRange,
+            onOptionSelected = { viewModel.selectTimeRange(it) },
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            labelSelector = { it.label }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Chart area
+        GlassCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
         ) {
-            TimeRange.entries.forEach { range ->
-                FilterChip(
-                    selected = selectedRange == range,
-                    onClick = { selectedRange = range },
-                    label = { Text(range.label) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MoneroOrange,
-                        selectedLabelColor = Color.White
+            if (uiState.isLoading && uiState.chartData.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = MoneroOrange,
+                        strokeWidth = 3.dp
                     )
+                }
+            } else if (uiState.chartData.isNotEmpty()) {
+                PriceChart(
+                    data = uiState.chartData,
+                    selectedPoint = uiState.selectedPoint,
+                    onPointSelected = { viewModel.selectPoint(it) },
+                    timeRange = selectedRange,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
                 )
+            } else if (uiState.error != null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Failed to load chart",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Simple chart placeholder (Vico requires more setup)
-        GlassCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(250.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
+        // Price stats (High/Low/Open/Close)
+        if (uiState.chartData.isNotEmpty()) {
+            GlassCard(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Simple price range display instead of full chart
                 Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (priceData.isNotEmpty()) {
-                        val min = priceData.minOrNull() ?: 0.0
-                        val max = priceData.maxOrNull() ?: 0.0
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        StatItem(
+                            label = "High",
+                            value = uiState.high?.let { formatCurrency(it) } ?: "-",
+                            valueColor = SuccessGreen
+                        )
+                        StatItem(
+                            label = "Low",
+                            value = uiState.low?.let { formatCurrency(it) } ?: "-",
+                            valueColor = ErrorRed
+                        )
+                    }
 
-                        Text(
-                            text = "Price Range",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        StatItem(
+                            label = "Open",
+                            value = uiState.open?.let { formatCurrency(it) } ?: "-"
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "High: ${formatCurrency(max)}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = SuccessGreen
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Low: ${formatCurrency(min)}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = ErrorRed
+                        StatItem(
+                            label = "Close",
+                            value = uiState.close?.let { formatCurrency(it) } ?: "-"
                         )
                     }
                 }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Market stats
-        Text(
-            text = "Market Stats",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        GlassCard(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                StatRow("Market Cap", "$2.8B")
-                Spacer(modifier = Modifier.height(12.dp))
-                StatRow("24h Volume", "$95M")
-                Spacer(modifier = Modifier.height(12.dp))
-                StatRow("Circulating Supply", "18.4M XMR")
-                Spacer(modifier = Modifier.height(12.dp))
-                StatRow("All-Time High", "$542.33")
             }
         }
 
@@ -210,20 +255,202 @@ fun ChartScreen() {
 }
 
 @Composable
-private fun StatRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+private fun PriceChart(
+    data: List<PriceDataPoint>,
+    selectedPoint: PriceDataPoint?,
+    onPointSelected: (PriceDataPoint?) -> Unit,
+    timeRange: TimeRange,
+    modifier: Modifier = Modifier
+) {
+    val lineColor = MoneroOrange
+    val areaTopColor = MoneroOrange.copy(alpha = 0.4f)
+    val areaBottomColor = MoneroOrange.copy(alpha = 0.0f)
+    val axisColor = Color.Gray.copy(alpha = 0.5f)
+    val textMeasurer = rememberTextMeasurer()
+    val labelStyle = TextStyle(fontSize = 10.sp, color = Color.Gray)
+
+    var chartWidth by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+
+    // Margins for axis labels
+    val rightMargin = 45f
+    val bottomMargin = 20f
+
+    Canvas(
+        modifier = modifier.pointerInput(data) {
+            detectHorizontalDragGestures(
+                onDragStart = { offset ->
+                    isDragging = true
+                    chartWidth = size.width.toFloat() - rightMargin
+                    val index = calculateChartIndex(offset.x, chartWidth, data.size)
+                    data.getOrNull(index)?.let { onPointSelected(it) }
+                },
+                onHorizontalDrag = { change, _ ->
+                    change.consume()
+                    val index = calculateChartIndex(change.position.x, chartWidth, data.size)
+                    data.getOrNull(index)?.let { onPointSelected(it) }
+                },
+                onDragEnd = {
+                    isDragging = false
+                    onPointSelected(null)
+                },
+                onDragCancel = {
+                    isDragging = false
+                    onPointSelected(null)
+                }
+            )
+        }
     ) {
+        if (data.isEmpty()) return@Canvas
+
+        val width = size.width - rightMargin
+        val height = size.height - bottomMargin
+        chartWidth = width
+
+        val min = data.minOfOrNull { it.price } ?: 0.0
+        val max = data.maxOfOrNull { it.price } ?: 0.0
+        val range = (max - min).coerceAtLeast(0.01)
+        val verticalPadding = height * 0.05f
+
+        val pointWidth = width / (data.size - 1).coerceAtLeast(1)
+
+        // Draw Y-axis labels (price) on the RIGHT side - only 3 labels to avoid cramping
+        val yLabelCount = 2
+        for (i in 0..yLabelCount) {
+            val price = min + (range * i / yLabelCount)
+            val y = height - verticalPadding - ((price - min) / range * (height - 2 * verticalPadding)).toFloat()
+            val label = "$${String.format(Locale.US, "%.0f", price)}"
+            val textLayout = textMeasurer.measure(label, labelStyle)
+            // Clamp y position so labels don't go outside chart area
+            val clampedY = y.coerceIn(textLayout.size.height / 2f, height - textLayout.size.height / 2f)
+            drawText(
+                textLayoutResult = textLayout,
+                topLeft = Offset(width + 6f, clampedY - textLayout.size.height / 2)
+            )
+            // Draw horizontal grid line
+            drawLine(
+                color = axisColor.copy(alpha = 0.15f),
+                start = Offset(0f, y),
+                end = Offset(width, y),
+                strokeWidth = 1f
+            )
+        }
+
+        // Draw X-axis labels (dates) - only middle labels, skip first and last to avoid cramping
+        val xLabelCount = 3
+        val datePattern = when (timeRange) {
+            TimeRange.DAY -> "ha"
+            TimeRange.WEEK -> "EEE"
+            TimeRange.MONTH -> "M/d"
+            TimeRange.YEAR, TimeRange.ALL -> "MMM"
+        }
+        val dateFormat = SimpleDateFormat(datePattern, Locale.US)
+        for (i in 1..xLabelCount) {
+            val dataIndex = (data.size - 1) * i / (xLabelCount + 1)
+            val point = data.getOrNull(dataIndex) ?: continue
+            val x = dataIndex * pointWidth
+            val label = dateFormat.format(Date(point.timestamp))
+            val textLayout = textMeasurer.measure(label, labelStyle)
+            drawText(
+                textLayoutResult = textLayout,
+                topLeft = Offset(x - textLayout.size.width / 2, height + 4f)
+            )
+        }
+
+        // Create path for the line
+        val linePath = Path()
+        val areaPath = Path()
+
+        data.forEachIndexed { index, point ->
+            val x = index * pointWidth
+            val y = height - verticalPadding - ((point.price - min) / range * (height - 2 * verticalPadding)).toFloat()
+
+            if (index == 0) {
+                linePath.moveTo(x, y)
+                areaPath.moveTo(x, height)
+                areaPath.lineTo(x, y)
+            } else {
+                linePath.lineTo(x, y)
+                areaPath.lineTo(x, y)
+            }
+        }
+
+        // Complete area path
+        areaPath.lineTo(width, height)
+        areaPath.lineTo(0f, height)
+        areaPath.close()
+
+        // Draw area fill with gradient
+        drawPath(
+            path = areaPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(areaTopColor, areaBottomColor)
+            )
+        )
+
+        // Draw line
+        drawPath(
+            path = linePath,
+            color = lineColor,
+            style = Stroke(
+                width = 3f,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+
+        // Draw selected point indicator
+        selectedPoint?.let { selected ->
+            val index = data.indexOfFirst { it.timestamp == selected.timestamp }
+            if (index >= 0) {
+                val x = index * pointWidth
+                val y = height - verticalPadding - ((selected.price - min) / range * (height - 2 * verticalPadding)).toFloat()
+
+                // Draw dashed vertical line
+                drawLine(
+                    color = lineColor.copy(alpha = 0.6f),
+                    start = Offset(x, 0f),
+                    end = Offset(x, height),
+                    strokeWidth = 1.5f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
+                )
+
+                // Draw outer circle (white border)
+                drawCircle(
+                    color = Color.White,
+                    radius = 10f,
+                    center = Offset(x, y)
+                )
+
+                // Draw inner circle (orange)
+                drawCircle(
+                    color = lineColor,
+                    radius = 6f,
+                    center = Offset(x, y)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatItem(
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    Column {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = valueColor
         )
     }
 }
@@ -234,12 +461,13 @@ private fun formatCurrency(amount: Double): String {
     return format.format(amount)
 }
 
-private fun generateMockPriceData(days: Int): List<Double> {
-    val dataPoints = days * 24 // Hourly data
-    var price = 145.0
-    return List(dataPoints) {
-        price += (Random.nextDouble() - 0.48) * 2 // Slight upward bias
-        price = price.coerceIn(100.0, 200.0)
-        price
+private fun formatDate(timestamp: Long, range: TimeRange): String {
+    val date = Date(timestamp)  // CoinGecko returns milliseconds already
+    val pattern = when (range) {
+        TimeRange.DAY -> "h:mm a"
+        TimeRange.WEEK -> "EEE h:mm a"
+        TimeRange.MONTH -> "MMM d, h:mm a"
+        TimeRange.YEAR, TimeRange.ALL -> "MMM d, yyyy"
     }
+    return SimpleDateFormat(pattern, Locale.US).format(date)
 }

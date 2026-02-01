@@ -72,6 +72,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.process)
 
     // Compose
     implementation(libs.androidx.activity.compose)
@@ -100,9 +101,17 @@ dependencies {
     // Image Loading
     implementation(libs.coil.compose)
 
-    // QR Code
+    // QR Code generation
     implementation(libs.zxing.android.embedded)
     implementation(libs.qrcode.kotlin)
+
+    // CameraX + ML Kit (for QR scanning)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.barcode.scanning)
+    implementation("com.google.guava:guava:32.1.3-android")
 
     // Charts
     implementation(libs.vico.compose.m3)
@@ -117,6 +126,9 @@ dependencies {
     // Logging
     implementation(libs.timber)
     implementation(libs.netcipher)
+
+    // HD Wallet Kit (for BIP39 mnemonic generation)
+    implementation(libs.hd.wallet.kit)
 
     // Testing
     testImplementation(libs.junit)

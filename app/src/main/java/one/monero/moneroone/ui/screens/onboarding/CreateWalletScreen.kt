@@ -59,7 +59,7 @@ fun CreateWalletScreen(
     onBack: () -> Unit
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
-    var selectedSeedType by remember { mutableStateOf(SeedType.LEGACY_25) }
+    var selectedSeedType by remember { mutableStateOf(SeedType.BIP39_24) }
     var generatedSeed by remember { mutableStateOf<List<String>>(emptyList()) }
     var seedConfirmed by remember { mutableStateOf(false) }
 
@@ -161,12 +161,12 @@ private fun SeedTypeSelection(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Legacy 25-word option
+        // BIP39 24-word option (Recommended)
         SeedTypeCard(
-            title = "Legacy (25 words)",
-            description = "Traditional Monero seed format. Compatible with all Monero wallets.",
-            isSelected = selectedType == SeedType.LEGACY_25,
-            onClick = { onTypeSelected(SeedType.LEGACY_25) }
+            title = "BIP39 (24 words)",
+            description = "Recommended. High security format with maximum entropy.",
+            isSelected = selectedType == SeedType.BIP39_24,
+            onClick = { onTypeSelected(SeedType.BIP39_24) }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -174,19 +174,19 @@ private fun SeedTypeSelection(
         // BIP39 12-word option
         SeedTypeCard(
             title = "BIP39 (12 words)",
-            description = "Modern compact format. Easier to backup but less compatible.",
+            description = "Compact format. Easier to backup, slightly less entropy.",
             isSelected = selectedType == SeedType.BIP39_12,
             onClick = { onTypeSelected(SeedType.BIP39_12) }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // BIP39 24-word option
+        // Legacy 25-word option
         SeedTypeCard(
-            title = "BIP39 (24 words)",
-            description = "High security BIP39 format with maximum entropy.",
-            isSelected = selectedType == SeedType.BIP39_24,
-            onClick = { onTypeSelected(SeedType.BIP39_24) }
+            title = "Legacy (25 words)",
+            description = "Traditional Monero seed format. Compatible with all Monero wallets.",
+            isSelected = selectedType == SeedType.LEGACY_25,
+            onClick = { onTypeSelected(SeedType.LEGACY_25) }
         )
 
         Spacer(modifier = Modifier.height(32.dp))

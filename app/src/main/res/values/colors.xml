@@ -20,4 +20,7 @@
     <!-- Glass Effect Colors -->
     <color name="glass_background_light">#80FFFFFF</color>
     <color name="glass_background_dark">#40FFFFFF</color>
+
+    <!-- App Icon -->
+    <color name="ic_launcher_background">#FFFFFFFF</color>
 </resources>

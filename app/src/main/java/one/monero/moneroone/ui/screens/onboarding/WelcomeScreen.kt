@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import one.monero.moneroone.R
 import one.monero.moneroone.ui.theme.MoneroOrange
 
 @Composable
@@ -59,8 +61,10 @@ fun WelcomeScreen(
         ) {
             Spacer(modifier = Modifier.weight(1f))
 
-            // Animated Monero Logo
-            AnimatedMoneroLogo(
+            // Monero Logo
+            AsyncImage(
+                model = R.drawable.monero_logo,
+                contentDescription = "Monero",
                 modifier = Modifier.size(120.dp)
             )
 

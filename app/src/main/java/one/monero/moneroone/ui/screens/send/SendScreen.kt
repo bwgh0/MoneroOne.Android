@@ -1,13 +1,21 @@
 package one.monero.moneroone.ui.screens.send
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -15,8 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,11 +36,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,40 +53,57 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.theme.MoneroOrange
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SendScreen(
     walletViewModel: WalletViewModel,
+    initialAddress: String? = null,
+    initialAmount: String? = null,
     onBack: () -> Unit,
     onScanQr: () -> Unit,
     onSent: () -> Unit
 ) {
-    var address by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
+    var address by remember(initialAddress) { mutableStateOf(initialAddress ?: "") }
+    var amount by remember(initialAmount) { mutableStateOf(initialAmount ?: "") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSending by remember { mutableStateOf(false) }
 
     val walletState by walletViewModel.walletState.collectAsState()
     val maxAmount = walletViewModel.formatXmr(walletState.balance.unlocked)
 
-    val estimatedFee = remember(address, amount) {
-        if (address.isNotBlank() && amount.isNotBlank()) {
-            try {
-                val amountLong = walletViewModel.parseXmr(amount)
-                if (amountLong > 0) {
-                    walletViewModel.estimateFee(address, amountLong)
-                } else 0L
-            } catch (e: Exception) {
-                0L
+    var estimatedFee by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(address, amount) {
+        estimatedFee = if (address.isNotBlank() && amount.isNotBlank()) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val amountLong = walletViewModel.parseXmr(amount)
+                    if (amountLong > 0) {
+                        walletViewModel.estimateFee(address, amountLong)
+                    } else 0L
+                } catch (e: Exception) {
+                    0L
+                }
             }
         } else 0L
     }
 
+    val isValidInput = address.isNotBlank() && amount.isNotBlank() && errorMessage == null
+
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Send XMR") },
+                title = {
+                    Text(
+                        text = "Send XMR",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -85,7 +111,8 @@ fun SendScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
-                )
+                ),
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
             )
         }
     ) { padding ->
@@ -99,6 +126,13 @@ fun SendScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Recipient address
+            Text(
+                text = "Recipient Address",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
             OutlinedTextField(
                 value = address,
                 onValueChange = {
@@ -106,7 +140,6 @@ fun SendScreen(
                     errorMessage = null
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Recipient Address") },
                 placeholder = { Text("4...") },
                 trailingIcon = {
                     IconButton(onClick = onScanQr) {
@@ -118,10 +151,11 @@ fun SendScreen(
                     }
                 },
                 isError = errorMessage != null && address.isNotBlank(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MoneroOrange,
-                    cursorColor = MoneroOrange
+                    cursorColor = MoneroOrange,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
                 ),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
@@ -130,37 +164,56 @@ fun SendScreen(
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Amount
+            Text(
+                text = "Amount",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
             OutlinedTextField(
                 value = amount,
                 onValueChange = {
-                    // Only allow valid decimal input
                     if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) {
                         amount = it
                         errorMessage = null
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Amount") },
                 placeholder = { Text("0.0000") },
-                suffix = { Text("XMR") },
+                suffix = {
+                    Text(
+                        text = "XMR",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
                 trailingIcon = {
-                    TextButton(
-                        onClick = { amount = maxAmount }
-                    ) {
-                        Text("MAX", color = MoneroOrange)
+                    TextButton(onClick = { amount = maxAmount }) {
+                        Text(
+                            text = "MAX",
+                            color = MoneroOrange,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 },
                 supportingText = {
-                    Text("Available: $maxAmount XMR")
+                    Text(
+                        text = "Available: $maxAmount XMR",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 },
                 isError = errorMessage != null && amount.isNotBlank(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MoneroOrange,
-                    cursorColor = MoneroOrange
+                    cursorColor = MoneroOrange,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
                 ),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Decimal,
@@ -169,19 +222,28 @@ fun SendScreen(
                 singleLine = true
             )
 
-            if (errorMessage != null) {
-                Spacer(modifier = Modifier.height(8.dp))
+            // Error message
+            AnimatedVisibility(
+                visible = errorMessage != null,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
                 Text(
-                    text = errorMessage!!,
+                    text = errorMessage ?: "",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Transaction summary
-            if (address.isNotBlank() && amount.isNotBlank() && estimatedFee > 0) {
+            AnimatedVisibility(
+                visible = isValidInput && estimatedFee > 0,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
                 GlassCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -201,18 +263,18 @@ fun SendScreen(
                             value = "$amount XMR"
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         SummaryRow(
                             label = "Network Fee",
                             value = "${walletViewModel.formatXmr(estimatedFee)} XMR"
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        HorizontalDivider()
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         val totalAmount = walletViewModel.parseXmr(amount) + estimatedFee
                         SummaryRow(
@@ -227,7 +289,7 @@ fun SendScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             // Send button
-            Button(
+            PrimaryButton(
                 onClick = {
                     when {
                         address.isBlank() -> errorMessage = "Please enter a recipient address"
@@ -242,6 +304,7 @@ fun SendScreen(
                             errorMessage = "Insufficient balance"
                         }
                         else -> {
+                            isSending = true
                             walletViewModel.send(
                                 address = address,
                                 amount = walletViewModel.parseXmr(amount)
@@ -253,16 +316,14 @@ fun SendScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MoneroOrange,
-                    contentColor = Color.White
-                ),
-                enabled = address.isNotBlank() && amount.isNotBlank()
+                enabled = isValidInput && !isSending,
+                color = MoneroOrange
             ) {
                 Text(
-                    text = "Send XMR",
-                    style = MaterialTheme.typography.titleMedium
+                    text = if (isSending) "Sending..." else "Send XMR",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
             }
 

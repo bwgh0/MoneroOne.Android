@@ -5,10 +5,15 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Background circle -->
+    <!-- Top half - Orange -->
     <path
         android:fillColor="#FFFF7500"
-        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0"/>
+        android:pathData="M54,14 A40,40 0 0,1 94,54 L14,54 A40,40 0 0,1 54,14 Z"/>
+
+    <!-- Bottom half - Gray -->
+    <path
+        android:fillColor="#FF4C4C4C"
+        android:pathData="M14,54 A40,40 0 0,0 94,54 L14,54 Z"/>
 
     <!-- Monero M shape -->
     <path

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#FFFF7500"
+        android:pathData="M24,24m-24,0a24,24 0,1 1,48 0a24,24 0,1 1,-48 0"/>
+
+    <!-- Monero M shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10,35 L10,18 L24,28 L38,18 L38,35 L34,35 L34,24 L24,31 L14,24 L14,35 Z"/>
+
+</vector>
