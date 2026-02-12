@@ -72,7 +72,7 @@ fun WelcomeScreen(
 
             // Title
             Text(
-                text = "Welcome to\nMoneroOne",
+                text = "Monero One",
                 style = MaterialTheme.typography.headlineLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onBackground
@@ -82,7 +82,7 @@ fun WelcomeScreen(
 
             // Subtitle
             Text(
-                text = "Your gateway to private,\ndecentralized money",
+                text = "Simple. Private. Secure.",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)

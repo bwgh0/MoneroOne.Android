@@ -232,7 +232,7 @@ private fun MainAddressCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Using your main address links all transactions. Consider using subaddresses for privacy.",
+                    text = "Main address links all transactions. Use subaddresses for privacy.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )

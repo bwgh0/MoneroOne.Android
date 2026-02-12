@@ -1,6 +1,8 @@
 package one.monero.moneroone.ui.screens.chart
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -15,10 +17,12 @@ import one.monero.moneroone.data.model.PriceDataPoint
 import one.monero.moneroone.data.repository.PriceRepository
 import timber.log.Timber
 
-class ChartViewModel : ViewModel() {
+class ChartViewModel(application: Application) : AndroidViewModel(application) {
 
     private val priceRepository = PriceRepository()
+    private val prefs = application.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
     private var chartLoadJob: Job? = null
+    private var priceLoadJob: Job? = null
 
     private val _uiState = MutableStateFlow(ChartUiState())
     val uiState: StateFlow<ChartUiState> = _uiState.asStateFlow()
@@ -29,7 +33,14 @@ class ChartViewModel : ViewModel() {
     private val _selectedCurrency = MutableStateFlow(Currency.USD)
     val selectedCurrency: StateFlow<Currency> = _selectedCurrency.asStateFlow()
 
+    // Conversion rate from USD to selected currency (for chart data conversion)
+    private val _usdToSelectedRate = MutableStateFlow(1.0)
+    val usdToSelectedRate: StateFlow<Double> = _usdToSelectedRate.asStateFlow()
+
     init {
+        // Load saved currency from preferences
+        val savedCode = prefs.getString("selected_currency", Currency.USD.code)
+        _selectedCurrency.value = Currency.entries.find { it.code == savedCode } ?: Currency.USD
         loadData()
     }
 
@@ -43,8 +54,12 @@ class ChartViewModel : ViewModel() {
     }
 
     fun selectCurrency(currency: Currency) {
+        if (_selectedCurrency.value == currency) return
         _selectedCurrency.value = currency
-        loadCurrentPrice()
+        // Persist to SharedPreferences (same key as WalletViewModel)
+        prefs.edit().putString("selected_currency", currency.code).apply()
+        // Reload all data with new currency (this sets the conversion rate from the response)
+        loadData()
     }
 
     fun selectPoint(point: PriceDataPoint?) {
@@ -65,21 +80,50 @@ class ChartViewModel : ViewModel() {
     }
 
     private fun loadCurrentPrice() {
-        viewModelScope.launch {
-            val result = priceRepository.fetchCurrentPrice(_selectedCurrency.value)
-            result.fold(
-                onSuccess = { price ->
-                    _uiState.update { state ->
-                        state.copy(
-                            currentPrice = price.price,
-                            priceChange = price.change24h,
-                            error = null
-                        )
+        // Cancel any pending price fetch to prevent race conditions
+        priceLoadJob?.cancel()
+
+        priceLoadJob = viewModelScope.launch {
+            val currency = _selectedCurrency.value
+            priceRepository.fetchCurrentPrice(currency).fold(
+                onSuccess = { result ->
+                    // Only update if this is still the selected currency
+                    if (_selectedCurrency.value == currency) {
+                        // Set the conversion rate from the API response
+                        _usdToSelectedRate.value = result.usdToSelectedRate
+                        Timber.d("Conversion rate for ${currency.code}: ${result.usdToSelectedRate}")
+                        _uiState.update { state ->
+                            state.copy(
+                                currentPrice = result.price,
+                                priceChange = result.change24h,
+                                error = null
+                            )
+                        }
                     }
                 },
                 onFailure = { e ->
-                    Timber.e(e, "Failed to fetch current price")
-                    _uiState.update { it.copy(error = e.message) }
+                    Timber.e(e, "Failed to fetch current price, retrying...")
+                    // Retry once after a short delay (handles rate limiting from CurrencyScreen)
+                    kotlinx.coroutines.delay(1000)
+                    priceRepository.fetchCurrentPrice(currency).fold(
+                        onSuccess = { result ->
+                            // Only update if this is still the selected currency
+                            if (_selectedCurrency.value == currency) {
+                                _usdToSelectedRate.value = result.usdToSelectedRate
+                                _uiState.update { state ->
+                                    state.copy(
+                                        currentPrice = result.price,
+                                        priceChange = result.change24h,
+                                        error = null
+                                    )
+                                }
+                            }
+                        },
+                        onFailure = { e2 ->
+                            Timber.e(e2, "Retry failed for current price")
+                            _uiState.update { it.copy(error = e2.message) }
+                        }
+                    )
                 }
             )
         }
@@ -93,10 +137,11 @@ class ChartViewModel : ViewModel() {
             _uiState.update { it.copy(isLoading = true) }
 
             val range = _selectedTimeRange.value
-            val result = priceRepository.fetchChartData(range)
+            val currency = _selectedCurrency.value
+            val result = priceRepository.fetchChartData(range, currency)
 
-            // Only update if this is still the selected range (in case user switched while loading)
-            if (_selectedTimeRange.value != range) return@launch
+            // Only update if this is still the selected range/currency (in case user switched while loading)
+            if (_selectedTimeRange.value != range || _selectedCurrency.value != currency) return@launch
 
             result.fold(
                 onSuccess = { data ->

@@ -1,7 +1,6 @@
 package one.monero.moneroone.ui.screens.settings
 
 import android.content.Context
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,28 +14,23 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,23 +39,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.SyncState
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
-import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
+import one.monero.moneroone.ui.theme.ErrorRed
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-enum class SyncMode(val title: String, val subtitle: String, val enabled: Boolean) {
-    PRIVACY("Privacy Mode", "Full sync with remote node", true),
-    LITE("Lite Mode", "Coming Soon", false)
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SyncSettingsScreen(
     walletViewModel: WalletViewModel,
@@ -72,15 +63,12 @@ fun SyncSettingsScreen(
     val prefs = remember { context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE) }
     val walletState by walletViewModel.walletState.collectAsState()
 
-    var selectedSyncMode by remember {
-        val savedMode = prefs.getString("sync_mode", SyncMode.PRIVACY.name)
-        mutableStateOf(SyncMode.entries.find { it.name == savedMode } ?: SyncMode.PRIVACY)
+    var showDatePicker by remember { mutableStateOf(false) }
+    var restoreHeight by remember {
+        mutableStateOf(prefs.getLong("restore_height", 0L))
     }
 
-    var showRestoreHeightDialog by remember { mutableStateOf(false) }
-    var restoreHeight by remember {
-        mutableStateOf(prefs.getString("restore_height", "0") ?: "0")
-    }
+    val dateFormatter = remember { SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()) }
 
     Column(
         modifier = Modifier
@@ -168,34 +156,12 @@ fun SyncSettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Sync Mode Section
-        SectionLabel("SYNC MODE")
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SyncMode.entries.forEach { mode ->
-                SyncModeItem(
-                    mode = mode,
-                    isSelected = mode == selectedSyncMode,
-                    onClick = {
-                        if (mode.enabled) {
-                            selectedSyncMode = mode
-                            prefs.edit().putString("sync_mode", mode.name).apply()
-                        }
-                    }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Restore Height Section
-        SectionLabel("RESTORE HEIGHT")
+        SectionLabel("WALLET BIRTHDAY")
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            onClick = { showRestoreHeightDialog = true }
+            onClick = { showDatePicker = true }
         ) {
             Row(
                 modifier = Modifier
@@ -212,13 +178,19 @@ fun SyncSettingsScreen(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Restore Height",
+                        text = "Restore Date",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(2.dp))
+                    val displayText = if (restoreHeight > 0) {
+                        val estimatedDate = restoreHeightToDate(restoreHeight)
+                        "${dateFormatter.format(estimatedDate)} (Block $restoreHeight)"
+                    } else {
+                        "From beginning (full scan)"
+                    }
                     Text(
-                        text = "Block $restoreHeight",
+                        text = displayText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MoneroOrange
                     )
@@ -279,18 +251,49 @@ fun SyncSettingsScreen(
         Spacer(modifier = Modifier.height(32.dp))
     }
 
-    // Restore Height Dialog
-    if (showRestoreHeightDialog) {
-        RestoreHeightDialog(
-            currentHeight = restoreHeight,
-            onConfirm = { newHeight ->
-                restoreHeight = newHeight
-                prefs.edit().putString("restore_height", newHeight).apply()
-                walletViewModel.setRestoreHeight(newHeight.toLongOrNull() ?: 0)
-                showRestoreHeightDialog = false
-            },
-            onDismiss = { showRestoreHeightDialog = false }
+    // Date Picker Dialog
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = if (restoreHeight > 0) {
+                restoreHeightToDate(restoreHeight).time
+            } else {
+                System.currentTimeMillis()
+            }
         )
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { dateMillis ->
+                            val newHeight = dateToRestoreHeight(dateMillis)
+                            restoreHeight = newHeight
+                            prefs.edit().putLong("restore_height", newHeight).apply()
+                            walletViewModel.setRestoreHeight(newHeight)
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK", color = MoneroOrange)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        // Clear / scan from beginning
+                        restoreHeight = 0L
+                        prefs.edit().putLong("restore_height", 0L).apply()
+                        walletViewModel.setRestoreHeight(0L)
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("Scan All")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 }
 
@@ -303,128 +306,6 @@ private fun SectionLabel(text: String) {
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
         letterSpacing = MaterialTheme.typography.labelMedium.letterSpacing * 1.5f,
         modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
-    )
-}
-
-@Composable
-private fun SyncModeItem(
-    mode: SyncMode,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (mode == SyncMode.PRIVACY) Icons.Default.Lock else Icons.Default.Storage,
-                contentDescription = null,
-                tint = if (mode.enabled) {
-                    if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                },
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = mode.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    color = if (mode.enabled) {
-                        if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    }
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = mode.subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-            if (isSelected && mode.enabled) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Selected",
-                    tint = MoneroOrange,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RestoreHeightDialog(
-    currentHeight: String,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var height by remember { mutableStateOf(currentHeight) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Restore Height") },
-        text = {
-            Column {
-                Text(
-                    text = "Enter the block height from which to restore your wallet. A lower height means scanning more blocks.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = height,
-                    onValueChange = {
-                        if (it.isEmpty() || it.all { c -> c.isDigit() }) {
-                            height = it
-                            error = null
-                        }
-                    },
-                    label = { Text("Block Height") },
-                    placeholder = { Text("0") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    isError = error != null,
-                    supportingText = error?.let { { Text(it, color = ErrorRed) } },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MoneroOrange,
-                        cursorColor = MoneroOrange
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val h = height.toLongOrNull() ?: 0
-                    if (h < 0) {
-                        error = "Invalid height"
-                    } else {
-                        onConfirm(height.ifEmpty { "0" })
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = MoneroOrange)
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
     )
 }
 
@@ -444,4 +325,33 @@ private fun getSyncStatusColor(syncState: SyncState): androidx.compose.ui.graphi
         is SyncState.NotSynced -> ErrorRed
         else -> MoneroOrange
     }
+}
+
+/**
+ * Converts a date (in milliseconds) to an estimated Monero block height.
+ * Monero mainnet started on April 18, 2014 (block 0).
+ * Average block time is ~2 minutes (120 seconds).
+ */
+private fun dateToRestoreHeight(dateMillis: Long): Long {
+    // Monero mainnet genesis: April 18, 2014 00:00:00 UTC
+    val genesisTimestamp = 1397782800000L
+
+    if (dateMillis <= genesisTimestamp) {
+        return 0L
+    }
+
+    val secondsSinceGenesis = (dateMillis - genesisTimestamp) / 1000
+    val estimatedHeight = secondsSinceGenesis / 120
+
+    // Subtract some blocks as safety margin (1 day = ~720 blocks)
+    return maxOf(0L, estimatedHeight - 720)
+}
+
+/**
+ * Converts a block height back to an estimated date.
+ */
+private fun restoreHeightToDate(height: Long): Date {
+    val genesisTimestamp = 1397782800000L
+    val estimatedMillis = genesisTimestamp + (height * 120 * 1000)
+    return Date(estimatedMillis)
 }

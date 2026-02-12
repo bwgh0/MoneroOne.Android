@@ -55,7 +55,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.data.model.PriceDataPoint
 import one.monero.moneroone.data.util.calculateChartIndex
@@ -71,27 +70,30 @@ import java.text.SimpleDateFormat
 import java.util.Currency
 import java.util.Date
 import java.util.Locale
+import one.monero.moneroone.data.model.Currency as AppCurrency
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PortfolioChartScreen(
     walletViewModel: WalletViewModel,
     onBack: () -> Unit,
-    chartViewModel: ChartViewModel = viewModel()
+    chartViewModel: ChartViewModel
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
     val chartUiState by chartViewModel.uiState.collectAsState()
     val selectedRange by chartViewModel.selectedTimeRange.collectAsState()
+    val selectedCurrency by chartViewModel.selectedCurrency.collectAsState()
+    val conversionRate by chartViewModel.usdToSelectedRate.collectAsState()
 
     // Calculate balance in XMR
     val balanceXmr = walletState.balance.all.toDouble() / 1_000_000_000_000.0
 
-    // Convert chart data to portfolio value
-    val portfolioData = remember(chartUiState.chartData, balanceXmr) {
+    // Convert chart data to portfolio value (apply conversion rate for currency)
+    val portfolioData = remember(chartUiState.chartData, balanceXmr, conversionRate) {
         chartUiState.chartData.map { point ->
             PriceDataPoint(
                 timestamp = point.timestamp,
-                price = point.price * balanceXmr
+                price = point.price * balanceXmr * conversionRate
             )
         }
     }
@@ -99,7 +101,7 @@ fun PortfolioChartScreen(
     val selectedPoint = chartUiState.selectedPoint?.let { point ->
         PriceDataPoint(
             timestamp = point.timestamp,
-            price = point.price * balanceXmr
+            price = point.price * balanceXmr * conversionRate
         )
     }
 
@@ -108,7 +110,7 @@ fun PortfolioChartScreen(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Portfolio Value") },
+                title = { Text("Portfolio") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -154,13 +156,15 @@ fun PortfolioChartScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
+                    // currentPrice is already in selected currency from CoinGecko
+                    // chart data (close) is in USD, so we apply conversion rate
                     val displayValue = selectedPoint?.price
                         ?: (chartUiState.currentPrice?.times(balanceXmr))
-                        ?: (chartUiState.close?.times(balanceXmr))
+                        ?: (chartUiState.close?.times(balanceXmr)?.times(conversionRate))
 
                     if (displayValue != null) {
                         Text(
-                            text = formatCurrency(displayValue),
+                            text = formatCurrency(displayValue, selectedCurrency),
                             style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -232,6 +236,7 @@ fun PortfolioChartScreen(
                     PortfolioChart(
                         data = portfolioData,
                         selectedPoint = selectedPoint,
+                        currency = selectedCurrency,
                         onPointSelected = { point ->
                             // Convert back to price point for the view model
                             if (point != null && balanceXmr > 0) {
@@ -256,7 +261,7 @@ fun PortfolioChartScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Failed to load chart",
+                            text = "Unable to load chart",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
@@ -281,13 +286,13 @@ fun PortfolioChartScreen(
                         val low = portfolioData.minOfOrNull { it.price }
 
                         StatItem(
-                            label = "High",
-                            value = high?.let { formatCurrency(it) } ?: "-",
+                            label = "${selectedRange.label} High",
+                            value = high?.let { formatCurrency(it, selectedCurrency) } ?: "-",
                             valueColor = SuccessGreen
                         )
                         StatItem(
-                            label = "Low",
-                            value = low?.let { formatCurrency(it) } ?: "-",
+                            label = "${selectedRange.label} Low",
+                            value = low?.let { formatCurrency(it, selectedCurrency) } ?: "-",
                             valueColor = ErrorRed
                         )
                     }
@@ -303,6 +308,7 @@ fun PortfolioChartScreen(
 private fun PortfolioChart(
     data: List<PriceDataPoint>,
     selectedPoint: PriceDataPoint?,
+    currency: AppCurrency,
     onPointSelected: (PriceDataPoint?) -> Unit,
     timeRange: TimeRange,
     modifier: Modifier = Modifier
@@ -352,10 +358,19 @@ private fun PortfolioChart(
 
         // Draw Y-axis labels
         val yLabelCount = 2
+        val currencySymbol = when (currency) {
+            AppCurrency.USD -> "$"
+            AppCurrency.EUR -> "€"
+            AppCurrency.GBP -> "£"
+            AppCurrency.CAD -> "C$"
+            AppCurrency.AUD -> "A$"
+            AppCurrency.JPY -> "¥"
+            AppCurrency.CNY -> "¥"
+        }
         for (i in 0..yLabelCount) {
             val price = min + (range * i / yLabelCount)
             val y = height - verticalPadding - ((price - min) / range * (height - 2 * verticalPadding)).toFloat()
-            val label = "$${String.format(Locale.US, "%.0f", price)}"
+            val label = "$currencySymbol${String.format(Locale.US, "%.0f", price)}"
             val textLayout = textMeasurer.measure(label, labelStyle)
             val clampedY = y.coerceIn(textLayout.size.height / 2f, height - textLayout.size.height / 2f)
             drawText(
@@ -485,9 +500,22 @@ private fun StatItem(
     }
 }
 
-private fun formatCurrency(amount: Double): String {
-    val format = NumberFormat.getCurrencyInstance(Locale.US)
-    format.currency = Currency.getInstance("USD")
+private fun formatCurrency(amount: Double, currency: AppCurrency): String {
+    val locale = when (currency) {
+        AppCurrency.USD -> Locale.US
+        AppCurrency.EUR -> Locale.GERMANY
+        AppCurrency.GBP -> Locale.UK
+        AppCurrency.CAD -> Locale.CANADA
+        AppCurrency.AUD -> Locale("en", "AU")
+        AppCurrency.JPY -> Locale.JAPAN
+        AppCurrency.CNY -> Locale.CHINA
+    }
+    val format = NumberFormat.getCurrencyInstance(locale)
+    try {
+        format.currency = Currency.getInstance(currency.code.uppercase())
+    } catch (e: Exception) {
+        // Fallback formatting
+    }
     return format.format(amount)
 }
 

@@ -1,6 +1,5 @@
 package one.monero.moneroone.ui.screens.settings
 
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,26 +18,20 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import one.monero.moneroone.data.model.Currency
-import one.monero.moneroone.data.repository.PriceRepository
+import one.monero.moneroone.data.model.CurrentPrice
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.MoneroOrange
 import java.text.NumberFormat
@@ -46,32 +39,12 @@ import java.util.Locale
 
 @Composable
 fun CurrencyScreen(
+    currentPrice: CurrentPrice?,
+    selectedCurrency: Currency,
+    isLoading: Boolean,
     onBack: () -> Unit,
     onCurrencySelected: (Currency) -> Unit
 ) {
-    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE) }
-    val priceRepository = remember { PriceRepository() }
-
-    var selectedCurrency by remember {
-        val savedCode = prefs.getString("selected_currency", Currency.USD.code)
-        mutableStateOf(Currency.entries.find { it.code == savedCode } ?: Currency.USD)
-    }
-
-    val prices = remember { mutableStateMapOf<Currency, Double?>() }
-
-    // Fetch current prices for all currencies
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            Currency.entries.forEach { currency ->
-                val result = priceRepository.fetchCurrentPrice(currency)
-                result.onSuccess { price ->
-                    prices[currency] = price.price
-                }
-            }
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -111,22 +84,169 @@ fun CurrencyScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Currency list (no prices per row - matches iOS)
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Currency.entries.forEach { currency ->
                 CurrencyItem(
                     currency = currency,
-                    price = prices[currency],
                     isSelected = currency == selectedCurrency,
-                    onClick = {
-                        selectedCurrency = currency
-                        prefs.edit().putString("selected_currency", currency.code).apply()
-                        onCurrencySelected(currency)
-                    }
+                    onClick = { onCurrencySelected(currency) }
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Current Price section
+        Text(
+            text = "CURRENT PRICE",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+        )
+
+        GlassCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                if (isLoading) {
+                    // Loading state
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MoneroOrange
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Fetching price...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                } else if (currentPrice != null) {
+                    // Price row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "1 XMR",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = formatPrice(currentPrice.price, selectedCurrency),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                    )
+
+                    // 24h change row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "24h Change",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+
+                        val change = currentPrice.change24h
+                        if (change != null) {
+                            val isPositive = change >= 0
+                            val changeColor = if (isPositive) Color(0xFF4CAF50) else Color(0xFFE53935)
+                            val arrow = if (isPositive) "\u2197" else "\u2198" // ↗ or ↘
+                            Text(
+                                text = "$arrow ${if (isPositive) "+" else ""}${String.format(Locale.US, "%.2f", change)}%",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = changeColor
+                            )
+                        } else {
+                            Text(
+                                text = "—",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                    )
+
+                    // Last updated row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Last Updated",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        Text(
+                            text = formatRelativeTime(currentPrice.lastUpdated),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                } else {
+                    // Error state (no price and not loading)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "\u26A0",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Unable to fetch price",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Footer
+        Text(
+            text = "Prices from CoinGecko",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
 
         Spacer(modifier = Modifier.height(32.dp))
     }
@@ -135,7 +255,6 @@ fun CurrencyScreen(
 @Composable
 private fun CurrencyItem(
     currency: Currency,
-    price: Double?,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -166,29 +285,11 @@ private fun CurrencyItem(
                     color = if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = currency.code.uppercase(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                    if (price != null) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "·",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "1 XMR = ${formatPrice(price, currency)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
+                Text(
+                    text = currency.code.uppercase(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
             }
 
             // Check mark if selected
@@ -222,5 +323,20 @@ private fun formatPrice(price: Double, currency: Currency): String {
         format.format(price)
     } catch (e: Exception) {
         "${currency.symbol}${String.format(Locale.US, "%.2f", price)}"
+    }
+}
+
+private fun formatRelativeTime(timestamp: Long): String {
+    val now = System.currentTimeMillis()
+    val diffMs = now - timestamp
+    val diffSeconds = diffMs / 1000
+    val diffMinutes = diffSeconds / 60
+    val diffHours = diffMinutes / 60
+
+    return when {
+        diffSeconds < 60 -> "Just now"
+        diffMinutes < 60 -> "${diffMinutes} min ago"
+        diffHours < 24 -> "${diffHours} hr ago"
+        else -> "${diffHours / 24} days ago"
     }
 }

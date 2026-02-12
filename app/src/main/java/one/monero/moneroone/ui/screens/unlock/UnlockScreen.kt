@@ -172,18 +172,9 @@ fun UnlockScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Welcome Back",
+            text = "Monero One",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Enter your PIN to unlock",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             textAlign = TextAlign.Center
         )
 

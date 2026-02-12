@@ -22,7 +22,42 @@ class PriceRepository {
         // CoinMarketCap API for chart data (matches iOS implementation)
         private const val CMC_CHART_URL = "https://api.coinmarketcap.com/data-api/v3.3/cryptocurrency/detail/chart"
         private const val MONERO_CMC_ID = 328
-        private const val USD_CMC_ID = 2781
+    }
+
+    /**
+     * Fetch prices for all supported currencies in a single API call.
+     * Returns a map of Currency to price.
+     */
+    suspend fun fetchAllPrices(): Result<Map<Currency, Double>> = withContext(Dispatchers.IO) {
+        try {
+            val currencies = Currency.entries.joinToString(",") { it.code }
+            val url = "$COINGECKO_BASE_URL/simple/price?ids=monero&vs_currencies=$currencies&include_24hr_change=true"
+
+            val response = fetchUrl(url)
+            val parsed = json.decodeFromString<CoinGeckoResponse>(response)
+
+            val priceData = parsed.monero
+                ?: return@withContext Result.failure(Exception("No price data available"))
+
+            val priceMap = mutableMapOf<Currency, Double>()
+            Currency.entries.forEach { currency ->
+                val price = when (currency) {
+                    Currency.USD -> priceData.usd
+                    Currency.EUR -> priceData.eur
+                    Currency.GBP -> priceData.gbp
+                    Currency.CAD -> priceData.cad
+                    Currency.AUD -> priceData.aud
+                    Currency.JPY -> priceData.jpy
+                    Currency.CNY -> priceData.cny
+                }
+                price?.let { priceMap[currency] = it }
+            }
+
+            Result.success(priceMap)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to fetch all prices")
+            Result.failure(e)
+        }
     }
 
     suspend fun fetchCurrentPrice(currency: Currency): Result<CurrentPrice> = withContext(Dispatchers.IO) {
@@ -36,7 +71,7 @@ class PriceRepository {
             val priceData = parsed.monero
                 ?: return@withContext Result.failure(Exception("No price data available"))
 
-            val price = when (currency) {
+            val selectedPrice = when (currency) {
                 Currency.USD -> priceData.usd
                 Currency.EUR -> priceData.eur
                 Currency.GBP -> priceData.gbp
@@ -45,6 +80,15 @@ class PriceRepository {
                 Currency.JPY -> priceData.jpy
                 Currency.CNY -> priceData.cny
             } ?: return@withContext Result.failure(Exception("Price not available for ${currency.code}"))
+
+            val usdPrice = priceData.usd ?: selectedPrice  // fallback if USD unavailable
+
+            // Calculate conversion rate from the prices we already have
+            val usdToSelectedRate = if (currency == Currency.USD || usdPrice == 0.0) {
+                1.0
+            } else {
+                selectedPrice / usdPrice
+            }
 
             val change = when (currency) {
                 Currency.USD -> priceData.usd24hChange
@@ -56,14 +100,14 @@ class PriceRepository {
                 Currency.CNY -> priceData.cny24hChange
             }
 
-            Result.success(CurrentPrice(price, change))
+            Result.success(CurrentPrice(selectedPrice, change, usdToSelectedRate))
         } catch (e: Exception) {
             Timber.e(e, "Failed to fetch current price")
             Result.failure(e)
         }
     }
 
-    suspend fun fetchChartData(range: TimeRange): Result<List<PriceDataPoint>> = withContext(Dispatchers.IO) {
+    suspend fun fetchChartData(range: TimeRange, currency: Currency = Currency.USD): Result<List<PriceDataPoint>> = withContext(Dispatchers.IO) {
         try {
             // CoinMarketCap range and interval parameters (matches iOS)
             val (rangeParam, interval) = when (range) {
@@ -74,7 +118,10 @@ class PriceRepository {
                 TimeRange.ALL -> "ALL" to "7d"
             }
 
-            val url = "$CMC_CHART_URL?id=$MONERO_CMC_ID&range=$rangeParam&interval=$interval&convertId=$USD_CMC_ID"
+            // IMPORTANT: Always fetch chart data in USD (convertId=2781)
+            // CMC API doesn't reliably return converted data, so we fetch in USD
+            // and apply conversion rate client-side (matching iOS implementation)
+            val url = "$CMC_CHART_URL?id=$MONERO_CMC_ID&range=$rangeParam&interval=$interval&convertId=2781"
 
             val response = fetchCmcUrl(url)
             val parsed = json.decodeFromString<CMCChartResponse>(response)

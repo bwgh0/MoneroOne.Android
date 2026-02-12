@@ -63,6 +63,7 @@ import one.monero.moneroone.ui.components.TransactionStatusIndicator
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -81,11 +82,17 @@ fun WalletScreen(
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
     val currentPrice by walletViewModel.currentPrice.collectAsState()
+    val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
 
-    // Calculate fiat value from balance × current price
+    // Calculate fiat value from balance × current price with correct currency symbol
     val fiatValue = currentPrice?.price?.let { price ->
         val balanceXmr = walletState.balance.all.toDouble() / 1_000_000_000_000.0
-        "≈ $${String.format("%.2f", balanceXmr * price)}"
+        val fiatAmount = balanceXmr * price
+        val format = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
+            minimumFractionDigits = 2
+            maximumFractionDigits = 2
+        }
+        "≈ ${selectedCurrency.symbol}${format.format(fiatAmount)}"
     }
 
     LazyColumn(
@@ -180,7 +187,12 @@ fun WalletScreen(
             }
         } else {
             items(
-                items = walletState.transactions.take(5),
+                items = walletState.transactions
+                    .sortedWith(
+                        compareBy<TransactionInfo> { it.confirmations > 0L }  // pending (0 confirmations) first
+                            .thenByDescending { it.timestamp }  // newest first within each group
+                    )
+                    .take(5),
                 key = { it.hash }
             ) { transaction ->
                 TransactionCard(
@@ -316,11 +328,11 @@ private fun BalanceCard(
                 }
             }
 
-            // Unlocked balance if different
+            // Available (unlocked) balance if different from total
             if (balance != unlockedBalance) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Unlocked: $unlockedBalance XMR",
+                    text = "Available: $unlockedBalance XMR",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )

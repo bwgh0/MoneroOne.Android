@@ -17,6 +17,7 @@ import io.horizontalsystems.monerokit.data.Subaddress
 import io.horizontalsystems.monerokit.model.NetworkType
 import io.horizontalsystems.monerokit.model.TransactionInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,10 +48,15 @@ data class PendingSeed(
 )
 
 enum class SeedType {
-    POLYSEED_16,    // 16-word Polyseed (embedded birthday - no date picker needed)
-    LEGACY_25,      // 25-word Electrum seed
-    BIP39_12,       // 12-word BIP39
-    BIP39_24        // 24-word BIP39
+    POLYSEED,       // 16-word Polyseed (embedded birthday - no date picker needed)
+    BIP39_24        // 24-word BIP39 (Standard)
+}
+
+sealed class SendState {
+    object Idle : SendState()
+    object Sending : SendState()
+    data class Success(val txHash: String) : SendState()
+    data class Error(val message: String) : SendState()
 }
 
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
@@ -75,6 +81,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val priceRepository = PriceRepository()
     private val _currentPrice = MutableStateFlow<CurrentPrice?>(null)
     val currentPrice: StateFlow<CurrentPrice?> = _currentPrice.asStateFlow()
+    private var priceFetchJob: Job? = null
+    private var fetchingCurrency: Currency? = null
+
+    // Selected currency (single source of truth for WalletScreen)
+    private val _selectedCurrency = MutableStateFlow(Currency.USD)
+    val selectedCurrency: StateFlow<Currency> = _selectedCurrency.asStateFlow()
+
+    // Send state tracking
+    private val _sendState = MutableStateFlow<SendState>(SendState.Idle)
+    val sendState: StateFlow<SendState> = _sendState.asStateFlow()
 
     // Encrypted storage for seed
     private val encryptedPrefs: SharedPreferences by lazy {
@@ -92,9 +108,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     init {
+        loadSelectedCurrency()
         checkExistingWallet()
         fetchPrice()
         checkAutoLock()
+    }
+
+    private fun loadSelectedCurrency() {
+        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+        val currencyCode = prefs.getString("selected_currency", Currency.USD.code)
+        _selectedCurrency.value = Currency.entries.find { it.code == currencyCode } ?: Currency.USD
     }
 
     private fun checkAutoLock() {
@@ -112,10 +135,63 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun fetchPrice() {
-        viewModelScope.launch {
-            priceRepository.fetchCurrentPrice(Currency.USD)
-                .onSuccess { _currentPrice.value = it }
+        val currency = _selectedCurrency.value
+
+        // If already fetching for this currency, don't restart
+        if (fetchingCurrency == currency && priceFetchJob?.isActive == true) {
+            return
         }
+
+        // Cancel only if fetching for a DIFFERENT currency (prevents stale data)
+        priceFetchJob?.cancel()
+        fetchingCurrency = currency
+
+        priceFetchJob = viewModelScope.launch {
+            priceRepository.fetchCurrentPrice(currency)
+                .onSuccess { result ->
+                    // Only update if this is still the selected currency
+                    if (_selectedCurrency.value == currency) {
+                        _currentPrice.value = result
+                        Timber.d("Price updated for $currency: ${result.price}")
+                    }
+                    fetchingCurrency = null
+                }
+                .onFailure { e ->
+                    Timber.e(e, "Failed to fetch price for $currency")
+                    // Retry once after a short delay (handles rate limiting from CurrencyScreen)
+                    kotlinx.coroutines.delay(1000)
+                    priceRepository.fetchCurrentPrice(currency)
+                        .onSuccess { result ->
+                            if (_selectedCurrency.value == currency) {
+                                _currentPrice.value = result
+                            }
+                        }
+                    fetchingCurrency = null
+                }
+        }
+    }
+
+    fun refreshPrice(currency: Currency? = null) {
+        if (currency != null && currency != _selectedCurrency.value) {
+            // CRITICAL: Switching to different currency - clear stale price FIRST
+            // This prevents showing old price with new symbol
+            Timber.d("refreshPrice: switching from ${_selectedCurrency.value} to $currency, clearing stale price")
+            _currentPrice.value = null
+            _selectedCurrency.value = currency
+            // Persist to SharedPreferences so selection survives app restart
+            context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+                .edit()
+                .putString("selected_currency", currency.code)
+                .apply()
+        } else if (currency != null) {
+            _selectedCurrency.value = currency
+            // Also persist even if same currency (defensive)
+            context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+                .edit()
+                .putString("selected_currency", currency.code)
+                .apply()
+        }
+        fetchPrice()
     }
 
     private fun checkExistingWallet() {
@@ -201,9 +277,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 Timber.d("initializeWalletIfNeeded: Connecting to node=$node, seedType=$seedType, networkType=$networkType")
 
                 val moneroSeed = when (seedType) {
-                    SeedType.POLYSEED_16 -> Seed.Bip39(seedWords, "") // Polyseed treated as BIP39 for now
-                    SeedType.LEGACY_25 -> Seed.Electrum(seedWords, "")
-                    SeedType.BIP39_12, SeedType.BIP39_24 -> Seed.Bip39(seedWords, "")
+                    SeedType.POLYSEED -> Seed.Bip39(seedWords, "") // Polyseed treated as BIP39 for now
+                    SeedType.BIP39_24 -> Seed.Bip39(seedWords, "")
                 }
 
                 val kit = MoneroKit.getInstance(
@@ -245,21 +320,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         val mnemonic = Mnemonic()
 
         val words = when (seedType) {
-            SeedType.POLYSEED_16 -> {
+            SeedType.POLYSEED -> {
                 // Polyseed requires native JNI binding to MONERO_Wallet_createPolyseed
                 // which is not yet available in MoneroKit Android.
                 // For new wallets, we fall back to BIP39-24 as the recommended option.
                 Timber.w("Polyseed generation not yet supported, falling back to BIP39-24")
                 mnemonic.generate(Mnemonic.EntropyStrength.VeryHigh) // 24 words
-            }
-            SeedType.LEGACY_25 -> {
-                // Legacy 25-word seeds are typically used for restore, not generation.
-                // For new wallet creation, generate BIP39-24 which MoneroKit converts internally.
-                Timber.d("Generating BIP39-24 seed for Legacy wallet")
-                mnemonic.generate(Mnemonic.EntropyStrength.VeryHigh) // 24 words
-            }
-            SeedType.BIP39_12 -> {
-                mnemonic.generate(Mnemonic.EntropyStrength.Default) // 12 words
             }
             SeedType.BIP39_24 -> {
                 mnemonic.generate(Mnemonic.EntropyStrength.VeryHigh) // 24 words
@@ -283,9 +349,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 Timber.d("createWallet: walletId=$newWalletId, restoreHeight=$restoreHeight, node=$node, seedType=$seedType, networkType=$networkType")
 
                 val moneroSeed = when (seedType) {
-                    SeedType.POLYSEED_16 -> Seed.Bip39(seed, "") // Polyseed treated as BIP39 for now
-                    SeedType.LEGACY_25 -> Seed.Electrum(seed, "")
-                    SeedType.BIP39_12, SeedType.BIP39_24 -> Seed.Bip39(seed, "")
+                    SeedType.POLYSEED -> Seed.Bip39(seed, "") // Polyseed treated as BIP39 for now
+                    SeedType.BIP39_24 -> Seed.Bip39(seed, "")
                 }
 
                 val kit = MoneroKit.getInstance(
@@ -351,12 +416,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 val networkType = if (isTestnetEnabled()) NetworkType.NetworkType_Testnet else NetworkType.NetworkType_Mainnet
                 Timber.d("restoreWallet: walletId=$newWalletId, restoreHeight=$height, node=$node, seedWordCount=${seed.size}, isPolyseed=$isPolyseed, networkType=$networkType")
 
-                // Determine seed type from word count
+                // Determine seed type from word count (only 16 and 24 supported)
                 val moneroSeed = when (seed.size) {
                     16 -> Seed.Bip39(seed, "") // Polyseed - birthday embedded, treated as BIP39 for now
-                    25 -> Seed.Electrum(seed, "")
-                    12, 24 -> Seed.Bip39(seed, "")
-                    else -> throw IllegalArgumentException("Invalid seed word count: ${seed.size}")
+                    24 -> Seed.Bip39(seed, "")
+                    else -> throw IllegalArgumentException("Invalid seed word count: ${seed.size}. Only 16 (Polyseed) or 24 (BIP39) words supported.")
                 }
 
                 val kit = MoneroKit.getInstance(
@@ -380,9 +444,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
                 // Determine seed type from word count and store encrypted
                 val seedType = when (seed.size) {
-                    16 -> SeedType.POLYSEED_16
-                    25 -> SeedType.LEGACY_25
-                    12 -> SeedType.BIP39_12
+                    16 -> SeedType.POLYSEED
                     else -> SeedType.BIP39_24
                 }
                 storeSeedEncrypted(seed, seedType)
@@ -606,9 +668,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 Timber.d("switchNetwork: Reinitializing wallet with networkType=$networkType, node=$node")
 
                 val moneroSeed = when (seedType) {
-                    SeedType.POLYSEED_16 -> Seed.Bip39(seedWords, "")
-                    SeedType.LEGACY_25 -> Seed.Electrum(seedWords, "")
-                    SeedType.BIP39_12, SeedType.BIP39_24 -> Seed.Bip39(seedWords, "")
+                    SeedType.POLYSEED -> Seed.Bip39(seedWords, "")
+                    SeedType.BIP39_24 -> Seed.Bip39(seedWords, "")
                 }
 
                 val kit = MoneroKit.getInstance(
@@ -662,7 +723,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         val defaultNode = if (isTestnet) {
             "testnet.xmr-tw.org:28081" // Monero Project testnet node
         } else {
-            DefaultNodes.CAKE.uri.split("/")[0]
+            "xmr-node.cakewallet.com:18081" // Cake Wallet node (default)
         }
         val node = savedNode ?: defaultNode
         Timber.d("getSelectedNode: isTestnet=$isTestnet, savedNode=$savedNode, using node=$node")
@@ -715,13 +776,23 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun send(address: String, amount: Long, memo: String? = null) {
         viewModelScope.launch {
+            _sendState.value = SendState.Sending
             try {
-                moneroKit?.send(amount, address, memo)
+                withContext(Dispatchers.IO) {
+                    moneroKit?.send(amount, address, memo)
+                }
+                // MoneroKit.send() doesn't return txHash, we'll show success without it
+                // The transaction will appear in the transactions list after sync
+                _sendState.value = SendState.Success("")
             } catch (e: Exception) {
                 Timber.e(e, "Failed to send transaction")
-                _walletState.update { it.copy(error = e.message) }
+                _sendState.value = SendState.Error(e.message ?: "Transaction failed")
             }
         }
+    }
+
+    fun resetSendState() {
+        _sendState.value = SendState.Idle
     }
 
     fun estimateFee(address: String, amount: Long): Long {

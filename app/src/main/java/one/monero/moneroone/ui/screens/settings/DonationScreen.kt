@@ -143,7 +143,7 @@ fun DonationScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Your donations help keep MoneroOne free and support ongoing development.",
+                text = "If you enjoy MoneroOne, consider donating to support continued development.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
@@ -189,10 +189,10 @@ fun DonationScreen(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "Donation Address",
+                        text = "Monero Address",
                         style = MaterialTheme.typography.labelMedium,
-                        color = GradientPink,
-                        fontWeight = FontWeight.SemiBold
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(

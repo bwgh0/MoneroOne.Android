@@ -155,23 +155,6 @@ fun ReceiveScreen(
         ) {
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text = "Scan to Pay",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Share this QR code or address to receive XMR",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
             // QR Code
             GlassCard(
                 modifier = Modifier.size(280.dp),
@@ -261,7 +244,7 @@ fun ReceiveScreen(
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("Monero Address", address)
                         clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Address copied", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier
                         .weight(1f)

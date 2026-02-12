@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,6 +54,7 @@ import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.PinEntryField
+import androidx.compose.foundation.border
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 
@@ -156,7 +158,7 @@ fun BackupSeedScreen(
                                 isUnlocked = true
                                 seedWords = walletViewModel.getSeedPhrase() ?: emptyList()
                             } else {
-                                pinError = "Incorrect PIN"
+                                pinError = "Invalid PIN"
                                 pin = ""
                             }
                         }
@@ -239,7 +241,7 @@ fun BackupSeedScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Copy button
+            // Copy button - Orange style matching iOS
             Button(
                 onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -249,8 +251,8 @@ fun BackupSeedScreen(
                     Toast.makeText(context, "Copied! Will clear in 5 minutes", Toast.LENGTH_LONG).show()
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = MoneroOrange,
+                    contentColor = Color.White
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -260,7 +262,10 @@ fun BackupSeedScreen(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Copy to Clipboard", fontWeight = FontWeight.Medium)
+                Text(
+                    text = if (copiedToClipboard) "Copied!" else "Copy Seed Phrase",
+                    fontWeight = FontWeight.Medium
+                )
             }
 
             if (copiedToClipboard) {
@@ -284,7 +289,12 @@ private fun SeedWordChip(index: Int, word: String) {
     Box(
         modifier = Modifier
             .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                 shape = RoundedCornerShape(8.dp)
             )
             .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -295,13 +305,15 @@ private fun SeedWordChip(index: Int, word: String) {
             Text(
                 text = "$index.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MoneroOrange
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = word,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }

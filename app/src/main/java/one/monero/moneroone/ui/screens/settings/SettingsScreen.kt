@@ -22,7 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
@@ -42,6 +41,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,16 +79,12 @@ fun SettingsScreen(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("monero_wallet", android.content.Context.MODE_PRIVATE) }
 
-    var biometricsEnabled by remember { mutableStateOf(prefs.getBoolean("biometrics_enabled", false)) }
     var testnetEnabled by remember { mutableStateOf(walletViewModel.isTestnetEnabled()) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showResetSyncDialog by remember { mutableStateOf(false) }
     var showTestnetDialog by remember { mutableStateOf(false) }
 
-    val selectedCurrency = remember {
-        val code = prefs.getString("selected_currency", "usd") ?: "usd"
-        code.uppercase()
-    }
+    val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
 
     Column(
         modifier = Modifier
@@ -111,7 +107,7 @@ fun SettingsScreen(
         SettingsSection(title = "Wallet") {
             SettingsItem(
                 icon = Icons.Default.Key,
-                title = "Backup Seed",
+                title = "Backup Seed Phrase",
                 subtitle = "View your recovery phrase",
                 onClick = onBackupClick,
                 iconColor = MoneroOrange
@@ -122,18 +118,6 @@ fun SettingsScreen(
                 title = "Security",
                 subtitle = "PIN and authentication settings",
                 onClick = onSecurityClick,
-                iconColor = SettingsBlue
-            )
-
-            SettingsToggleItem(
-                icon = Icons.Default.Fingerprint,
-                title = "Biometric Unlock",
-                subtitle = "Use fingerprint or face ID",
-                checked = biometricsEnabled,
-                onCheckedChange = { enabled ->
-                    biometricsEnabled = enabled
-                    walletViewModel.setBiometricsEnabled(enabled)
-                },
                 iconColor = SettingsBlue
             )
         }
@@ -153,7 +137,7 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Default.CurrencyExchange,
                 title = "Currency",
-                subtitle = selectedCurrency,
+                subtitle = selectedCurrency.code.uppercase(),
                 onClick = onCurrencyClick,
                 iconColor = SettingsGreen
             )
@@ -203,16 +187,6 @@ fun SettingsScreen(
                 iconColor = SettingsGreen
             )
 
-            SettingsItem(
-                icon = Icons.Default.Visibility,
-                title = "Privacy Policy",
-                subtitle = "View our privacy policy",
-                onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://monero.one/privacy"))
-                    context.startActivity(intent)
-                },
-                iconColor = SettingsGray
-            )
         }
 
         Spacer(modifier = Modifier.height(20.dp))

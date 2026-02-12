@@ -42,6 +42,7 @@ import one.monero.moneroone.ui.screens.settings.SecurityScreen
 import one.monero.moneroone.ui.screens.settings.SyncSettingsScreen
 import one.monero.moneroone.ui.screens.settings.ThemeScreen
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.screens.chart.ChartViewModel
 
 sealed class Screen(val route: String) {
     data object Welcome : Screen("welcome")
@@ -81,7 +82,8 @@ sealed class Screen(val route: String) {
 fun MoneroOneNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    walletViewModel: WalletViewModel = viewModel()
+    walletViewModel: WalletViewModel = viewModel(),
+    chartViewModel: ChartViewModel = viewModel()
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
     val isLocked by walletViewModel.isLocked.collectAsState()
@@ -211,6 +213,7 @@ fun MoneroOneNavHost(
             MainScreen(
                 walletViewModel = walletViewModel,
                 navController = navController,
+                chartViewModel = chartViewModel,
                 onNavigateToSend = { navController.navigate(Screen.Send.createRoute()) },
                 onNavigateToReceive = { navController.navigate(Screen.Receive.route) }
             )
@@ -301,7 +304,8 @@ fun MoneroOneNavHost(
         composable(Screen.PortfolioChart.route) {
             PortfolioChartScreen(
                 walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                chartViewModel = chartViewModel
             )
         }
 
@@ -336,9 +340,19 @@ fun MoneroOneNavHost(
         }
 
         composable(Screen.Currency.route) {
+            val currentPrice by walletViewModel.currentPrice.collectAsState()
+            val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+            val isLoading = currentPrice == null
+
             CurrencyScreen(
+                currentPrice = currentPrice,
+                selectedCurrency = selectedCurrency,
+                isLoading = isLoading,
                 onBack = { navController.popBackStack() },
-                onCurrencySelected = { /* Currency selection is handled within the screen */ }
+                onCurrencySelected = { currency ->
+                    chartViewModel.selectCurrency(currency)
+                    walletViewModel.refreshPrice(currency)
+                }
             )
         }
 

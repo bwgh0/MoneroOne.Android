@@ -100,7 +100,7 @@ fun RestoreWalletScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Enter your 12, 16, 24, or 25 word seed phrase to restore your wallet",
+                text = "16 words (Polyseed) or 24 words (BIP39)",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
@@ -119,7 +119,7 @@ fun RestoreWalletScreen(
                     .fillMaxWidth()
                     .height(200.dp),
                 label = { Text("Seed Phrase") },
-                placeholder = { Text("Enter words separated by spaces...") },
+                placeholder = { Text("Separate words with spaces") },
                 supportingText = {
                     val wordCount = seedPhrase.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
                     Text("$wordCount words")
@@ -215,8 +215,8 @@ fun RestoreWalletScreen(
                         words.isEmpty() -> {
                             errorMessage = "Please enter your seed phrase"
                         }
-                        words.size !in listOf(12, 16, 24, 25) -> {
-                            errorMessage = "Seed phrase must be 12, 16, 24, or 25 words (got ${words.size})"
+                        words.size !in listOf(16, 24) -> {
+                            errorMessage = "Seed phrase must be 16 words (Polyseed) or 24 words (BIP39)"
                         }
                         else -> {
                             // Convert selected date to restore height

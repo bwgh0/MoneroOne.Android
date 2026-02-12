@@ -59,7 +59,7 @@ fun CreateWalletScreen(
     onBack: () -> Unit
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
-    var selectedSeedType by remember { mutableStateOf(SeedType.BIP39_24) }
+    var selectedSeedType by remember { mutableStateOf(SeedType.POLYSEED) }
     var generatedSeed by remember { mutableStateOf<List<String>>(emptyList()) }
     var seedConfirmed by remember { mutableStateOf(false) }
 
@@ -145,7 +145,7 @@ private fun SeedTypeSelection(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Choose Seed Type",
+            text = "Choose Seed Format",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold
         )
@@ -161,32 +161,24 @@ private fun SeedTypeSelection(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // BIP39 24-word option (Recommended)
+        // Polyseed option (Recommended)
         SeedTypeCard(
-            title = "BIP39 (24 words)",
-            description = "Recommended. High security format with maximum entropy.",
+            title = "Polyseed",
+            subtitle = "Recommended",
+            description = "16 words with embedded wallet birthday. Faster restoration, same security.",
+            isSelected = selectedType == SeedType.POLYSEED,
+            onClick = { onTypeSelected(SeedType.POLYSEED) }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Standard BIP39 24-word option
+        SeedTypeCard(
+            title = "Standard",
+            subtitle = null,
+            description = "24 words (BIP39 format). Compatible with more wallets.",
             isSelected = selectedType == SeedType.BIP39_24,
             onClick = { onTypeSelected(SeedType.BIP39_24) }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // BIP39 12-word option
-        SeedTypeCard(
-            title = "BIP39 (12 words)",
-            description = "Compact format. Easier to backup, slightly less entropy.",
-            isSelected = selectedType == SeedType.BIP39_12,
-            onClick = { onTypeSelected(SeedType.BIP39_12) }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Legacy 25-word option
-        SeedTypeCard(
-            title = "Legacy (25 words)",
-            description = "Traditional Monero seed format. Compatible with all Monero wallets.",
-            isSelected = selectedType == SeedType.LEGACY_25,
-            onClick = { onTypeSelected(SeedType.LEGACY_25) }
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -210,6 +202,7 @@ private fun SeedTypeSelection(
 @Composable
 private fun SeedTypeCard(
     title: String,
+    subtitle: String?,
     description: String,
     isSelected: Boolean,
     onClick: () -> Unit
@@ -225,11 +218,33 @@ private fun SeedTypeCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (subtitle != null) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = MoneroOrange.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MoneroOrange,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = description,
@@ -260,7 +275,7 @@ private fun SeedDisplay(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Your Seed Phrase",
+            text = "Write Down Your Seed Phrase",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold
         )

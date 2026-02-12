@@ -58,7 +58,9 @@ data class PriceDataPoint(
 
 data class CurrentPrice(
     val price: Double,
-    val change24h: Double?
+    val change24h: Double?,
+    val usdToSelectedRate: Double = 1.0,  // Conversion rate calculated from CoinGecko response
+    val lastUpdated: Long = System.currentTimeMillis()
 )
 
 // UI state
@@ -75,13 +77,19 @@ data class ChartUiState(
     val close: Double? = null
 )
 
-// Supported currencies
-enum class Currency(val code: String, val symbol: String, val flag: String, val displayName: String) {
-    USD("usd", "$", "🇺🇸", "US Dollar"),
-    EUR("eur", "€", "🇪🇺", "Euro"),
-    GBP("gbp", "£", "🇬🇧", "British Pound"),
-    CAD("cad", "C$", "🇨🇦", "Canadian Dollar"),
-    AUD("aud", "A$", "🇦🇺", "Australian Dollar"),
-    JPY("jpy", "¥", "🇯🇵", "Japanese Yen"),
-    CNY("cny", "¥", "🇨🇳", "Chinese Yuan")
+// Supported currencies with CoinMarketCap IDs for chart data
+enum class Currency(
+    val code: String,
+    val symbol: String,
+    val flag: String,
+    val displayName: String,
+    val cmcId: Int
+) {
+    USD("usd", "$", "🇺🇸", "US Dollar", 2781),
+    EUR("eur", "€", "🇪🇺", "Euro", 2790),
+    GBP("gbp", "£", "🇬🇧", "British Pound", 2791),
+    CAD("cad", "C$", "🇨🇦", "Canadian Dollar", 2784),
+    AUD("aud", "A$", "🇦🇺", "Australian Dollar", 2782),
+    JPY("jpy", "¥", "🇯🇵", "Japanese Yen", 2797),
+    CNY("cny", "¥", "🇨🇳", "Chinese Yuan", 2787)
 }

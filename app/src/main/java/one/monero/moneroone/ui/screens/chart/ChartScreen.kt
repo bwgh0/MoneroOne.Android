@@ -48,6 +48,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import one.monero.moneroone.data.model.Currency as AppCurrency
 import one.monero.moneroone.data.model.PriceDataPoint
 import one.monero.moneroone.data.util.calculateChartIndex
 import one.monero.moneroone.ui.components.GlassCard
@@ -75,6 +76,8 @@ fun ChartScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedRange by viewModel.selectedTimeRange.collectAsState()
+    val selectedCurrency by viewModel.selectedCurrency.collectAsState()
+    val conversionRate by viewModel.usdToSelectedRate.collectAsState()
 
     Column(
         modifier = Modifier
@@ -86,7 +89,7 @@ fun ChartScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "XMR Price",
+            text = "Monero Price",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -119,10 +122,17 @@ fun ChartScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 // Show selected point price, or current price, or fall back to latest chart price
-                val displayPrice = selectedPoint?.price ?: uiState.currentPrice ?: uiState.close
+                // Apply conversion rate to chart data (which is in USD) for non-USD currencies
+                // Note: currentPrice is already in the selected currency from CoinGecko
+                val displayPrice = when {
+                    selectedPoint != null -> selectedPoint.price * conversionRate
+                    uiState.currentPrice != null -> uiState.currentPrice
+                    uiState.close != null -> uiState.close!! * conversionRate
+                    else -> null
+                }
                 if (displayPrice != null) {
                     Text(
-                        text = formatCurrency(displayPrice),
+                        text = formatCurrency(displayPrice, selectedCurrency),
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -183,10 +193,32 @@ fun ChartScreen(
                     )
                 }
             } else if (uiState.chartData.isNotEmpty()) {
+                // Apply conversion rate to chart data for display
+                val convertedChartData = remember(uiState.chartData, conversionRate) {
+                    uiState.chartData.map { point ->
+                        PriceDataPoint(point.timestamp, point.price * conversionRate)
+                    }
+                }
+                val convertedSelectedPoint = uiState.selectedPoint?.let { point ->
+                    PriceDataPoint(point.timestamp, point.price * conversionRate)
+                }
                 PriceChart(
-                    data = uiState.chartData,
-                    selectedPoint = uiState.selectedPoint,
-                    onPointSelected = { viewModel.selectPoint(it) },
+                    data = convertedChartData,
+                    selectedPoint = convertedSelectedPoint,
+                    currency = selectedCurrency,
+                    onPointSelected = { convertedPoint ->
+                        // Convert back to USD for the view model
+                        if (convertedPoint != null && conversionRate > 0) {
+                            viewModel.selectPoint(
+                                PriceDataPoint(
+                                    convertedPoint.timestamp,
+                                    convertedPoint.price / conversionRate
+                                )
+                            )
+                        } else {
+                            viewModel.selectPoint(null)
+                        }
+                    },
                     timeRange = selectedRange,
                     modifier = Modifier
                         .fillMaxSize()
@@ -198,7 +230,7 @@ fun ChartScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Failed to load chart",
+                        text = "Unable to load chart",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -222,13 +254,13 @@ fun ChartScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         StatItem(
-                            label = "High",
-                            value = uiState.high?.let { formatCurrency(it) } ?: "-",
+                            label = "${selectedRange.label} High",
+                            value = uiState.high?.let { formatCurrency(it * conversionRate, selectedCurrency) } ?: "-",
                             valueColor = SuccessGreen
                         )
                         StatItem(
-                            label = "Low",
-                            value = uiState.low?.let { formatCurrency(it) } ?: "-",
+                            label = "${selectedRange.label} Low",
+                            value = uiState.low?.let { formatCurrency(it * conversionRate, selectedCurrency) } ?: "-",
                             valueColor = ErrorRed
                         )
                     }
@@ -239,11 +271,11 @@ fun ChartScreen(
                     ) {
                         StatItem(
                             label = "Open",
-                            value = uiState.open?.let { formatCurrency(it) } ?: "-"
+                            value = uiState.open?.let { formatCurrency(it * conversionRate, selectedCurrency) } ?: "-"
                         )
                         StatItem(
                             label = "Close",
-                            value = uiState.close?.let { formatCurrency(it) } ?: "-"
+                            value = uiState.close?.let { formatCurrency(it * conversionRate, selectedCurrency) } ?: "-"
                         )
                     }
                 }
@@ -258,6 +290,7 @@ fun ChartScreen(
 private fun PriceChart(
     data: List<PriceDataPoint>,
     selectedPoint: PriceDataPoint?,
+    currency: AppCurrency,
     onPointSelected: (PriceDataPoint?) -> Unit,
     timeRange: TimeRange,
     modifier: Modifier = Modifier
@@ -316,10 +349,19 @@ private fun PriceChart(
 
         // Draw Y-axis labels (price) on the RIGHT side - only 3 labels to avoid cramping
         val yLabelCount = 2
+        val currencySymbol = when (currency) {
+            AppCurrency.USD -> "$"
+            AppCurrency.EUR -> "€"
+            AppCurrency.GBP -> "£"
+            AppCurrency.CAD -> "C$"
+            AppCurrency.AUD -> "A$"
+            AppCurrency.JPY -> "¥"
+            AppCurrency.CNY -> "¥"
+        }
         for (i in 0..yLabelCount) {
             val price = min + (range * i / yLabelCount)
             val y = height - verticalPadding - ((price - min) / range * (height - 2 * verticalPadding)).toFloat()
-            val label = "$${String.format(Locale.US, "%.0f", price)}"
+            val label = "$currencySymbol${String.format(Locale.US, "%.0f", price)}"
             val textLayout = textMeasurer.measure(label, labelStyle)
             // Clamp y position so labels don't go outside chart area
             val clampedY = y.coerceIn(textLayout.size.height / 2f, height - textLayout.size.height / 2f)
@@ -455,9 +497,22 @@ private fun StatItem(
     }
 }
 
-private fun formatCurrency(amount: Double): String {
-    val format = NumberFormat.getCurrencyInstance(Locale.US)
-    format.currency = Currency.getInstance("USD")
+private fun formatCurrency(amount: Double, currency: AppCurrency): String {
+    val locale = when (currency) {
+        AppCurrency.USD -> Locale.US
+        AppCurrency.EUR -> Locale.GERMANY
+        AppCurrency.GBP -> Locale.UK
+        AppCurrency.CAD -> Locale.CANADA
+        AppCurrency.AUD -> Locale("en", "AU")
+        AppCurrency.JPY -> Locale.JAPAN
+        AppCurrency.CNY -> Locale.CHINA
+    }
+    val format = NumberFormat.getCurrencyInstance(locale)
+    try {
+        format.currency = Currency.getInstance(currency.code.uppercase())
+    } catch (e: Exception) {
+        // Fallback formatting
+    }
     return format.format(amount)
 }
 

@@ -86,13 +86,15 @@ fun TransactionDetailScreen(
     var isRefreshing by remember { mutableStateOf(false) }
 
     val transaction = walletState.transactions.find { it.hash == txId }
+    val isIncoming = transaction?.direction == TransactionInfo.Direction.Direction_In
+    val navTitle = if (isIncoming) "Received" else "Sent"
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Transaction Details") },
+                title = { Text(navTitle) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

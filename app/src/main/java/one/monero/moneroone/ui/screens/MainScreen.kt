@@ -40,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.screens.chart.ChartScreen
@@ -59,14 +58,12 @@ data class BottomNavItem(
 fun MainScreen(
     walletViewModel: WalletViewModel,
     navController: NavHostController,
+    chartViewModel: ChartViewModel,
     onNavigateToSend: () -> Unit = {},
     onNavigateToReceive: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
-
-    // Create ChartViewModel early so it preloads data before user navigates to Chart tab
-    val chartViewModel: ChartViewModel = viewModel()
 
     val navItems = listOf(
         BottomNavItem("Wallet", Icons.Filled.Wallet, Icons.Outlined.Wallet),

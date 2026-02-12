@@ -97,6 +97,10 @@ fun TransactionListScreen(
                 if (searchQuery.isBlank()) true
                 else tx.hash.contains(searchQuery, ignoreCase = true)
             }
+            .sortedWith(
+                compareBy<TransactionInfo> { it.confirmations > 0L }  // pending (0 confirmations) first
+                    .thenByDescending { it.timestamp }  // newest first within each group
+            )
     }
 
     Scaffold(
@@ -104,7 +108,7 @@ fun TransactionListScreen(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Transactions") },
+                title = { Text("All Transactions") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

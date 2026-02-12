@@ -68,8 +68,8 @@ data class NodeInfo(
 )
 
 private val DEFAULT_MAINNET_NODES = listOf(
-    NodeInfo("node.sethforprivacy.com:18089", "Seth For Privacy", true),
     NodeInfo("xmr-node.cakewallet.com:18081", "Cake Wallet", true),
+    NodeInfo("node.sethforprivacy.com:18089", "Seth For Privacy", true),
     NodeInfo("nodes.hashvault.pro:18081", "HashVault", true),
     NodeInfo("node.community.rino.io:18081", "RINO Community", true)
 )
@@ -134,7 +134,7 @@ fun NodeSettingsScreen(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (isTestnet) "Testnet Nodes" else "Node Settings",
+                text = if (isTestnet) "Remote Node (Testnet)" else "Remote Node",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
