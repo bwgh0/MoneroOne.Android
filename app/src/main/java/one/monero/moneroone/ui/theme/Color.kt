@@ -12,7 +12,7 @@ val SuccessGreen = Color(0xFF34C759)
 val ErrorRed = Color(0xFFFF3B30)
 val WarningYellow = Color(0xFFFFCC00)
 val PendingOrange = Color(0xFFFF9500)
-val TestnetCyan = Color(0xFF00BCD4)
+
 
 // Settings Icon Colors (matching iOS)
 val SettingsBlue = Color(0xFF007AFF)

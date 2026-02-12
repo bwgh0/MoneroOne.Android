@@ -21,14 +21,17 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +59,8 @@ import one.monero.moneroone.ui.components.GlassSegmentedPicker
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Currency
@@ -70,6 +75,7 @@ enum class TimeRange(val label: String, val days: Int) {
     ALL("All", 1825)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChartScreen(
     viewModel: ChartViewModel = viewModel()
@@ -78,11 +84,26 @@ fun ChartScreen(
     val selectedRange by viewModel.selectedTimeRange.collectAsState()
     val selectedCurrency by viewModel.selectedCurrency.collectAsState()
     val conversionRate by viewModel.usdToSelectedRate.collectAsState()
+    val scope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
 
-    Column(
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            scope.launch {
+                isRefreshing = true
+                viewModel.refresh()
+                delay(1500)
+                isRefreshing = false
+            }
+        },
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
+    ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -284,6 +305,7 @@ fun ChartScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
     }
+    } // PullToRefreshBox
 }
 
 @Composable

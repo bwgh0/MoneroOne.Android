@@ -77,7 +77,6 @@ import java.util.Locale
 fun TransactionDetailScreen(
     walletViewModel: WalletViewModel,
     txId: String,
-    isTestnet: Boolean,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -134,7 +133,6 @@ fun TransactionDetailScreen(
             } else {
                 TransactionDetailContent(
                     transaction = transaction,
-                    isTestnet = isTestnet,
                     formatXmr = walletViewModel::formatXmr,
                     context = context
                 )
@@ -146,7 +144,6 @@ fun TransactionDetailScreen(
 @Composable
 private fun TransactionDetailContent(
     transaction: TransactionInfo,
-    isTestnet: Boolean,
     formatXmr: (Long) -> String,
     context: Context
 ) {
@@ -346,11 +343,7 @@ private fun TransactionDetailContent(
         // Actions Section
         SecondaryButton(
             onClick = {
-                val explorerUrl = if (isTestnet) {
-                    "https://stagenet.xmrchain.net/tx/${transaction.hash}"
-                } else {
-                    "https://xmrchain.net/tx/${transaction.hash}"
-                }
+                val explorerUrl = "https://xmrchain.net/tx/${transaction.hash}"
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(explorerUrl))
                 context.startActivity(intent)
             },

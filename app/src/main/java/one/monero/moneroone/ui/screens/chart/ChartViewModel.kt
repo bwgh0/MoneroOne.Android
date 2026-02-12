@@ -42,6 +42,7 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
         val savedCode = prefs.getString("selected_currency", Currency.USD.code)
         _selectedCurrency.value = Currency.entries.find { it.code == savedCode } ?: Currency.USD
         loadData()
+        load24hChange()
     }
 
     fun selectTimeRange(range: TimeRange) {
@@ -60,6 +61,7 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit().putString("selected_currency", currency.code).apply()
         // Reload all data with new currency (this sets the conversion rate from the response)
         loadData()
+        load24hChange()
     }
 
     fun selectPoint(point: PriceDataPoint?) {
@@ -77,6 +79,25 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadData() {
         loadCurrentPrice()
         loadChartData()
+    }
+
+    /**
+     * Fetches 1D chart data to calculate the true 24h price change.
+     * This value stays stable regardless of which time range the user selects in the chart.
+     */
+    private fun load24hChange() {
+        viewModelScope.launch {
+            priceRepository.fetchChartData(TimeRange.DAY, _selectedCurrency.value).fold(
+                onSuccess = { data ->
+                    val open = data.firstOrNull()?.price
+                    val close = data.lastOrNull()?.price
+                    if (open != null && close != null && open > 0) {
+                        _uiState.update { it.copy(priceChange24h = ((close - open) / open) * 100) }
+                    }
+                },
+                onFailure = { /* Silently fail, badge just won't show */ }
+            )
+        }
     }
 
     private fun loadCurrentPrice() {

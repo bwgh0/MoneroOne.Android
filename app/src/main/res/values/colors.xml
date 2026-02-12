@@ -9,7 +9,7 @@
     <color name="success_green">#FF34C759</color>
     <color name="error_red">#FFFF3B30</color>
     <color name="warning_yellow">#FFFFCC00</color>
-    <color name="testnet_cyan">#FF00BCD4</color>
+
 
     <!-- Background Colors -->
     <color name="background_light">#FFFFFFFF</color>

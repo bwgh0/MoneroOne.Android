@@ -67,6 +67,7 @@ data class CurrentPrice(
 data class ChartUiState(
     val currentPrice: Double? = null,
     val priceChange: Double? = null,
+    val priceChange24h: Double? = null,
     val chartData: List<PriceDataPoint> = emptyList(),
     val isLoading: Boolean = true,
     val error: String? = null,

@@ -22,7 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
@@ -79,10 +78,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("monero_wallet", android.content.Context.MODE_PRIVATE) }
 
-    var testnetEnabled by remember { mutableStateOf(walletViewModel.isTestnetEnabled()) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showResetSyncDialog by remember { mutableStateOf(false) }
-    var showTestnetDialog by remember { mutableStateOf(false) }
 
     val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
 
@@ -204,20 +201,6 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Developer Section
-        SettingsSection(title = "Developer") {
-            SettingsToggleItem(
-                icon = Icons.Default.Code,
-                title = "Testnet Mode",
-                subtitle = if (testnetEnabled) "Using testnet" else "Use testnet for development",
-                checked = testnetEnabled,
-                onCheckedChange = { showTestnetDialog = true },
-                iconColor = SettingsBlue
-            )
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Danger Zone
         SettingsSection(title = "Danger Zone") {
             GlassCard(
@@ -334,49 +317,6 @@ fun SettingsScreen(
         )
     }
 
-    // Testnet toggle confirmation dialog
-    if (showTestnetDialog) {
-        AlertDialog(
-            onDismissRequest = { showTestnetDialog = false },
-            title = {
-                Text(
-                    text = if (testnetEnabled) "Switch to Mainnet?" else "Switch to Testnet?",
-                    style = MaterialTheme.typography.titleLarge
-                )
-            },
-            text = {
-                Text(
-                    text = if (testnetEnabled) {
-                        "Switching to mainnet will use real XMR. Node settings will be updated accordingly."
-                    } else {
-                        "Switching to testnet allows testing with test XMR. Node settings will be updated accordingly."
-                    },
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val newValue = !testnetEnabled
-                        testnetEnabled = newValue
-                        walletViewModel.setTestnetEnabled(newValue)
-                        walletViewModel.switchNetwork()
-                        showTestnetDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MoneroOrange
-                    )
-                ) {
-                    Text("Switch")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTestnetDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 }
 
 @Composable

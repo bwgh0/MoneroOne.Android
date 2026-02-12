@@ -1,10 +1,14 @@
 package one.monero.moneroone
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import one.monero.moneroone.core.service.WalletSyncService
+import one.monero.moneroone.core.wallet.WalletManager
 import timber.log.Timber
 
 class MoneroOneApp : Application() {
@@ -14,6 +18,7 @@ class MoneroOneApp : Application() {
         private const val KEY_BACKGROUND_TIMESTAMP = "background_timestamp"
         private const val KEY_AUTO_LOCK_TIMEOUT = "auto_lock_timeout"
         private const val KEY_SHOULD_LOCK = "should_lock"
+        private const val KEY_BACKGROUND_SYNC = "background_sync_enabled"
     }
 
     private val lifecycleObserver = object : DefaultLifecycleObserver {
@@ -24,10 +29,19 @@ class MoneroOneApp : Application() {
                 .putLong(KEY_BACKGROUND_TIMESTAMP, System.currentTimeMillis())
                 .apply()
             Timber.d("App went to background, recorded timestamp")
+
+            // Start background sync service if enabled and wallet is initialized
+            if (prefs.getBoolean(KEY_BACKGROUND_SYNC, false) && WalletManager.kit != null) {
+                Timber.d("Starting background sync service")
+                WalletSyncService.start(this@MoneroOneApp)
+            }
         }
 
         override fun onStart(owner: LifecycleOwner) {
-            // App coming to foreground - check if we should lock
+            // App coming to foreground - stop the service (ViewModel handles sync now)
+            WalletSyncService.stop(this@MoneroOneApp)
+
+            // Check if we should lock
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val backgroundTimestamp = prefs.getLong(KEY_BACKGROUND_TIMESTAMP, 0)
             val timeoutSeconds = prefs.getInt(KEY_AUTO_LOCK_TIMEOUT, 60) // Default 1 minute
@@ -65,9 +79,24 @@ class MoneroOneApp : Application() {
             Timber.plant(Timber.DebugTree())
         }
 
+        createNotificationChannel()
+
         // Register lifecycle observer for auto-lock
         ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleObserver)
 
         Timber.d("MoneroOne Application started")
+    }
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            WalletSyncService.CHANNEL_ID,
+            "Wallet Sync",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Shows wallet sync progress while running in the background"
+            setShowBadge(false)
+        }
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(channel)
     }
 }

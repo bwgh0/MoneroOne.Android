@@ -63,38 +63,31 @@ import java.net.URL
 data class NodeInfo(
     val uri: String,
     val name: String,
-    val isDefault: Boolean = false,
-    val isTestnet: Boolean = false
+    val isDefault: Boolean = false
 )
 
-private val DEFAULT_MAINNET_NODES = listOf(
+private val DEFAULT_NODES = listOf(
     NodeInfo("xmr-node.cakewallet.com:18081", "Cake Wallet", true),
     NodeInfo("node.sethforprivacy.com:18089", "Seth For Privacy", true),
     NodeInfo("nodes.hashvault.pro:18081", "HashVault", true),
     NodeInfo("node.community.rino.io:18081", "RINO Community", true)
 )
 
-private val DEFAULT_TESTNET_NODES = listOf(
-    NodeInfo("testnet.xmr-tw.org:28081", "Monero Project", true, true),
-    NodeInfo("node.monerodevs.org:28089", "MoneroDevs", true, true)
-)
-
 @Composable
 fun NodeSettingsScreen(
     onBack: () -> Unit,
-    isTestnet: Boolean = false
+    onNodeChanged: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
     val json = remember { Json { ignoreUnknownKeys = true } }
 
-    val defaultNodes = if (isTestnet) DEFAULT_TESTNET_NODES else DEFAULT_MAINNET_NODES
     val customNodes = remember { mutableStateListOf<NodeInfo>() }
 
     var selectedNode by remember {
-        val savedUri = prefs.getString(if (isTestnet) "selected_testnet_node" else "selected_node", defaultNodes.first().uri)
-        mutableStateOf(savedUri ?: defaultNodes.first().uri)
+        val savedUri = prefs.getString("selected_node", DEFAULT_NODES.first().uri)
+        mutableStateOf(savedUri ?: DEFAULT_NODES.first().uri)
     }
 
     var showAddNodeDialog by remember { mutableStateOf(false) }
@@ -102,11 +95,11 @@ fun NodeSettingsScreen(
 
     // Load custom nodes from prefs
     LaunchedEffect(Unit) {
-        val customJson = prefs.getString(if (isTestnet) "custom_testnet_nodes" else "custom_nodes", "[]")
+        val customJson = prefs.getString("custom_nodes", "[]")
         try {
             val nodes = json.decodeFromString<List<String>>(customJson ?: "[]")
             customNodes.clear()
-            customNodes.addAll(nodes.map { NodeInfo(it, "Custom Node", false, isTestnet) })
+            customNodes.addAll(nodes.map { NodeInfo(it, "Custom Node", false) })
         } catch (e: Exception) {
             // Ignore parse errors
         }
@@ -134,7 +127,7 @@ fun NodeSettingsScreen(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (isTestnet) "Remote Node (Testnet)" else "Remote Node",
+                text = "Remote Node",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -157,17 +150,19 @@ fun NodeSettingsScreen(
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            defaultNodes.forEach { node ->
+            DEFAULT_NODES.forEach { node ->
                 NodeItem(
                     node = node,
                     isSelected = node.uri == selectedNode,
                     isTesting = testingNode == node.uri,
                     onSelect = {
+                        val changed = selectedNode != node.uri
                         selectedNode = node.uri
                         prefs.edit().putString(
-                            if (isTestnet) "selected_testnet_node" else "selected_node",
+                            "selected_node",
                             node.uri
                         ).apply()
+                        if (changed) onNodeChanged()
                     },
                     onTest = {
                         testingNode = node.uri
@@ -229,11 +224,13 @@ fun NodeSettingsScreen(
                         isSelected = node.uri == selectedNode,
                         isTesting = testingNode == node.uri,
                         onSelect = {
+                            val changed = selectedNode != node.uri
                             selectedNode = node.uri
                             prefs.edit().putString(
-                                if (isTestnet) "selected_testnet_node" else "selected_node",
+                                "selected_node",
                                 node.uri
                             ).apply()
+                            if (changed) onNodeChanged()
                         },
                         onTest = {
                             testingNode = node.uri
@@ -251,16 +248,16 @@ fun NodeSettingsScreen(
                             customNodes.remove(node)
                             val uris = customNodes.map { it.uri }
                             prefs.edit().putString(
-                                if (isTestnet) "custom_testnet_nodes" else "custom_nodes",
+                                "custom_nodes",
                                 json.encodeToString(uris)
                             ).apply()
 
                             // If deleted node was selected, switch to default
                             if (selectedNode == node.uri) {
-                                selectedNode = defaultNodes.first().uri
+                                selectedNode = DEFAULT_NODES.first().uri
                                 prefs.edit().putString(
-                                    if (isTestnet) "selected_testnet_node" else "selected_node",
-                                    defaultNodes.first().uri
+                                    "selected_node",
+                                    DEFAULT_NODES.first().uri
                                 ).apply()
                             }
                         }
@@ -276,11 +273,11 @@ fun NodeSettingsScreen(
     if (showAddNodeDialog) {
         AddNodeDialog(
             onConfirm = { uri ->
-                val newNode = NodeInfo(uri, "Custom Node", false, isTestnet)
+                val newNode = NodeInfo(uri, "Custom Node", false)
                 customNodes.add(newNode)
                 val uris = customNodes.map { it.uri }
                 prefs.edit().putString(
-                    if (isTestnet) "custom_testnet_nodes" else "custom_nodes",
+                    "custom_nodes",
                     json.encodeToString(uris)
                 ).apply()
                 showAddNodeDialog = false

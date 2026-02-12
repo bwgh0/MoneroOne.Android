@@ -12,7 +12,6 @@ import io.horizontalsystems.monerokit.Balance
 import io.horizontalsystems.monerokit.MoneroKit
 import io.horizontalsystems.monerokit.Seed
 import io.horizontalsystems.monerokit.SyncState
-import io.horizontalsystems.monerokit.data.DefaultNodes
 import io.horizontalsystems.monerokit.data.Subaddress
 import io.horizontalsystems.monerokit.model.NetworkType
 import io.horizontalsystems.monerokit.model.TransactionInfo
@@ -62,7 +61,6 @@ sealed class SendState {
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
-    private var moneroKit: MoneroKit? = null
 
     private val _walletState = MutableStateFlow(WalletState())
     val walletState: StateFlow<WalletState> = _walletState.asStateFlow()
@@ -248,10 +246,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun initializeWalletIfNeeded() {
-        Timber.d("initializeWalletIfNeeded: moneroKit=${moneroKit != null}, walletId=$walletId")
+        Timber.d("initializeWalletIfNeeded: kit=${WalletManager.kit != null}, walletId=$walletId")
 
-        // If moneroKit is already initialized, just start it
-        if (moneroKit != null) {
+        // If kit is already initialized, just start it
+        if (WalletManager.kit != null) {
             Timber.d("MoneroKit already initialized, starting wallet")
             startWallet()
             return
@@ -273,7 +271,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
                 val (seedWords, seedType) = seedData
                 val node = getSelectedNode()
-                val networkType = if (isTestnetEnabled()) NetworkType.NetworkType_Testnet else NetworkType.NetworkType_Mainnet
+                val networkType = NetworkType.NetworkType_Mainnet
                 Timber.d("initializeWalletIfNeeded: Connecting to node=$node, seedType=$seedType, networkType=$networkType")
 
                 val moneroSeed = when (seedType) {
@@ -281,7 +279,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     SeedType.BIP39_24 -> Seed.Bip39(seedWords, "")
                 }
 
-                val kit = MoneroKit.getInstance(
+                val kit = WalletManager.initialize(
                     context = context,
                     seed = moneroSeed,
                     restoreDateOrHeight = "0", // Wallet files exist, height from files
@@ -291,18 +289,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     networkType = networkType
                 )
 
-                moneroKit = kit
-                setupKitObservers(kit)
+                setupKitObservers()
 
                 _walletState.update {
                     it.copy(receiveAddress = kit.receiveAddress)
                 }
 
                 Timber.d("initializeWalletIfNeeded: Starting kit, receiveAddress=${kit.receiveAddress}")
-                // Start the wallet (must run on IO thread for network operations)
-                withContext(Dispatchers.IO) {
-                    kit.start()
-                }
+                WalletManager.start()
 
             } catch (e: Exception) {
                 Timber.e(e, "Failed to reinitialize wallet")
@@ -345,7 +339,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 val newWalletId = UUID.randomUUID().toString()
                 val restoreHeight = MoneroKit.restoreHeightForNewWallet().toString()
                 val node = getSelectedNode()
-                val networkType = if (isTestnetEnabled()) NetworkType.NetworkType_Testnet else NetworkType.NetworkType_Mainnet
+                val networkType = NetworkType.NetworkType_Mainnet
                 Timber.d("createWallet: walletId=$newWalletId, restoreHeight=$restoreHeight, node=$node, seedType=$seedType, networkType=$networkType")
 
                 val moneroSeed = when (seedType) {
@@ -353,7 +347,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     SeedType.BIP39_24 -> Seed.Bip39(seed, "")
                 }
 
-                val kit = MoneroKit.getInstance(
+                val kit = WalletManager.initialize(
                     context = context,
                     seed = moneroSeed,
                     restoreDateOrHeight = restoreHeight,
@@ -363,7 +357,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     networkType = networkType
                 )
 
-                moneroKit = kit
                 walletId = newWalletId
 
                 // Save wallet ID
@@ -375,7 +368,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 // Store seed encrypted for wallet restoration on app restart
                 storeSeedEncrypted(seed, seedType)
 
-                setupKitObservers(kit)
+                setupKitObservers()
 
                 _walletState.update {
                     it.copy(
@@ -386,10 +379,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
                 Timber.d("createWallet: Wallet created successfully, receiveAddress=${kit.receiveAddress}")
 
-                // Start the wallet to begin syncing (must run on IO thread for network operations)
-                withContext(Dispatchers.IO) {
-                    kit.start()
-                }
+                WalletManager.start()
 
             } catch (e: Exception) {
                 Timber.e(e, "Failed to create wallet")
@@ -413,7 +403,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 val isPolyseed = seed.size == 16
                 val height = if (isPolyseed) "0" else (restoreHeight ?: "0")
                 val node = getSelectedNode()
-                val networkType = if (isTestnetEnabled()) NetworkType.NetworkType_Testnet else NetworkType.NetworkType_Mainnet
+                val networkType = NetworkType.NetworkType_Mainnet
                 Timber.d("restoreWallet: walletId=$newWalletId, restoreHeight=$height, node=$node, seedWordCount=${seed.size}, isPolyseed=$isPolyseed, networkType=$networkType")
 
                 // Determine seed type from word count (only 16 and 24 supported)
@@ -423,7 +413,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     else -> throw IllegalArgumentException("Invalid seed word count: ${seed.size}. Only 16 (Polyseed) or 24 (BIP39) words supported.")
                 }
 
-                val kit = MoneroKit.getInstance(
+                val kit = WalletManager.initialize(
                     context = context,
                     seed = moneroSeed,
                     restoreDateOrHeight = height,
@@ -433,7 +423,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     networkType = networkType
                 )
 
-                moneroKit = kit
                 walletId = newWalletId
 
                 // Save wallet ID
@@ -449,7 +438,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 storeSeedEncrypted(seed, seedType)
 
-                setupKitObservers(kit)
+                setupKitObservers()
 
                 _walletState.update {
                     it.copy(
@@ -460,10 +449,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
                 Timber.d("restoreWallet: Wallet restored successfully, receiveAddress=${kit.receiveAddress}")
 
-                // Start the wallet to begin syncing (must run on IO thread for network operations)
-                withContext(Dispatchers.IO) {
-                    kit.start()
-                }
+                WalletManager.start()
 
             } catch (e: Exception) {
                 Timber.e(e, "Failed to restore wallet")
@@ -477,10 +463,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun setupKitObservers(kit: MoneroKit) {
+    private fun setupKitObservers() {
         viewModelScope.launch {
-            kit.syncStateFlow.collect { syncState ->
-                // Log detailed sync state changes for debugging
+            WalletManager.syncStateFlow.collect { syncState ->
                 when (syncState) {
                     is SyncState.NotSynced -> {
                         Timber.d("SyncState: NotSynced, error=${syncState.error}")
@@ -500,14 +485,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         viewModelScope.launch {
-            kit.balanceFlow.collect { balance ->
+            WalletManager.balanceFlow.collect { balance ->
                 Timber.d("Balance updated: all=${balance.all}, unlocked=${balance.unlocked}")
                 _walletState.update { it.copy(balance = balance) }
             }
         }
 
         viewModelScope.launch {
-            kit.allTransactionsFlow.collect { transactions ->
+            WalletManager.transactionsFlow.collect { transactions ->
                 Timber.d("Transactions updated: count=${transactions.size}")
                 _walletState.update { it.copy(transactions = transactions) }
             }
@@ -592,12 +577,81 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             .apply()
     }
 
+    fun resetSync() {
+        viewModelScope.launch {
+            try {
+                val seedData = loadSeedEncrypted() ?: run {
+                    Timber.w("No encrypted seed found, cannot reset sync")
+                    _walletState.update { it.copy(error = "No wallet seed to reset sync") }
+                    return@launch
+                }
+                val savedWalletId = walletId ?: return@launch
+
+                _walletState.update {
+                    it.copy(
+                        balance = Balance(0, 0),
+                        transactions = emptyList(),
+                        syncState = SyncState.Connecting(waiting = false)
+                    )
+                }
+
+                // Stop current kit
+                WalletManager.kit?.stop()
+
+                // Delete cached wallet files to force full resync
+                MoneroKit.deleteWallet(context, savedWalletId)
+
+                val (seedWords, seedType) = seedData
+                val node = getSelectedNode()
+                val networkType = NetworkType.NetworkType_Mainnet
+
+                Timber.d("resetSync: Reinitializing wallet from scratch, node=$node")
+
+                val moneroSeed = when (seedType) {
+                    SeedType.POLYSEED -> Seed.Bip39(seedWords, "")
+                    SeedType.BIP39_24 -> Seed.Bip39(seedWords, "")
+                }
+
+                val restoreHeight = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+                    .getLong("restore_height", 0L).toString()
+
+                val kit = WalletManager.initialize(
+                    context = context,
+                    seed = moneroSeed,
+                    restoreDateOrHeight = restoreHeight,
+                    walletId = savedWalletId,
+                    node = node,
+                    trustNode = false,
+                    networkType = networkType
+                )
+
+                setupKitObservers()
+
+                _walletState.update {
+                    it.copy(receiveAddress = kit.receiveAddress)
+                }
+
+                WalletManager.start()
+
+                Timber.d("resetSync: Wallet resync started successfully")
+
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to reset sync")
+                _walletState.update {
+                    it.copy(
+                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                        error = "Failed to reset sync: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
     fun removeWallet() {
         viewModelScope.launch {
             try {
-                // Stop the wallet
-                moneroKit?.stop()
-                moneroKit = null
+                // Stop and release the kit via WalletManager
+                WalletManager.clear()
 
                 // Clear all wallet data from SharedPreferences
                 context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
@@ -619,114 +673,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setTestnetEnabled(enabled: Boolean) {
-        context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("testnet_enabled", enabled)
-            .apply()
-    }
-
-    fun isTestnetEnabled(): Boolean {
-        return context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .getBoolean("testnet_enabled", false)
-    }
-
-    /**
-     * Switch networks without clearing sync cache - each network maintains separate sync state.
-     * Called after toggling testnet mode to reinitialize wallet with new network type.
-     */
-    fun switchNetwork() {
-        viewModelScope.launch {
-            try {
-                // Get seed before stopping wallet
-                val seedData = loadSeedEncrypted() ?: run {
-                    Timber.w("No encrypted seed found, cannot switch network")
-                    _walletState.update { it.copy(error = "No wallet seed to switch network") }
-                    return@launch
-                }
-
-                // Clear address/balance state first
-                _walletState.update {
-                    it.copy(
-                        receiveAddress = "",
-                        balance = Balance(0, 0),
-                        transactions = emptyList(),
-                        syncState = SyncState.Connecting(waiting = false)
-                    )
-                }
-
-                // Stop current wallet
-                moneroKit?.stop()
-                moneroKit = null
-
-                // Reinitialize with new network type
-                val savedWalletId = walletId ?: return@launch
-                val (seedWords, seedType) = seedData
-                val node = getSelectedNode()
-                val networkType = if (isTestnetEnabled()) NetworkType.NetworkType_Testnet else NetworkType.NetworkType_Mainnet
-
-                Timber.d("switchNetwork: Reinitializing wallet with networkType=$networkType, node=$node")
-
-                val moneroSeed = when (seedType) {
-                    SeedType.POLYSEED -> Seed.Bip39(seedWords, "")
-                    SeedType.BIP39_24 -> Seed.Bip39(seedWords, "")
-                }
-
-                val kit = MoneroKit.getInstance(
-                    context = context,
-                    seed = moneroSeed,
-                    restoreDateOrHeight = "0", // Wallet files may exist for this network
-                    walletId = savedWalletId,
-                    node = node,
-                    trustNode = false,
-                    networkType = networkType
-                )
-
-                moneroKit = kit
-                setupKitObservers(kit)
-
-                _walletState.update {
-                    it.copy(receiveAddress = kit.receiveAddress)
-                }
-
-                // Start the wallet
-                withContext(Dispatchers.IO) {
-                    kit.start()
-                }
-
-                Timber.d("switchNetwork: Successfully switched to $networkType")
-
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to switch network")
-                _walletState.update {
-                    it.copy(
-                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                        error = "Failed to switch network: ${e.message}"
-                    )
-                }
-            }
-        }
-    }
-
     /**
      * Get the user's selected node from SharedPreferences, or fall back to default.
      */
     private fun getSelectedNode(): String {
         val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-        val isTestnet = prefs.getBoolean("testnet_enabled", false)
-        val savedNode = if (isTestnet) {
-            prefs.getString("selected_testnet_node", null)
-        } else {
-            prefs.getString("selected_node", null)
-        }
-        // Use appropriate default based on network (match iOS NodeManager)
-        val defaultNode = if (isTestnet) {
-            "testnet.xmr-tw.org:28081" // Monero Project testnet node
-        } else {
-            "xmr-node.cakewallet.com:18081" // Cake Wallet node (default)
-        }
-        val node = savedNode ?: defaultNode
-        Timber.d("getSelectedNode: isTestnet=$isTestnet, savedNode=$savedNode, using node=$node")
+        val savedNode = prefs.getString("selected_node", null)
+        val node = savedNode ?: "xmr-node.cakewallet.com:18081"
+        Timber.d("getSelectedNode: savedNode=$savedNode, using node=$node")
         return node
     }
 
@@ -735,7 +689,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun getDebugInfo(): String {
         return try {
-            val statusMap = moneroKit?.statusInfo()
+            val statusMap = WalletManager.kit?.statusInfo()
             if (statusMap != null) {
                 statusMap.entries.joinToString("\n") { "${it.key}: ${it.value}" }
             } else {
@@ -754,9 +708,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun startWallet() {
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) {
-                    moneroKit?.start()
-                }
+                WalletManager.start()
             } catch (e: Exception) {
                 Timber.e(e, "Failed to start wallet")
                 _walletState.update { it.copy(error = e.message) }
@@ -767,7 +719,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun stopWallet() {
         viewModelScope.launch {
             try {
-                moneroKit?.stop()
+                WalletManager.stop()
             } catch (e: Exception) {
                 Timber.e(e, "Failed to stop wallet")
             }
@@ -779,7 +731,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             _sendState.value = SendState.Sending
             try {
                 withContext(Dispatchers.IO) {
-                    moneroKit?.send(amount, address, memo)
+                    WalletManager.kit?.send(amount, address, memo)
                 }
                 // MoneroKit.send() doesn't return txHash, we'll show success without it
                 // The transaction will appear in the transactions list after sync
@@ -797,7 +749,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun estimateFee(address: String, amount: Long): Long {
         return try {
-            moneroKit?.estimateFee(amount, address, null) ?: 0L
+            WalletManager.kit?.estimateFee(amount, address, null) ?: 0L
         } catch (e: Exception) {
             Timber.e(e, "Failed to estimate fee")
             0L
@@ -805,7 +757,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun getSubaddresses(): List<Subaddress> {
-        return moneroKit?.getSubaddresses() ?: emptyList()
+        return WalletManager.kit?.getSubaddresses() ?: emptyList()
     }
 
     fun formatXmr(atomicUnits: Long): String {
@@ -824,8 +776,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     override fun onCleared() {
         super.onCleared()
-        viewModelScope.launch {
-            moneroKit?.stop()
+        // Don't stop kit if background sync is enabled — the service keeps it alive
+        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("background_sync_enabled", false)) {
+            WalletManager.stop()
         }
     }
 }

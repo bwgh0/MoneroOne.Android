@@ -285,7 +285,6 @@ fun MoneroOneNavHost(
             TransactionDetailScreen(
                 walletViewModel = walletViewModel,
                 txId = txId,
-                isTestnet = walletViewModel.isTestnetEnabled(),
                 onBack = { navController.popBackStack() }
             )
         }
@@ -293,7 +292,6 @@ fun MoneroOneNavHost(
         composable(Screen.TransactionList.route) {
             TransactionListScreen(
                 walletViewModel = walletViewModel,
-                isTestnet = walletViewModel.isTestnetEnabled(),
                 onBack = { navController.popBackStack() },
                 onTransactionClick = { txId ->
                     navController.navigate(Screen.TransactionDetail.createRoute(txId))
@@ -367,7 +365,7 @@ fun MoneroOneNavHost(
         composable(Screen.NodeSettings.route) {
             NodeSettingsScreen(
                 onBack = { navController.popBackStack() },
-                isTestnet = walletViewModel.isTestnetEnabled()
+                onNodeChanged = { walletViewModel.resetSync() }
             )
         }
 

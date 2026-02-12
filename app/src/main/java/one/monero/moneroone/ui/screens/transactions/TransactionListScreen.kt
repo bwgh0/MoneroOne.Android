@@ -75,7 +75,6 @@ enum class TransactionFilter(val label: String) {
 @Composable
 fun TransactionListScreen(
     walletViewModel: WalletViewModel,
-    isTestnet: Boolean,
     onBack: () -> Unit,
     onTransactionClick: (String) -> Unit
 ) {

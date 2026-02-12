@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">MoneroOne</string>
+    <string name="app_name">Monero One</string>
 
     <!-- Onboarding -->
-    <string name="welcome_title">Welcome to\nMoneroOne</string>
+    <string name="welcome_title">Welcome to\nMonero One</string>
     <string name="welcome_subtitle">Your gateway to private, decentralized money</string>
     <string name="create_wallet">Create New Wallet</string>
     <string name="restore_wallet">Restore Wallet</string>

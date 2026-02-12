@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import one.monero.moneroone.core.wallet.WalletViewModel
+import androidx.compose.runtime.collectAsState
 import one.monero.moneroone.ui.screens.chart.ChartScreen
 import one.monero.moneroone.ui.screens.chart.ChartViewModel
 import one.monero.moneroone.ui.screens.settings.SettingsScreen
@@ -64,6 +65,7 @@ fun MainScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
+    val chartUiState by chartViewModel.uiState.collectAsState()
 
     val navItems = listOf(
         BottomNavItem("Wallet", Icons.Filled.Wallet, Icons.Outlined.Wallet),
@@ -142,7 +144,6 @@ fun MainScreen(
                 when (tab) {
                     0 -> WalletScreen(
                         walletViewModel = walletViewModel,
-                        isTestnet = walletViewModel.isTestnetEnabled(),
                         onSendClick = onNavigateToSend,
                         onReceiveClick = onNavigateToReceive,
                         onTransactionClick = { tx ->
@@ -153,7 +154,8 @@ fun MainScreen(
                         },
                         onBalanceClick = {
                             navController.navigate("portfolio_chart")
-                        }
+                        },
+                        priceChange24h = chartUiState.priceChange24h
                     )
                     1 -> ChartScreen(viewModel = chartViewModel)
                     2 -> SettingsScreen(
@@ -164,7 +166,7 @@ fun MainScreen(
                         onCurrencyClick = { navController.navigate("currency") },
                         onSyncSettingsClick = { navController.navigate("sync_settings") },
                         onResetSyncClick = {
-                            // Reset sync is handled within the SettingsScreen dialog
+                            walletViewModel.resetSync()
                             Toast.makeText(context, "Sync reset initiated", Toast.LENGTH_SHORT).show()
                         },
                         onRemoveWalletClick = {

@@ -28,6 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -43,6 +45,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.SyncState
+import one.monero.moneroone.core.service.WalletSyncService
+import one.monero.moneroone.core.util.rememberNotificationPermission
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.MoneroOrange
@@ -62,6 +66,11 @@ fun SyncSettingsScreen(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE) }
     val walletState by walletViewModel.walletState.collectAsState()
+
+    var backgroundSyncEnabled by remember {
+        mutableStateOf(prefs.getBoolean("background_sync_enabled", false))
+    }
+    val (hasNotificationPermission, requestNotificationPermission) = rememberNotificationPermission()
 
     var showDatePicker by remember { mutableStateOf(false) }
     var restoreHeight by remember {
@@ -137,20 +146,76 @@ fun SyncSettingsScreen(
                 val syncState = walletState.syncState
                 if (syncState is SyncState.Syncing) {
                     val progress = syncState.progress ?: 0.0
+                    val progressPct = (progress * 100).toInt()
                     Spacer(modifier = Modifier.height(12.dp))
                     LinearProgressIndicator(
-                        progress = { (progress.toFloat() / 100f) },
+                        progress = { progress.toFloat() },
                         modifier = Modifier.fillMaxWidth(),
                         color = MoneroOrange,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "${progress.toInt()}% complete",
+                        text = "$progressPct% complete",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Background Sync Section
+        SectionLabel("BACKGROUND SYNC")
+
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Sync,
+                    contentDescription = null,
+                    tint = MoneroOrange,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Sync in Background",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Keep wallet synced when app is backgrounded",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Switch(
+                    checked = backgroundSyncEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled && !hasNotificationPermission) {
+                            requestNotificationPermission()
+                        }
+                        backgroundSyncEnabled = enabled
+                        prefs.edit().putBoolean("background_sync_enabled", enabled).apply()
+                        if (enabled) {
+                            WalletSyncService.start(context)
+                        } else {
+                            WalletSyncService.stop(context)
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MoneroOrange,
+                        checkedTrackColor = MoneroOrange.copy(alpha = 0.3f)
+                    )
+                )
             }
         }
 
@@ -271,6 +336,7 @@ fun SyncSettingsScreen(
                             restoreHeight = newHeight
                             prefs.edit().putLong("restore_height", newHeight).apply()
                             walletViewModel.setRestoreHeight(newHeight)
+                            walletViewModel.resetSync()
                         }
                         showDatePicker = false
                     }
@@ -285,6 +351,7 @@ fun SyncSettingsScreen(
                         restoreHeight = 0L
                         prefs.edit().putLong("restore_height", 0L).apply()
                         walletViewModel.setRestoreHeight(0L)
+                        walletViewModel.resetSync()
                         showDatePicker = false
                     }
                 ) {
@@ -312,7 +379,7 @@ private fun SectionLabel(text: String) {
 private fun getSyncStatusText(syncState: SyncState): String {
     return when (syncState) {
         is SyncState.Synced -> "Synced"
-        is SyncState.Syncing -> "Syncing ${(syncState.progress ?: 0.0).toInt()}%"
+        is SyncState.Syncing -> "Syncing ${((syncState.progress ?: 0.0) * 100).toInt()}%"
         is SyncState.NotSynced -> "Not synced"
         else -> "Connecting..."
     }

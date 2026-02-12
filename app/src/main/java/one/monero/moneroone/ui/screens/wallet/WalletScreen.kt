@@ -24,19 +24,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +52,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.SyncState
 import io.horizontalsystems.monerokit.model.TransactionInfo
@@ -57,12 +64,14 @@ import one.monero.moneroone.ui.components.MoneroLogo
 import one.monero.moneroone.ui.components.StatusDot
 import one.monero.moneroone.ui.components.SyncStatus
 import one.monero.moneroone.ui.components.SyncStatusIndicator
-import one.monero.moneroone.ui.components.TestnetBanner
+
 import one.monero.moneroone.ui.components.TransactionStatus
 import one.monero.moneroone.ui.components.TransactionStatusIndicator
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -70,35 +79,57 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletScreen(
     walletViewModel: WalletViewModel,
-    isTestnet: Boolean,
     onSendClick: () -> Unit,
     onReceiveClick: () -> Unit,
     onTransactionClick: (TransactionInfo) -> Unit,
     onSeeAllTransactionsClick: () -> Unit,
-    onBalanceClick: (() -> Unit)? = null
+    onBalanceClick: (() -> Unit)? = null,
+    priceChange24h: Double? = null
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
     val currentPrice by walletViewModel.currentPrice.collectAsState()
     val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+    val scope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
 
     // Calculate fiat value from balance × current price with correct currency symbol
+    val fiatFormat = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }
     val fiatValue = currentPrice?.price?.let { price ->
         val balanceXmr = walletState.balance.all.toDouble() / 1_000_000_000_000.0
         val fiatAmount = balanceXmr * price
-        val format = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
-            minimumFractionDigits = 2
-            maximumFractionDigits = 2
-        }
-        "≈ ${selectedCurrency.symbol}${format.format(fiatAmount)}"
+        "≈ ${selectedCurrency.symbol}${fiatFormat.format(fiatAmount)}"
+    }
+    val unlockedFiatValue = currentPrice?.price?.let { price ->
+        val unlockedXmr = walletState.balance.unlocked.toDouble() / 1_000_000_000_000.0
+        val fiatAmount = unlockedXmr * price
+        "${selectedCurrency.symbol}${fiatFormat.format(fiatAmount)}"
     }
 
-    LazyColumn(
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            scope.launch {
+                isRefreshing = true
+                walletViewModel.resetSync()
+                walletViewModel.refreshPrice()
+                delay(1500)
+                isRefreshing = false
+            }
+        },
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
+    ) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
@@ -109,21 +140,15 @@ fun WalletScreen(
             GreetingHeader()
         }
 
-        // Testnet banner
-        if (isTestnet) {
-            item {
-                TestnetBanner()
-            }
-        }
-
         // Balance card
         item {
             BalanceCard(
                 balance = walletViewModel.formatXmr(walletState.balance.all),
                 unlockedBalance = walletViewModel.formatXmr(walletState.balance.unlocked),
                 fiatValue = fiatValue,
+                unlockedFiatValue = unlockedFiatValue,
                 syncState = walletState.syncState,
-                priceChange24h = currentPrice?.change24h,
+                priceChange24h = priceChange24h,
                 onClick = onBalanceClick
             )
         }
@@ -205,6 +230,7 @@ fun WalletScreen(
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
     }
+    } // PullToRefreshBox
 }
 
 @Composable
@@ -250,6 +276,7 @@ private fun BalanceCard(
     balance: String,
     unlockedBalance: String,
     fiatValue: String?,
+    unlockedFiatValue: String?,
     syncState: SyncState,
     priceChange24h: Double? = null,
     onClick: (() -> Unit)? = null
@@ -259,13 +286,13 @@ private fun BalanceCard(
         onClick = onClick
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier.padding(24.dp)
         ) {
             // Top row with sync status and price change (matching iOS)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 // Sync status
                 val status = when (syncState) {
@@ -278,7 +305,8 @@ private fun BalanceCard(
 
                 SyncStatusIndicator(
                     status = status,
-                    progress = progress
+                    progress = progress,
+                    syncState = syncState
                 )
 
                 // Price change indicator (moved from bottom to top right like iOS)
@@ -296,10 +324,10 @@ private fun BalanceCard(
                 // Monero logo on left of balance
                 MoneroLogo(size = 48.dp)
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
                 // Balance amount
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(
                         verticalAlignment = Alignment.Bottom
                     ) {
@@ -331,11 +359,50 @@ private fun BalanceCard(
             // Available (unlocked) balance if different from total
             if (balance != unlockedBalance) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Available: $unlockedBalance XMR",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Available: ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = unlockedBalance,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                    )
+                    Text(
+                        text = " XMR",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    if (unlockedFiatValue != null) {
+                        Text(
+                            text = " ($unlockedFiatValue)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = null,
+                        tint = MoneroOrange,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Locked until recent transactions confirm",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MoneroOrange
+                    )
+                }
             }
 
             // Sync progress bar
@@ -351,6 +418,18 @@ private fun BalanceCard(
                     trackColor = MoneroOrange.copy(alpha = 0.3f),
                     strokeCap = StrokeCap.Round
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                val pct = ((syncState.progress ?: 0.0) * 100).toInt()
+                val blocks = syncState.remainingBlocks
+                Text(
+                    text = if (blocks != null && blocks > 0L)
+                        "$pct% synced - ${formatBlockCount(blocks)} blocks remaining"
+                    else "$pct% synced",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -360,23 +439,25 @@ private fun BalanceCard(
 private fun PriceChangeIndicator(priceChange: Double) {
     val isPositive = priceChange >= 0
     val color = if (isPositive) SuccessGreen else ErrorRed
-    val icon = if (isPositive) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown
+    val icon = if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown
+    val sign = if (isPositive) "+" else ""
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(color.copy(alpha = 0.2f))
-            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(color.copy(alpha = 0.1f))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = color,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(12.dp)
         )
+        Spacer(modifier = Modifier.width(2.dp))
         Text(
-            text = String.format("%.1f%%", kotlin.math.abs(priceChange)),
+            text = "$sign${String.format("%.2f", priceChange)}%",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = color
@@ -551,6 +632,12 @@ private fun TransactionCard(
             )
         }
     }
+}
+
+private fun formatBlockCount(count: Long): String = when {
+    count >= 1_000_000 -> String.format("%.2fM", count / 1_000_000.0)
+    count >= 1_000 -> String.format("%.1fK", count / 1_000.0)
+    else -> "$count"
 }
 
 private fun formatRelativeTime(timestamp: Long): String {
