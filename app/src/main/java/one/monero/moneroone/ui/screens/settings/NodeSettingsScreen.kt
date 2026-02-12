@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -33,22 +34,29 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -57,6 +65,7 @@ import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
+import one.monero.moneroone.ui.theme.WarningYellow
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -84,14 +93,19 @@ fun NodeSettingsScreen(
     val json = remember { Json { ignoreUnknownKeys = true } }
 
     val customNodes = remember { mutableStateListOf<NodeInfo>() }
+    val latencyMap = remember { mutableStateMapOf<String, Long>() } // uri -> latency ms, -1 = unreachable
+    var isBenchmarking by remember { mutableStateOf(false) }
 
     var selectedNode by remember {
         val savedUri = prefs.getString("selected_node", DEFAULT_NODES.first().uri)
         mutableStateOf(savedUri ?: DEFAULT_NODES.first().uri)
     }
 
+    var autoSelectEnabled by remember {
+        mutableStateOf(prefs.getBoolean("auto_select_node", false))
+    }
+
     var showAddNodeDialog by remember { mutableStateOf(false) }
-    var testingNode by remember { mutableStateOf<String?>(null) }
 
     // Load custom nodes from prefs
     LaunchedEffect(Unit) {
@@ -102,6 +116,33 @@ fun NodeSettingsScreen(
             customNodes.addAll(nodes.map { NodeInfo(it, "Custom Node", false) })
         } catch (e: Exception) {
             // Ignore parse errors
+        }
+    }
+
+    // Benchmark all nodes on screen entry
+    LaunchedEffect(customNodes.size) {
+        isBenchmarking = true
+        val allNodes = DEFAULT_NODES + customNodes
+        val results = allNodes.map { node ->
+            async {
+                node.uri to benchmarkNode(node.uri)
+            }
+        }.awaitAll()
+        results.forEach { (uri, latency) ->
+            latencyMap[uri] = latency
+        }
+        isBenchmarking = false
+
+        // Auto-select fastest if enabled
+        if (autoSelectEnabled) {
+            val fastest = results
+                .filter { it.second >= 0 }
+                .minByOrNull { it.second }
+            if (fastest != null && fastest.first != selectedNode) {
+                selectedNode = fastest.first
+                prefs.edit().putString("selected_node", fastest.first).apply()
+                onNodeChanged()
+            }
         }
     }
 
@@ -142,7 +183,57 @@ fun NodeSettingsScreen(
             modifier = Modifier.padding(horizontal = 4.dp)
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Auto-Select Toggle
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Auto-Select",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Automatically use the fastest node",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                Switch(
+                    checked = autoSelectEnabled,
+                    onCheckedChange = { enabled ->
+                        autoSelectEnabled = enabled
+                        prefs.edit().putBoolean("auto_select_node", enabled).apply()
+                        if (enabled) {
+                            // Pick fastest reachable node
+                            val fastest = latencyMap.entries
+                                .filter { it.value >= 0 }
+                                .minByOrNull { it.value }
+                            if (fastest != null && fastest.key != selectedNode) {
+                                selectedNode = fastest.key
+                                prefs.edit().putString("selected_node", fastest.key).apply()
+                                onNodeChanged()
+                            }
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = MoneroOrange,
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Default Nodes
         SectionLabel("DEFAULT NODES")
@@ -154,26 +245,15 @@ fun NodeSettingsScreen(
                 NodeItem(
                     node = node,
                     isSelected = node.uri == selectedNode,
-                    isTesting = testingNode == node.uri,
+                    isBenchmarking = isBenchmarking && node.uri !in latencyMap,
+                    latencyMs = latencyMap[node.uri],
+                    enabled = !autoSelectEnabled,
                     onSelect = {
-                        val changed = selectedNode != node.uri
-                        selectedNode = node.uri
-                        prefs.edit().putString(
-                            "selected_node",
-                            node.uri
-                        ).apply()
-                        if (changed) onNodeChanged()
-                    },
-                    onTest = {
-                        testingNode = node.uri
-                        scope.launch {
-                            val success = testNodeConnection(node.uri)
-                            testingNode = null
-                            Toast.makeText(
-                                context,
-                                if (success) "Connected successfully" else "Connection failed",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                        if (!autoSelectEnabled) {
+                            val changed = selectedNode != node.uri
+                            selectedNode = node.uri
+                            prefs.edit().putString("selected_node", node.uri).apply()
+                            if (changed) onNodeChanged()
                         }
                     },
                     onDelete = null
@@ -222,37 +302,26 @@ fun NodeSettingsScreen(
                     NodeItem(
                         node = node,
                         isSelected = node.uri == selectedNode,
-                        isTesting = testingNode == node.uri,
+                        isBenchmarking = isBenchmarking && node.uri !in latencyMap,
+                        latencyMs = latencyMap[node.uri],
+                        enabled = !autoSelectEnabled,
                         onSelect = {
-                            val changed = selectedNode != node.uri
-                            selectedNode = node.uri
-                            prefs.edit().putString(
-                                "selected_node",
-                                node.uri
-                            ).apply()
-                            if (changed) onNodeChanged()
-                        },
-                        onTest = {
-                            testingNode = node.uri
-                            scope.launch {
-                                val success = testNodeConnection(node.uri)
-                                testingNode = null
-                                Toast.makeText(
-                                    context,
-                                    if (success) "Connected successfully" else "Connection failed",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                            if (!autoSelectEnabled) {
+                                val changed = selectedNode != node.uri
+                                selectedNode = node.uri
+                                prefs.edit().putString("selected_node", node.uri).apply()
+                                if (changed) onNodeChanged()
                             }
                         },
                         onDelete = {
                             customNodes.remove(node)
+                            latencyMap.remove(node.uri)
                             val uris = customNodes.map { it.uri }
                             prefs.edit().putString(
                                 "custom_nodes",
                                 json.encodeToString(uris)
                             ).apply()
 
-                            // If deleted node was selected, switch to default
                             if (selectedNode == node.uri) {
                                 selectedNode = DEFAULT_NODES.first().uri
                                 prefs.edit().putString(
@@ -281,6 +350,10 @@ fun NodeSettingsScreen(
                     json.encodeToString(uris)
                 ).apply()
                 showAddNodeDialog = false
+                // Benchmark the new node
+                scope.launch {
+                    latencyMap[uri] = benchmarkNode(uri)
+                }
             },
             onDismiss = { showAddNodeDialog = false }
         )
@@ -303,14 +376,17 @@ private fun SectionLabel(text: String) {
 private fun NodeItem(
     node: NodeInfo,
     isSelected: Boolean,
-    isTesting: Boolean,
+    isBenchmarking: Boolean,
+    latencyMs: Long?,
+    enabled: Boolean,
     onSelect: () -> Unit,
-    onTest: () -> Unit,
     onDelete: (() -> Unit)?
 ) {
+    val alpha = if (enabled) 1f else 0.6f
+
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onSelect
+        onClick = if (enabled) onSelect else null
     ) {
         Row(
             modifier = Modifier
@@ -321,7 +397,7 @@ private fun NodeItem(
             Icon(
                 imageVector = Icons.Default.Cloud,
                 contentDescription = null,
-                tint = if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface,
+                tint = (if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface).copy(alpha = alpha),
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
@@ -330,26 +406,25 @@ private fun NodeItem(
                     text = node.name,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Medium,
-                    color = if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface
+                    color = (if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface).copy(alpha = alpha)
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = node.uri,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f * alpha)
                 )
             }
 
-            if (isTesting) {
+            // Latency indicator
+            if (isBenchmarking) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     color = MoneroOrange,
                     strokeWidth = 2.dp
                 )
-            } else {
-                TextButton(onClick = onTest) {
-                    Text("Test", color = MoneroOrange)
-                }
+            } else if (latencyMs != null) {
+                LatencyBadge(latencyMs)
             }
 
             if (onDelete != null) {
@@ -374,6 +449,26 @@ private fun NodeItem(
             }
         }
     }
+}
+
+@Composable
+private fun LatencyBadge(latencyMs: Long) {
+    val (text, color) = when {
+        latencyMs < 0 -> "Unreachable" to ErrorRed
+        latencyMs < 200 -> "${latencyMs}ms" to SuccessGreen
+        latencyMs < 500 -> "${latencyMs}ms" to WarningYellow
+        else -> "${latencyMs}ms" to ErrorRed
+    }
+
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = color,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    )
 }
 
 @Composable
@@ -438,8 +533,13 @@ private fun AddNodeDialog(
     )
 }
 
-private suspend fun testNodeConnection(uri: String): Boolean = withContext(Dispatchers.IO) {
+/**
+ * Benchmarks a node by measuring the round-trip time for a /get_info request.
+ * Returns latency in ms, or -1 if unreachable.
+ */
+private suspend fun benchmarkNode(uri: String): Long = withContext(Dispatchers.IO) {
     try {
+        val start = System.currentTimeMillis()
         val url = URL("http://$uri/get_info")
         val connection = url.openConnection() as HttpURLConnection
         connection.connectTimeout = 5000
@@ -449,8 +549,12 @@ private suspend fun testNodeConnection(uri: String): Boolean = withContext(Dispa
         val responseCode = connection.responseCode
         connection.disconnect()
 
-        responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_FORBIDDEN
+        if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+            System.currentTimeMillis() - start
+        } else {
+            -1L
+        }
     } catch (e: Exception) {
-        false
+        -1L
     }
 }

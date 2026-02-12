@@ -23,13 +23,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -116,9 +121,17 @@ fun ReceiveScreen(
         if (selectedAddressIndex == 0) "Main Address" else "Subaddress #$selectedAddressIndex"
     }
 
-    val qrBitmap = remember(address) {
-        if (address.isNotBlank()) {
-            generateQRCode(address, 512, context)
+    var requestAmount by remember { mutableStateOf("") }
+
+    val qrData = remember(address, requestAmount) {
+        if (address.isBlank()) ""
+        else if (requestAmount.isBlank()) address
+        else "monero:$address?tx_amount=$requestAmount"
+    }
+
+    val qrBitmap = remember(qrData) {
+        if (qrData.isNotBlank()) {
+            generateQRCode(qrData, 512, context)
         } else null
     }
 
@@ -183,7 +196,47 @@ fun ReceiveScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Optional amount input
+            OutlinedTextField(
+                value = requestAmount,
+                onValueChange = {
+                    if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) {
+                        requestAmount = it
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Amount (optional)") },
+                suffix = {
+                    Text(
+                        text = "XMR",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                trailingIcon = {
+                    if (requestAmount.isNotBlank()) {
+                        IconButton(onClick = { requestAmount = "" }) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = "Clear",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MoneroOrange,
+                    cursorColor = MoneroOrange,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Address display with selector
             GlassCard(
@@ -242,7 +295,8 @@ fun ReceiveScreen(
                 PrimaryButton(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Monero Address", address)
+                        val copyText = if (requestAmount.isNotBlank()) qrData else address
+                        val clip = ClipData.newPlainText("Monero Address", copyText)
                         clipboard.setPrimaryClip(clip)
                         Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                     },
@@ -275,9 +329,10 @@ fun ReceiveScreen(
 
                 SecondaryButton(
                     onClick = {
+                        val shareText = if (requestAmount.isNotBlank()) qrData else address
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, address)
+                            putExtra(Intent.EXTRA_TEXT, shareText)
                         }
                         context.startActivity(Intent.createChooser(intent, "Share Address"))
                     },

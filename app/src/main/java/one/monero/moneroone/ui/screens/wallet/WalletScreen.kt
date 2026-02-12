@@ -1,5 +1,6 @@
 package one.monero.moneroone.ui.screens.wallet
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -67,6 +69,7 @@ import one.monero.moneroone.ui.components.SyncStatusIndicator
 
 import one.monero.moneroone.ui.components.TransactionStatus
 import one.monero.moneroone.ui.components.TransactionStatusIndicator
+import one.monero.moneroone.core.util.NetworkMonitor
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
@@ -95,6 +98,7 @@ fun WalletScreen(
     val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
+    val isOnline by NetworkMonitor.isConnected.collectAsState()
 
     // Calculate fiat value from balance × current price with correct currency symbol
     val fiatFormat = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
@@ -134,6 +138,34 @@ fun WalletScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         item { Spacer(modifier = Modifier.height(12.dp)) }
+
+        // Offline banner
+        item {
+            AnimatedVisibility(visible = !isOnline) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ErrorRed)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.WifiOff,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "You're offline. Some features may be unavailable.",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
+                }
+            }
+        }
 
         // Greeting header
         item {

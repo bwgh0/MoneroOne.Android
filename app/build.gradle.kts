@@ -113,6 +113,13 @@ dependencies {
     implementation(libs.mlkit.barcode.scanning)
     implementation("com.google.guava:guava:32.1.3-android")
 
+    // WorkManager
+    implementation(libs.androidx.work.runtime)
+
+    // Glance (App Widgets) - kept for WorkManager session cleanup; widgets use RemoteViews directly
+    // implementation(libs.androidx.glance.appwidget)
+    // implementation(libs.androidx.glance.material3)
+
     // Charts
     implementation(libs.vico.compose.m3)
 

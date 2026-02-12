@@ -7,8 +7,13 @@ import android.content.Context
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import one.monero.moneroone.core.alert.PriceAlertManager
+import one.monero.moneroone.core.alert.PriceAlertWorker
 import one.monero.moneroone.core.service.WalletSyncService
+import one.monero.moneroone.core.util.NetworkMonitor
 import one.monero.moneroone.core.wallet.WalletManager
+import one.monero.moneroone.widget.PriceWidget
+import one.monero.moneroone.widget.WalletWidget
 import timber.log.Timber
 
 class MoneroOneApp : Application() {
@@ -79,16 +84,30 @@ class MoneroOneApp : Application() {
             Timber.plant(Timber.DebugTree())
         }
 
-        createNotificationChannel()
+        createNotificationChannels()
+
+        // Initialize network monitor
+        NetworkMonitor.init(this)
 
         // Register lifecycle observer for auto-lock
         ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleObserver)
 
+        // Schedule price alert worker if there are enabled alerts
+        if (PriceAlertManager(this).hasEnabledAlerts()) {
+            PriceAlertWorker.schedule(this)
+        }
+
+        // Refresh all widgets on startup
+        PriceWidget.updateAll(this)
+        WalletWidget.updateAll(this)
+
         Timber.d("MoneroOne Application started")
     }
 
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
+    private fun createNotificationChannels() {
+        val nm = getSystemService(NotificationManager::class.java)
+
+        val syncChannel = NotificationChannel(
             WalletSyncService.CHANNEL_ID,
             "Wallet Sync",
             NotificationManager.IMPORTANCE_LOW
@@ -96,7 +115,15 @@ class MoneroOneApp : Application() {
             description = "Shows wallet sync progress while running in the background"
             setShowBadge(false)
         }
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(channel)
+        nm.createNotificationChannel(syncChannel)
+
+        val alertChannel = NotificationChannel(
+            PriceAlertWorker.CHANNEL_ID,
+            "Price Alerts",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Notifications when XMR price hits your target"
+        }
+        nm.createNotificationChannel(alertChannel)
     }
 }

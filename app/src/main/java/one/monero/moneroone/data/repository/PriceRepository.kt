@@ -8,6 +8,7 @@ import one.monero.moneroone.data.model.CoinGeckoResponse
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.model.CurrentPrice
 import one.monero.moneroone.data.model.PriceDataPoint
+import one.monero.moneroone.data.util.lttbDownsample
 import one.monero.moneroone.ui.screens.chart.TimeRange
 import timber.log.Timber
 import java.net.HttpURLConnection
@@ -148,21 +149,12 @@ class PriceRepository {
                 TimeRange.YEAR -> 365    // ~1 day intervals
                 TimeRange.ALL -> 500     // More points for full history
             }
-            val downsampled = downsample(dataPoints, maxPoints)
+            val downsampled = lttbDownsample(dataPoints, maxPoints)
 
             Result.success(downsampled)
         } catch (e: Exception) {
             Timber.e(e, "Failed to fetch chart data")
             Result.failure(e)
-        }
-    }
-
-    private fun downsample(data: List<PriceDataPoint>, maxPoints: Int): List<PriceDataPoint> {
-        if (data.size <= maxPoints) return data
-
-        val step = data.size.toDouble() / maxPoints
-        return (0 until maxPoints).map { i ->
-            data[(i * step).toInt().coerceIn(0, data.lastIndex)]
         }
     }
 

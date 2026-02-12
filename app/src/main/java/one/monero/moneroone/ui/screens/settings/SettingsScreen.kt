@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
@@ -57,6 +58,9 @@ import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.widget.WalletWidget
+import one.monero.moneroone.widget.WidgetDataStore
+import androidx.compose.material.icons.filled.Widgets
 import one.monero.moneroone.ui.theme.SettingsBlue
 import one.monero.moneroone.ui.theme.SettingsGray
 import one.monero.moneroone.ui.theme.SettingsGreen
@@ -70,6 +74,7 @@ fun SettingsScreen(
     onSecurityClick: () -> Unit,
     onThemeClick: () -> Unit,
     onCurrencyClick: () -> Unit,
+    onPriceAlertsClick: () -> Unit = {},
     onSyncSettingsClick: () -> Unit,
     onResetSyncClick: () -> Unit,
     onRemoveWalletClick: () -> Unit,
@@ -137,6 +142,36 @@ fun SettingsScreen(
                 subtitle = selectedCurrency.code.uppercase(),
                 onClick = onCurrencyClick,
                 iconColor = SettingsGreen
+            )
+
+            SettingsItem(
+                icon = Icons.Default.Notifications,
+                title = "Price Alerts",
+                subtitle = "Get notified on price changes",
+                onClick = onPriceAlertsClick,
+                iconColor = MoneroOrange
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Widgets Section
+        SettingsSection(title = "Widgets") {
+            var walletWidgetEnabled by remember {
+                mutableStateOf(WidgetDataStore.isWalletWidgetEnabled(context))
+            }
+
+            SettingsToggleItem(
+                icon = Icons.Default.Widgets,
+                title = "Balance & Transactions",
+                subtitle = "Show wallet data on home screen",
+                checked = walletWidgetEnabled,
+                onCheckedChange = { enabled ->
+                    walletWidgetEnabled = enabled
+                    WidgetDataStore.setWalletWidgetEnabled(context, enabled)
+                    WalletWidget.updateAll(context)
+                },
+                iconColor = SettingsBlue
             )
         }
 

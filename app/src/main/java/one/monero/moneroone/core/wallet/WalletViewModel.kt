@@ -26,6 +26,9 @@ import kotlinx.coroutines.withContext
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.model.CurrentPrice
 import one.monero.moneroone.data.repository.PriceRepository
+import one.monero.moneroone.widget.PriceWidget
+import one.monero.moneroone.widget.WalletWidget
+import one.monero.moneroone.widget.WidgetDataStore
 import timber.log.Timber
 import java.math.BigDecimal
 import java.util.UUID
@@ -151,6 +154,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     if (_selectedCurrency.value == currency) {
                         _currentPrice.value = result
                         Timber.d("Price updated for $currency: ${result.price}")
+                        // Update widget data
+                        WidgetDataStore.savePrice(
+                            context,
+                            result.price,
+                            result.change24h,
+                            currency.code,
+                            currency.symbol
+                        )
+                        PriceWidget.updateAll(context)
                     }
                     fetchingCurrency = null
                 }
@@ -488,6 +500,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             WalletManager.balanceFlow.collect { balance ->
                 Timber.d("Balance updated: all=${balance.all}, unlocked=${balance.unlocked}")
                 _walletState.update { it.copy(balance = balance) }
+                // Update balance widget
+                WidgetDataStore.saveBalance(context, balance.all, balance.unlocked)
+                WalletWidget.updateAll(context)
             }
         }
 
@@ -495,6 +510,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             WalletManager.transactionsFlow.collect { transactions ->
                 Timber.d("Transactions updated: count=${transactions.size}")
                 _walletState.update { it.copy(transactions = transactions) }
+                // Update transactions widget (store last 3)
+                val txString = transactions
+                    .sortedByDescending { it.timestamp }
+                    .take(3)
+                    .joinToString(";") { tx ->
+                        val dir = if (tx.direction == io.horizontalsystems.monerokit.model.TransactionInfo.Direction.Direction_In) "in" else "out"
+                        "$dir|${tx.amount}|${tx.timestamp}"
+                    }
+                WidgetDataStore.saveTransactions(context, txString)
+                WalletWidget.updateAll(context)
             }
         }
     }

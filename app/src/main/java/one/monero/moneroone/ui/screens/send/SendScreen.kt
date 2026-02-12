@@ -69,6 +69,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import one.monero.moneroone.core.util.NetworkMonitor
 import one.monero.moneroone.core.wallet.SendState
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
@@ -366,6 +367,9 @@ fun SendScreen(
             PrimaryButton(
                 onClick = {
                     when {
+                        !NetworkMonitor.isConnected.value -> {
+                            errorMessage = "No internet connection. Please check your network."
+                        }
                         address.isBlank() -> errorMessage = "Please enter a recipient address"
                         !address.startsWith("4") && !address.startsWith("8") -> {
                             errorMessage = "Invalid Monero address"

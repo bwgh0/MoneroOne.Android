@@ -15,6 +15,7 @@ import one.monero.moneroone.data.model.ChartUiState
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.model.PriceDataPoint
 import one.monero.moneroone.data.repository.PriceRepository
+import one.monero.moneroone.data.util.emaSmooth
 import timber.log.Timber
 
 class ChartViewModel(application: Application) : AndroidViewModel(application) {
@@ -26,6 +27,8 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ChartUiState())
     val uiState: StateFlow<ChartUiState> = _uiState.asStateFlow()
+
+    private var rawChartData: List<PriceDataPoint> = emptyList()
 
     private val _selectedTimeRange = MutableStateFlow(TimeRange.WEEK)
     val selectedTimeRange: StateFlow<TimeRange> = _selectedTimeRange.asStateFlow()
@@ -70,6 +73,10 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSelection() {
         _uiState.update { it.copy(selectedPoint = null) }
+    }
+
+    private fun applySmoothing(data: List<PriceDataPoint>): List<PriceDataPoint> {
+        return emaSmooth(data, 10)
     }
 
     fun refresh() {
@@ -166,14 +173,17 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
 
             result.fold(
                 onSuccess = { data ->
-                    val high = data.maxOfOrNull { it.price }
-                    val low = data.minOfOrNull { it.price }
-                    val open = data.firstOrNull()?.price
-                    val close = data.lastOrNull()?.price
+                    rawChartData = data
+                    val displayData = applySmoothing(data)
+
+                    val high = displayData.maxOfOrNull { it.price }
+                    val low = displayData.minOfOrNull { it.price }
+                    val open = displayData.firstOrNull()?.price
+                    val close = displayData.lastOrNull()?.price
 
                     _uiState.update { state ->
                         state.copy(
-                            chartData = data,
+                            chartData = displayData,
                             isLoading = false,
                             error = null,
                             high = high,

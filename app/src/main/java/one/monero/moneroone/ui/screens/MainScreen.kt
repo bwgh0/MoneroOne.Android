@@ -157,13 +157,17 @@ fun MainScreen(
                         },
                         priceChange24h = chartUiState.priceChange24h
                     )
-                    1 -> ChartScreen(viewModel = chartViewModel)
+                    1 -> ChartScreen(
+                        viewModel = chartViewModel,
+                        onPriceAlertsClick = { navController.navigate("price_alerts") }
+                    )
                     2 -> SettingsScreen(
                         walletViewModel = walletViewModel,
                         onBackupClick = { navController.navigate("backup_seed") },
                         onSecurityClick = { navController.navigate("security") },
                         onThemeClick = { navController.navigate("theme") },
                         onCurrencyClick = { navController.navigate("currency") },
+                        onPriceAlertsClick = { navController.navigate("price_alerts") },
                         onSyncSettingsClick = { navController.navigate("sync_settings") },
                         onResetSyncClick = {
                             walletViewModel.resetSync()

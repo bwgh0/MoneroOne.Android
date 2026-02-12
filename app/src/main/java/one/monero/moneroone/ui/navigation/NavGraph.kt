@@ -37,7 +37,9 @@ import one.monero.moneroone.ui.screens.settings.BackupSeedScreen
 import one.monero.moneroone.ui.screens.settings.ChangePinScreen
 import one.monero.moneroone.ui.screens.settings.CurrencyScreen
 import one.monero.moneroone.ui.screens.settings.NodeSettingsScreen
+import one.monero.moneroone.ui.screens.settings.AddPriceAlertScreen
 import one.monero.moneroone.ui.screens.settings.DonationScreen
+import one.monero.moneroone.ui.screens.settings.PriceAlertsScreen
 import one.monero.moneroone.ui.screens.settings.SecurityScreen
 import one.monero.moneroone.ui.screens.settings.SyncSettingsScreen
 import one.monero.moneroone.ui.screens.settings.ThemeScreen
@@ -76,6 +78,8 @@ sealed class Screen(val route: String) {
     data object SyncSettings : Screen("sync_settings")
     data object NodeSettings : Screen("node_settings")
     data object Donation : Screen("donation")
+    data object PriceAlerts : Screen("price_alerts")
+    data object AddPriceAlert : Screen("add_price_alert")
 }
 
 @Composable
@@ -366,6 +370,20 @@ fun MoneroOneNavHost(
             NodeSettingsScreen(
                 onBack = { navController.popBackStack() },
                 onNodeChanged = { walletViewModel.resetSync() }
+            )
+        }
+
+        composable(Screen.PriceAlerts.route) {
+            PriceAlertsScreen(
+                onBack = { navController.popBackStack() },
+                onAddAlert = { navController.navigate(Screen.AddPriceAlert.route) }
+            )
+        }
+
+        composable(Screen.AddPriceAlert.route) {
+            AddPriceAlertScreen(
+                walletViewModel = walletViewModel,
+                onBack = { navController.popBackStack() }
             )
         }
 

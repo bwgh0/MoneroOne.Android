@@ -108,4 +108,8 @@
     <string name="insufficient_balance">Insufficient balance</string>
     <string name="connection_error">Connection error</string>
     <string name="sync_error">Sync error</string>
+
+    <!-- Widgets -->
+    <string name="widget_description">Shows the current Monero price and 24h change</string>
+    <string name="wallet_widget_description">Shows your Monero balance and recent transactions</string>
 </resources>
