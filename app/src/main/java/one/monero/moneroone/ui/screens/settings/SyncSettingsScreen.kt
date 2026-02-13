@@ -52,6 +52,7 @@ import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.ErrorRed
+import io.horizontalsystems.monerokit.util.RestoreHeight
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,10 +75,19 @@ fun SyncSettingsScreen(
 
     var showDatePicker by remember { mutableStateOf(false) }
     var restoreHeight by remember {
-        mutableStateOf(prefs.getLong("restore_height", 0L))
+        val longVal = prefs.getLong("restore_height", 0L)
+        val strVal = prefs.getString("restore_height_str", "0")?.toLongOrNull() ?: 0L
+        mutableStateOf(if (longVal > 0L) longVal else strVal)
+    }
+    var restoreDateMillis by remember {
+        mutableStateOf(prefs.getLong("restore_date_millis", 0L))
     }
 
-    val dateFormatter = remember { SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()) }
+    val dateFormatter = remember {
+        SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -248,7 +258,9 @@ fun SyncSettingsScreen(
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    val displayText = if (restoreHeight > 0) {
+                    val displayText = if (restoreDateMillis > 0L) {
+                        "${dateFormatter.format(Date(restoreDateMillis))} (Block $restoreHeight)"
+                    } else if (restoreHeight > 0) {
                         val estimatedDate = restoreHeightToDate(restoreHeight)
                         "${dateFormatter.format(estimatedDate)} (Block $restoreHeight)"
                     } else {
@@ -319,7 +331,9 @@ fun SyncSettingsScreen(
     // Date Picker Dialog
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = if (restoreHeight > 0) {
+            initialSelectedDateMillis = if (restoreDateMillis > 0L) {
+                restoreDateMillis
+            } else if (restoreHeight > 0) {
                 restoreHeightToDate(restoreHeight).time
             } else {
                 System.currentTimeMillis()
@@ -334,7 +348,11 @@ fun SyncSettingsScreen(
                         datePickerState.selectedDateMillis?.let { dateMillis ->
                             val newHeight = dateToRestoreHeight(dateMillis)
                             restoreHeight = newHeight
-                            prefs.edit().putLong("restore_height", newHeight).apply()
+                            restoreDateMillis = dateMillis
+                            prefs.edit()
+                                .putLong("restore_height", newHeight)
+                                .putLong("restore_date_millis", dateMillis)
+                                .apply()
                             walletViewModel.setRestoreHeight(newHeight)
                             walletViewModel.resetSync()
                         }
@@ -349,7 +367,11 @@ fun SyncSettingsScreen(
                     onClick = {
                         // Clear / scan from beginning
                         restoreHeight = 0L
-                        prefs.edit().putLong("restore_height", 0L).apply()
+                        restoreDateMillis = 0L
+                        prefs.edit()
+                            .putLong("restore_height", 0L)
+                            .putLong("restore_date_millis", 0L)
+                            .apply()
                         walletViewModel.setRestoreHeight(0L)
                         walletViewModel.resetSync()
                         showDatePicker = false
@@ -394,31 +416,185 @@ private fun getSyncStatusColor(syncState: SyncState): androidx.compose.ui.graphi
     }
 }
 
-/**
- * Converts a date (in milliseconds) to an estimated Monero block height.
- * Monero mainnet started on April 18, 2014 (block 0).
- * Average block time is ~2 minutes (120 seconds).
- */
 private fun dateToRestoreHeight(dateMillis: Long): Long {
-    // Monero mainnet genesis: April 18, 2014 00:00:00 UTC
-    val genesisTimestamp = 1397782800000L
-
-    if (dateMillis <= genesisTimestamp) {
-        return 0L
-    }
-
-    val secondsSinceGenesis = (dateMillis - genesisTimestamp) / 1000
-    val estimatedHeight = secondsSinceGenesis / 120
-
-    // Subtract some blocks as safety margin (1 day = ~720 blocks)
-    return maxOf(0L, estimatedHeight - 720)
+    return RestoreHeight.getInstance().getHeight(Date(dateMillis))
 }
 
 /**
- * Converts a block height back to an estimated date.
+ * Height-to-date lookup table from RestoreHeight.java.
+ * Used for reverse interpolation: given a height, find the approximate date.
+ */
+private val heightToDateTable: List<Pair<Long, Long>> by lazy {
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+        timeZone = java.util.TimeZone.getTimeZone("UTC")
+    }
+    listOf(
+        0L to sdf.parse("2014-04-18")!!.time,
+        18844L to sdf.parse("2014-05-01")!!.time,
+        65406L to sdf.parse("2014-06-01")!!.time,
+        108882L to sdf.parse("2014-07-01")!!.time,
+        153594L to sdf.parse("2014-08-01")!!.time,
+        198072L to sdf.parse("2014-09-01")!!.time,
+        241088L to sdf.parse("2014-10-01")!!.time,
+        285305L to sdf.parse("2014-11-01")!!.time,
+        328069L to sdf.parse("2014-12-01")!!.time,
+        372369L to sdf.parse("2015-01-01")!!.time,
+        416505L to sdf.parse("2015-02-01")!!.time,
+        456631L to sdf.parse("2015-03-01")!!.time,
+        501084L to sdf.parse("2015-04-01")!!.time,
+        543973L to sdf.parse("2015-05-01")!!.time,
+        588326L to sdf.parse("2015-06-01")!!.time,
+        631187L to sdf.parse("2015-07-01")!!.time,
+        675484L to sdf.parse("2015-08-01")!!.time,
+        719725L to sdf.parse("2015-09-01")!!.time,
+        762463L to sdf.parse("2015-10-01")!!.time,
+        806528L to sdf.parse("2015-11-01")!!.time,
+        849041L to sdf.parse("2015-12-01")!!.time,
+        892866L to sdf.parse("2016-01-01")!!.time,
+        936736L to sdf.parse("2016-02-01")!!.time,
+        977691L to sdf.parse("2016-03-01")!!.time,
+        1015848L to sdf.parse("2016-04-01")!!.time,
+        1037417L to sdf.parse("2016-05-01")!!.time,
+        1059651L to sdf.parse("2016-06-01")!!.time,
+        1081269L to sdf.parse("2016-07-01")!!.time,
+        1103630L to sdf.parse("2016-08-01")!!.time,
+        1125983L to sdf.parse("2016-09-01")!!.time,
+        1147617L to sdf.parse("2016-10-01")!!.time,
+        1169779L to sdf.parse("2016-11-01")!!.time,
+        1191402L to sdf.parse("2016-12-01")!!.time,
+        1213861L to sdf.parse("2017-01-01")!!.time,
+        1236197L to sdf.parse("2017-02-01")!!.time,
+        1256358L to sdf.parse("2017-03-01")!!.time,
+        1278622L to sdf.parse("2017-04-01")!!.time,
+        1300239L to sdf.parse("2017-05-01")!!.time,
+        1322564L to sdf.parse("2017-06-01")!!.time,
+        1344225L to sdf.parse("2017-07-01")!!.time,
+        1366664L to sdf.parse("2017-08-01")!!.time,
+        1389113L to sdf.parse("2017-09-01")!!.time,
+        1410738L to sdf.parse("2017-10-01")!!.time,
+        1433039L to sdf.parse("2017-11-01")!!.time,
+        1454639L to sdf.parse("2017-12-01")!!.time,
+        1477201L to sdf.parse("2018-01-01")!!.time,
+        1499599L to sdf.parse("2018-02-01")!!.time,
+        1519796L to sdf.parse("2018-03-01")!!.time,
+        1542067L to sdf.parse("2018-04-01")!!.time,
+        1562861L to sdf.parse("2018-05-01")!!.time,
+        1585135L to sdf.parse("2018-06-01")!!.time,
+        1606715L to sdf.parse("2018-07-01")!!.time,
+        1629017L to sdf.parse("2018-08-01")!!.time,
+        1651347L to sdf.parse("2018-09-01")!!.time,
+        1673031L to sdf.parse("2018-10-01")!!.time,
+        1695128L to sdf.parse("2018-11-01")!!.time,
+        1716687L to sdf.parse("2018-12-01")!!.time,
+        1738923L to sdf.parse("2019-01-01")!!.time,
+        1761435L to sdf.parse("2019-02-01")!!.time,
+        1781681L to sdf.parse("2019-03-01")!!.time,
+        1803081L to sdf.parse("2019-04-01")!!.time,
+        1824671L to sdf.parse("2019-05-01")!!.time,
+        1847005L to sdf.parse("2019-06-01")!!.time,
+        1868590L to sdf.parse("2019-07-01")!!.time,
+        1890878L to sdf.parse("2019-08-01")!!.time,
+        1913201L to sdf.parse("2019-09-01")!!.time,
+        1934732L to sdf.parse("2019-10-01")!!.time,
+        1957051L to sdf.parse("2019-11-01")!!.time,
+        1978433L to sdf.parse("2019-12-01")!!.time,
+        2001315L to sdf.parse("2020-01-01")!!.time,
+        2023656L to sdf.parse("2020-02-01")!!.time,
+        2044552L to sdf.parse("2020-03-01")!!.time,
+        2066806L to sdf.parse("2020-04-01")!!.time,
+        2088411L to sdf.parse("2020-05-01")!!.time,
+        2110702L to sdf.parse("2020-06-01")!!.time,
+        2132318L to sdf.parse("2020-07-01")!!.time,
+        2154590L to sdf.parse("2020-08-01")!!.time,
+        2176790L to sdf.parse("2020-09-01")!!.time,
+        2198370L to sdf.parse("2020-10-01")!!.time,
+        2220670L to sdf.parse("2020-11-01")!!.time,
+        2242241L to sdf.parse("2020-12-01")!!.time,
+        2264584L to sdf.parse("2021-01-01")!!.time,
+        2286892L to sdf.parse("2021-02-01")!!.time,
+        2307079L to sdf.parse("2021-03-01")!!.time,
+        2329385L to sdf.parse("2021-04-01")!!.time,
+        2351004L to sdf.parse("2021-05-01")!!.time,
+        2373306L to sdf.parse("2021-06-01")!!.time,
+        2394882L to sdf.parse("2021-07-01")!!.time,
+        2417162L to sdf.parse("2021-08-01")!!.time,
+        2439490L to sdf.parse("2021-09-01")!!.time,
+        2461020L to sdf.parse("2021-10-01")!!.time,
+        2483377L to sdf.parse("2021-11-01")!!.time,
+        2504932L to sdf.parse("2021-12-01")!!.time,
+        2527316L to sdf.parse("2022-01-01")!!.time,
+        2549605L to sdf.parse("2022-02-01")!!.time,
+        2569711L to sdf.parse("2022-03-01")!!.time,
+        2591995L to sdf.parse("2022-04-01")!!.time,
+        2613603L to sdf.parse("2022-05-01")!!.time,
+        2635840L to sdf.parse("2022-06-01")!!.time,
+        2657395L to sdf.parse("2022-07-01")!!.time,
+        2679705L to sdf.parse("2022-08-01")!!.time,
+        2701991L to sdf.parse("2022-09-01")!!.time,
+        2723607L to sdf.parse("2022-10-01")!!.time,
+        2745899L to sdf.parse("2022-11-01")!!.time,
+        2767427L to sdf.parse("2022-12-01")!!.time,
+        2789763L to sdf.parse("2023-01-01")!!.time,
+        2811996L to sdf.parse("2023-02-01")!!.time,
+        2832118L to sdf.parse("2023-03-01")!!.time,
+        2854365L to sdf.parse("2023-04-01")!!.time,
+        2875972L to sdf.parse("2023-05-01")!!.time,
+        2898270L to sdf.parse("2023-06-01")!!.time,
+        2919840L to sdf.parse("2023-07-01")!!.time,
+        2942140L to sdf.parse("2023-08-01")!!.time,
+        2964430L to sdf.parse("2023-09-01")!!.time,
+        2986010L to sdf.parse("2023-10-01")!!.time,
+        3008300L to sdf.parse("2023-11-01")!!.time,
+        3029880L to sdf.parse("2023-12-01")!!.time,
+        3052170L to sdf.parse("2024-01-01")!!.time,
+        3074470L to sdf.parse("2024-02-01")!!.time,
+        3095330L to sdf.parse("2024-03-01")!!.time,
+        3117620L to sdf.parse("2024-04-01")!!.time,
+        3139200L to sdf.parse("2024-05-01")!!.time,
+        3161490L to sdf.parse("2024-06-01")!!.time,
+        3183070L to sdf.parse("2024-07-01")!!.time,
+        3205360L to sdf.parse("2024-08-01")!!.time,
+        3227660L to sdf.parse("2024-09-01")!!.time,
+        3249240L to sdf.parse("2024-10-01")!!.time,
+        3271530L to sdf.parse("2024-11-01")!!.time,
+        3293110L to sdf.parse("2024-12-01")!!.time,
+        3315400L to sdf.parse("2025-01-01")!!.time,
+        3337700L to sdf.parse("2025-02-01")!!.time,
+        3357830L to sdf.parse("2025-03-01")!!.time,
+        3380130L to sdf.parse("2025-04-01")!!.time,
+        3401700L to sdf.parse("2025-05-01")!!.time,
+        3424000L to sdf.parse("2025-06-01")!!.time,
+        3445580L to sdf.parse("2025-07-01")!!.time,
+        3467870L to sdf.parse("2025-08-01")!!.time,
+        3490175L to sdf.parse("2025-09-01")!!.time,
+        3575753L to sdf.parse("2025-12-29")!!.time,
+    )
+}
+
+/**
+ * Converts a block height back to an estimated date using reverse lookup table interpolation.
  */
 private fun restoreHeightToDate(height: Long): Date {
-    val genesisTimestamp = 1397782800000L
-    val estimatedMillis = genesisTimestamp + (height * 120 * 1000)
-    return Date(estimatedMillis)
+    if (height <= 0L) return Date(heightToDateTable.first().second)
+
+    val table = heightToDateTable
+    // If beyond the last known height, extrapolate at 120s/block from last entry
+    if (height >= table.last().first) {
+        val lastEntry = table.last()
+        val extraMillis = (height - lastEntry.first) * 120L * 1000L
+        return Date(lastEntry.second + extraMillis)
+    }
+
+    // Find bracketing entries and interpolate
+    for (i in 0 until table.size - 1) {
+        val (h0, t0) = table[i]
+        val (h1, t1) = table[i + 1]
+        if (height in h0..h1) {
+            val fraction = (height - h0).toDouble() / (h1 - h0).toDouble()
+            val interpolatedTime = t0 + (fraction * (t1 - t0)).toLong()
+            return Date(interpolatedTime)
+        }
+    }
+
+    return Date(table.last().second)
 }

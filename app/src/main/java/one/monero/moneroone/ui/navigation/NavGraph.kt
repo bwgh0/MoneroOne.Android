@@ -24,6 +24,7 @@ import one.monero.moneroone.ui.screens.MainScreen
 import one.monero.moneroone.ui.screens.onboarding.CreateWalletScreen
 import one.monero.moneroone.ui.screens.onboarding.RestoreWalletScreen
 import one.monero.moneroone.ui.screens.onboarding.SetPinScreen
+import one.monero.moneroone.ui.screens.onboarding.SetupBiometricsScreen
 import one.monero.moneroone.ui.screens.onboarding.WelcomeScreen
 import one.monero.moneroone.ui.screens.receive.AddressPickerScreen
 import one.monero.moneroone.ui.screens.receive.ReceiveScreen
@@ -51,6 +52,7 @@ sealed class Screen(val route: String) {
     data object CreateWallet : Screen("create_wallet")
     data object RestoreWallet : Screen("restore_wallet")
     data object SetPin : Screen("set_pin")
+    data object SetupBiometrics : Screen("setup_biometrics")
     data object Unlock : Screen("unlock")
     data object Main : Screen("main")
     data object Send : Screen("send?address={address}&amount={amount}") {
@@ -115,7 +117,7 @@ fun MoneroOneNavHost(
     androidx.compose.runtime.LaunchedEffect(isLocked, walletState.hasWallet) {
         val currentRoute = navController.currentDestination?.route
         if (walletState.hasWallet && !isLocked && currentRoute != Screen.Main.route) {
-            if (currentRoute == Screen.Unlock.route || currentRoute == Screen.SetPin.route) {
+            if (currentRoute == Screen.Unlock.route) {
                 navController.navigate(Screen.Main.route) {
                     popUpTo(0) { inclusive = true }
                 }
@@ -195,6 +197,17 @@ fun MoneroOneNavHost(
             SetPinScreen(
                 walletViewModel = walletViewModel,
                 onPinSet = {
+                    navController.navigate(Screen.SetupBiometrics.route) {
+                        popUpTo(Screen.SetPin.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.SetupBiometrics.route) {
+            SetupBiometricsScreen(
+                walletViewModel = walletViewModel,
+                onContinue = {
                     navController.navigate(Screen.Main.route) {
                         popUpTo(0) { inclusive = true }
                     }
@@ -369,7 +382,7 @@ fun MoneroOneNavHost(
         composable(Screen.NodeSettings.route) {
             NodeSettingsScreen(
                 onBack = { navController.popBackStack() },
-                onNodeChanged = { walletViewModel.resetSync() }
+                onNodeChanged = { walletViewModel.changeNode() }
             )
         }
 

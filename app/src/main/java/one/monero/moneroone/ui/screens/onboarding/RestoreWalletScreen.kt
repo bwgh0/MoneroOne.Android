@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.theme.MoneroOrange
+import io.horizontalsystems.monerokit.util.RestoreHeight
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -64,7 +65,11 @@ fun RestoreWalletScreen(
 
     val walletState by walletViewModel.walletState.collectAsState()
 
-    val dateFormatter = remember { SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()) }
+    val dateFormatter = remember {
+        SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -100,7 +105,7 @@ fun RestoreWalletScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "16 words (Polyseed) or 24 words (BIP39)",
+                text = "24 words (BIP39) or 25 words (Monero legacy)",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
@@ -138,55 +143,40 @@ fun RestoreWalletScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Calculate word count for conditional UI
-            val wordCount = seedPhrase.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
-            val isPolyseed = wordCount == 16
-
-            // Restore height input - hidden for Polyseed (16 words) since birthday is embedded
-            if (!isPolyseed) {
-                OutlinedTextField(
-                    value = selectedDate?.let { dateFormatter.format(Date(it)) } ?: "",
-                    onValueChange = { },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true },
-                    label = { Text("Wallet Birthday (Optional)") },
-                    placeholder = { Text("Select date when wallet was created") },
-                    supportingText = { Text("Leave empty to scan from beginning (slower)") },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MoneroOrange,
-                        cursorColor = MoneroOrange,
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    trailingIcon = {
-                        IconButton(onClick = { showDatePicker = true }) {
-                            Icon(
-                                imageVector = Icons.Default.DateRange,
-                                contentDescription = "Select date",
-                                tint = MoneroOrange
-                            )
-                        }
-                    },
-                    readOnly = true,
-                    enabled = false,
-                    singleLine = true
-                )
-            } else {
-                // Show info for Polyseed
-                Text(
-                    text = "Polyseed detected - wallet birthday is embedded in the seed",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            // Restore height input
+            OutlinedTextField(
+                value = selectedDate?.let { dateFormatter.format(Date(it)) } ?: "",
+                onValueChange = { },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDatePicker = true },
+                label = { Text("Wallet Birthday (Optional)") },
+                placeholder = { Text("Select date when wallet was created") },
+                supportingText = { Text("Leave empty to scan from beginning (slower)") },
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MoneroOrange,
+                    cursorColor = MoneroOrange,
+                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline,
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                trailingIcon = {
+                    IconButton(onClick = { showDatePicker = true }) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = "Select date",
+                            tint = MoneroOrange
+                        )
+                    }
+                },
+                readOnly = true,
+                enabled = false,
+                singleLine = true
+            )
 
             if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -215,15 +205,16 @@ fun RestoreWalletScreen(
                         words.isEmpty() -> {
                             errorMessage = "Please enter your seed phrase"
                         }
-                        words.size !in listOf(16, 24) -> {
-                            errorMessage = "Seed phrase must be 16 words (Polyseed) or 24 words (BIP39)"
+                        words.size !in listOf(24, 25) -> {
+                            errorMessage = "Seed phrase must be 24 or 25 words"
                         }
                         else -> {
                             // Convert selected date to restore height
                             val restoreHeightValue = selectedDate?.let { dateToRestoreHeight(it) }?.toString()
                             walletViewModel.restoreWallet(
                                 seed = words,
-                                restoreHeight = restoreHeightValue
+                                restoreHeight = restoreHeightValue,
+                                restoreDateMillis = selectedDate
                             )
                             onWalletRestored()
                         }
@@ -284,26 +275,6 @@ fun RestoreWalletScreen(
     }
 }
 
-/**
- * Converts a date (in milliseconds) to an estimated Monero block height.
- * Monero mainnet started on April 18, 2014 (block 0).
- * Average block time is ~2 minutes (120 seconds).
- */
 private fun dateToRestoreHeight(dateMillis: Long): Long {
-    // Monero mainnet genesis: April 18, 2014 00:00:00 UTC
-    val genesisTimestamp = 1397782800000L // April 18, 2014 in milliseconds
-
-    // If date is before genesis, return 0
-    if (dateMillis <= genesisTimestamp) {
-        return 0L
-    }
-
-    // Calculate seconds since genesis
-    val secondsSinceGenesis = (dateMillis - genesisTimestamp) / 1000
-
-    // Average block time is ~120 seconds (2 minutes)
-    val estimatedHeight = secondsSinceGenesis / 120
-
-    // Subtract some blocks as a safety margin (1 day worth = ~720 blocks)
-    return maxOf(0L, estimatedHeight - 720)
+    return RestoreHeight.getInstance().getHeight(Date(dateMillis))
 }

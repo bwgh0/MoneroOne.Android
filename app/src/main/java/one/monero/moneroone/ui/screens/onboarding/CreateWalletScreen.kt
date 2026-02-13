@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,9 +60,15 @@ fun CreateWalletScreen(
     onBack: () -> Unit
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
-    var selectedSeedType by remember { mutableStateOf(SeedType.POLYSEED) }
     var generatedSeed by remember { mutableStateOf<List<String>>(emptyList()) }
     var seedConfirmed by remember { mutableStateOf(false) }
+
+    // Generate seed immediately on screen entry
+    LaunchedEffect(Unit) {
+        if (generatedSeed.isEmpty()) {
+            generatedSeed = walletViewModel.generateNewSeed(SeedType.BIP39_24)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -95,7 +102,7 @@ fun CreateWalletScreen(
                     .padding(vertical = 16.dp),
                 horizontalArrangement = Arrangement.Center
             ) {
-                repeat(3) { step ->
+                repeat(2) { step ->
                     Box(
                         modifier = Modifier
                             .size(if (step == currentStep) 12.dp else 8.dp)
@@ -104,160 +111,22 @@ fun CreateWalletScreen(
                                 shape = RoundedCornerShape(50)
                             )
                     )
-                    if (step < 2) Spacer(modifier = Modifier.width(8.dp))
+                    if (step < 1) Spacer(modifier = Modifier.width(8.dp))
                 }
             }
 
             when (currentStep) {
-                0 -> SeedTypeSelection(
-                    selectedType = selectedSeedType,
-                    onTypeSelected = { selectedSeedType = it },
-                    onContinue = {
-                        generatedSeed = walletViewModel.generateNewSeed(selectedSeedType)
-                        currentStep = 1
-                    }
-                )
-                1 -> SeedDisplay(
+                0 -> SeedDisplay(
                     seed = generatedSeed,
-                    onContinue = { currentStep = 2 }
+                    onContinue = { currentStep = 1 }
                 )
-                2 -> SeedConfirmation(
+                1 -> SeedConfirmation(
                     seed = generatedSeed,
                     onConfirmed = {
                         seedConfirmed = true
-                        walletViewModel.createWallet(generatedSeed, selectedSeedType)
+                        walletViewModel.createWallet(generatedSeed, SeedType.BIP39_24)
                         onWalletCreated()
                     }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SeedTypeSelection(
-    selectedType: SeedType,
-    onTypeSelected: (SeedType) -> Unit,
-    onContinue: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Choose Seed Format",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Select the type of recovery phrase for your wallet",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Polyseed option (Recommended)
-        SeedTypeCard(
-            title = "Polyseed",
-            subtitle = "Recommended",
-            description = "16 words with embedded wallet birthday. Faster restoration, same security.",
-            isSelected = selectedType == SeedType.POLYSEED,
-            onClick = { onTypeSelected(SeedType.POLYSEED) }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Standard BIP39 24-word option
-        SeedTypeCard(
-            title = "Standard",
-            subtitle = null,
-            description = "24 words (BIP39 format). Compatible with more wallets.",
-            isSelected = selectedType == SeedType.BIP39_24,
-            onClick = { onTypeSelected(SeedType.BIP39_24) }
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = onContinue,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MoneroOrange,
-                contentColor = Color.White
-            )
-        ) {
-            Text("Continue", style = MaterialTheme.typography.titleMedium)
-        }
-    }
-}
-
-@Composable
-private fun SeedTypeCard(
-    title: String,
-    subtitle: String?,
-    description: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    if (subtitle != null) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = MoneroOrange.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(4.dp)
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MoneroOrange,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-            }
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Selected",
-                    tint = MoneroOrange,
-                    modifier = Modifier.size(24.dp)
                 )
             }
         }

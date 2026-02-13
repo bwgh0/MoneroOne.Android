@@ -50,7 +50,7 @@ object WalletManager {
         walletId: String,
         node: String,
         trustNode: Boolean,
-        networkType: NetworkType
+        networkType: NetworkType = NetworkType.NetworkType_Mainnet
     ): MoneroKit {
         // Stop any existing kit
         kit?.let {
@@ -61,12 +61,11 @@ object WalletManager {
 
         val newKit = MoneroKit.getInstance(
             context = context,
-            seed = seed,
+            seed = seed as Seed.Bip39,
             restoreDateOrHeight = restoreDateOrHeight,
             walletId = walletId,
             node = node,
-            trustNode = trustNode,
-            networkType = networkType
+            trustNode = trustNode
         )
 
         kit = newKit
@@ -109,6 +108,20 @@ object WalletManager {
                 Timber.e(e, "WalletManager.stop() failed")
             }
         }
+    }
+
+    /**
+     * Stop the kit and release the reference, but preserve flow state (balance, txs).
+     * Used for node switching where we want to reinitialize without losing UI state.
+     */
+    suspend fun stopAndRelease() {
+        try {
+            kit?.stop()
+        } catch (e: Exception) {
+            Timber.w(e, "WalletManager.stopAndRelease() stop failed")
+        }
+        kit = null
+        Timber.d("WalletManager: stopped and released kit")
     }
 
     /**

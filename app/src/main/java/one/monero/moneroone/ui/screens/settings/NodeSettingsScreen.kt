@@ -102,7 +102,7 @@ fun NodeSettingsScreen(
     }
 
     var autoSelectEnabled by remember {
-        mutableStateOf(prefs.getBoolean("auto_select_node", false))
+        mutableStateOf(prefs.getBoolean("auto_select_node", true))
     }
 
     var showAddNodeDialog by remember { mutableStateOf(false) }
