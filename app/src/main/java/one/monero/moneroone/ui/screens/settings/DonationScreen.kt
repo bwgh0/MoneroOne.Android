@@ -38,10 +38,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,8 +86,11 @@ fun DonationScreen(
     val context = LocalContext.current
     var copied by remember { mutableStateOf(false) }
 
-    val qrBitmap = remember {
-        generateDonationQRCode(DONATION_ADDRESS, 512, context)
+    var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(Unit) {
+        qrBitmap = withContext(Dispatchers.Default) {
+            generateDonationQRCode(DONATION_ADDRESS, 512, context)
+        }
     }
 
     val donationGradient = Brush.horizontalGradient(
@@ -162,9 +168,10 @@ fun DonationScreen(
                         .padding(20.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (qrBitmap != null) {
+                    val bitmap = qrBitmap
+                    if (bitmap != null) {
                         Image(
-                            bitmap = qrBitmap.asImageBitmap(),
+                            bitmap = bitmap.asImageBitmap(),
                             contentDescription = "Donation QR Code",
                             modifier = Modifier
                                 .fillMaxSize()

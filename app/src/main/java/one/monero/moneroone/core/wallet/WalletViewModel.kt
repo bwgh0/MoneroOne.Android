@@ -819,6 +819,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return WalletManager.kit?.getSubaddresses() ?: emptyList()
     }
 
+    fun createSubaddress(): String? {
+        return WalletManager.kit?.createSubaddress()
+    }
+
     fun formatXmr(atomicUnits: Long): String {
         val xmr = BigDecimal(atomicUnits).divide(BigDecimal(1_000_000_000_000L))
         return xmr.setScale(4, java.math.RoundingMode.DOWN).toPlainString()

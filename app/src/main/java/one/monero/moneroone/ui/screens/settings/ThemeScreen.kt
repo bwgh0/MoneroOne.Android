@@ -102,7 +102,7 @@ fun ThemeScreen(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Theme",
+                text = "Appearance",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )

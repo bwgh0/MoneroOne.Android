@@ -110,8 +110,54 @@ fun SecurityScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // PIN Section
-        SectionLabel("PIN")
+        // Authentication Section
+        SectionLabel("AUTHENTICATION")
+
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Fingerprint,
+                    contentDescription = null,
+                    tint = if (biometricAvailable) MoneroOrange else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Biometrics",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = if (biometricAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (biometricAvailable) "Use fingerprint or face to unlock" else "Not available on this device",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                Switch(
+                    checked = biometricsEnabled,
+                    onCheckedChange = { enabled ->
+                        biometricsEnabled = enabled
+                        prefs.edit().putBoolean("biometrics_enabled", enabled).apply()
+                        walletViewModel.setBiometricsEnabled(enabled)
+                    },
+                    enabled = biometricAvailable,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = MoneroOrange,
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                )
+            }
+        }
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
@@ -154,57 +200,6 @@ fun SecurityScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Biometrics Section
-        SectionLabel("BIOMETRICS")
-
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Fingerprint,
-                    contentDescription = null,
-                    tint = if (biometricAvailable) MoneroOrange else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Biometric Unlock",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = if (biometricAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = if (biometricAvailable) "Use fingerprint or face to unlock" else "Not available on this device",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-                Switch(
-                    checked = biometricsEnabled,
-                    onCheckedChange = { enabled ->
-                        biometricsEnabled = enabled
-                        prefs.edit().putBoolean("biometrics_enabled", enabled).apply()
-                        walletViewModel.setBiometricsEnabled(enabled)
-                    },
-                    enabled = biometricAvailable,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = MoneroOrange,
-                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Auto-Lock Section
         SectionLabel("AUTO-LOCK")
 
@@ -227,7 +222,7 @@ fun SecurityScreen(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Auto-Lock Timeout",
+                        text = "Lock After",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium
                     )
@@ -285,7 +280,7 @@ private fun AutoLockDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Auto-Lock Timeout") },
+        title = { Text("Lock After") },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp)

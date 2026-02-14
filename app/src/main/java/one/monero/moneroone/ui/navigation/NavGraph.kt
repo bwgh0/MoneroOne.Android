@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -108,10 +109,12 @@ fun MoneroOneNavHost(
         }
     }
 
-    val startDestination = when {
-        !walletState.hasWallet -> Screen.Welcome.route
-        isLocked -> Screen.Unlock.route
-        else -> Screen.Main.route
+    val startDestination = remember {
+        when {
+            !walletState.hasWallet -> Screen.Welcome.route
+            isLocked -> Screen.Unlock.route
+            else -> Screen.Main.route
+        }
     }
 
     androidx.compose.runtime.LaunchedEffect(isLocked, walletState.hasWallet) {
@@ -221,6 +224,12 @@ fun MoneroOneNavHost(
                 onUnlocked = {
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Unlock.route) { inclusive = true }
+                    }
+                },
+                onResetWallet = {
+                    walletViewModel.removeWallet()
+                    navController.navigate(Screen.Welcome.route) {
+                        popUpTo(0) { inclusive = true }
                     }
                 }
             )

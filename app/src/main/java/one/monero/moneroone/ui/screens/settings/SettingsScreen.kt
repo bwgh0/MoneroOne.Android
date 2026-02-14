@@ -130,7 +130,7 @@ fun SettingsScreen(
         SettingsSection(title = "Display") {
             SettingsItem(
                 icon = Icons.Default.Brush,
-                title = "Theme",
+                title = "Appearance",
                 subtitle = "System default",
                 onClick = onThemeClick,
                 iconColor = SettingsPurple
@@ -151,12 +151,7 @@ fun SettingsScreen(
                 onClick = onPriceAlertsClick,
                 iconColor = MoneroOrange
             )
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Widgets Section
-        SettingsSection(title = "Widgets") {
             var walletWidgetEnabled by remember {
                 mutableStateOf(WidgetDataStore.isWalletWidgetEnabled(context))
             }
@@ -186,14 +181,6 @@ fun SettingsScreen(
                 onClick = onSyncSettingsClick,
                 iconColor = MoneroOrange
             )
-
-            SettingsItem(
-                icon = Icons.Default.Refresh,
-                title = "Reset Sync",
-                subtitle = "Resync wallet from scratch",
-                onClick = { showResetSyncDialog = true },
-                iconColor = MoneroOrange
-            )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -202,8 +189,8 @@ fun SettingsScreen(
         SettingsSection(title = "About") {
             SettingsItem(
                 icon = Icons.Default.Info,
-                title = "Version",
-                subtitle = BuildConfig.VERSION_NAME,
+                title = "Build",
+                subtitle = BuildConfig.VERSION_CODE.toString(),
                 onClick = { },
                 iconColor = SettingsGray
             )
@@ -224,7 +211,7 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // Support Section
-        SettingsSection(title = "Support") {
+        SettingsSection(title = "Support the Developer") {
             SettingsItem(
                 icon = Icons.Default.Favorite,
                 title = "Donate XMR",
@@ -238,6 +225,40 @@ fun SettingsScreen(
 
         // Danger Zone
         SettingsSection(title = "Danger Zone") {
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { showResetSyncDialog = true }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = ErrorRed,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Reset Sync Data",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = ErrorRed
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Resync wallet from scratch",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            }
+
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { showDeleteDialog = true }
@@ -257,7 +278,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Remove Wallet",
+                            text = "Remove Wallet from Device",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium,
                             color = ErrorRed
@@ -282,14 +303,14 @@ fun SettingsScreen(
             onDismissRequest = { showDeleteDialog = false },
             title = {
                 Text(
-                    text = "Remove Wallet?",
+                    text = "Remove Wallet from Device?",
                     style = MaterialTheme.typography.titleLarge
                 )
             },
             text = {
                 Text(
-                    text = "This will permanently delete your wallet from this device. " +
-                        "Make sure you have backed up your seed phrase before continuing!",
+                    text = "This removes wallet data from this device only. " +
+                        "Your wallet still exists on the blockchain and can be recovered with your seed phrase.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
@@ -320,14 +341,14 @@ fun SettingsScreen(
             onDismissRequest = { showResetSyncDialog = false },
             title = {
                 Text(
-                    text = "Reset Sync?",
+                    text = "Reset Sync Data?",
                     style = MaterialTheme.typography.titleLarge
                 )
             },
             text = {
                 Text(
-                    text = "This will resync your wallet from the beginning. " +
-                        "Your balance and transactions will be temporarily unavailable during sync.",
+                    text = "This will clear all sync progress and re-sync from the beginning. " +
+                        "Your wallet and keys are not affected.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             },

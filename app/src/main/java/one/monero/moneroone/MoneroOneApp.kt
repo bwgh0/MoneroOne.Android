@@ -62,17 +62,17 @@ class MoneroOneApp : Application() {
 
                 if (shouldLock) {
                     Timber.d("Auto-lock triggered: elapsed=${elapsedSeconds}s, timeout=${timeoutSeconds}s")
-                    // Set flag that WalletViewModel will check - use commit() for synchronous write
+                    // Set flag that WalletViewModel will check
                     prefs.edit()
                         .putBoolean(KEY_SHOULD_LOCK, true)
-                        .commit()
+                        .apply()
                 }
             }
 
-            // Clear the background timestamp - use commit() to ensure synchronous removal
+            // Clear the background timestamp
             prefs.edit()
                 .remove(KEY_BACKGROUND_TIMESTAMP)
-                .commit()
+                .apply()
         }
     }
 

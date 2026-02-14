@@ -34,11 +34,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,10 +69,14 @@ fun AddressPickerScreen(
 ) {
     val context = LocalContext.current
     val walletState by walletViewModel.walletState.collectAsState()
-    val subaddresses = walletViewModel.getSubaddresses()
+    var subaddresses by remember { mutableStateOf(walletViewModel.getSubaddresses()) }
+    LaunchedEffect(walletState.receiveAddress) {
+        subaddresses = withContext(Dispatchers.IO) { walletViewModel.getSubaddresses() }
+    }
 
     val prefs = remember { context.getSharedPreferences("monero_wallet", android.content.Context.MODE_PRIVATE) }
     var selectedIndex by remember { mutableIntStateOf(prefs.getInt("selected_address_index", 0)) }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -88,7 +98,10 @@ fun AddressPickerScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    // TODO: Create new subaddress when MoneroKit exposes this
+                    scope.launch {
+                        withContext(Dispatchers.IO) { walletViewModel.createSubaddress() }
+                        subaddresses = withContext(Dispatchers.IO) { walletViewModel.getSubaddresses() }
+                    }
                 },
                 containerColor = MoneroOrange,
                 contentColor = Color.White
@@ -106,21 +119,23 @@ fun AddressPickerScreen(
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // Main address (index 0)
+            // Main address (subaddresses[0] = primary address)
             item {
+                val mainAddress = subaddresses.firstOrNull()?.address ?: walletState.receiveAddress
                 MainAddressCard(
-                    address = walletState.receiveAddress,
+                    address = mainAddress,
                     isSelected = selectedIndex == 0,
                     onClick = {
                         selectedIndex = 0
-                        prefs.edit().putInt("selected_address_index", 0).commit()
-                        onAddressSelected(walletState.receiveAddress, 0)
+                        prefs.edit().putInt("selected_address_index", 0).apply()
+                        onAddressSelected(mainAddress, 0)
                     }
                 )
             }
 
-            // Subaddresses
-            if (subaddresses.isNotEmpty()) {
+            // Subaddresses (subaddresses[1+])
+            val realSubaddresses = subaddresses.drop(1)
+            if (realSubaddresses.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -132,15 +147,16 @@ fun AddressPickerScreen(
                     )
                 }
 
-                itemsIndexed(subaddresses) { index, subaddress ->
+                itemsIndexed(realSubaddresses) { index, subaddress ->
+                    val subIndex = index + 1 // maps to subaddresses[1], [2], etc.
                     SubaddressCard(
                         subaddress = subaddress,
-                        index = index + 1, // Subaddresses start from index 1
-                        isSelected = selectedIndex == index + 1,
+                        index = subIndex,
+                        isSelected = selectedIndex == subIndex,
                         onClick = {
-                            selectedIndex = index + 1
-                            prefs.edit().putInt("selected_address_index", index + 1).commit()
-                            onAddressSelected(subaddress.address, index + 1)
+                            selectedIndex = subIndex
+                            prefs.edit().putInt("selected_address_index", subIndex).apply()
+                            onAddressSelected(subaddress.address, subIndex)
                         }
                     )
                 }
@@ -276,9 +292,8 @@ private fun SubaddressCard(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                val defaultLabels = setOf("primary account", "Primary account", "")
                 Text(
-                    text = if (subaddress.label in defaultLabels) "Subaddress #$index" else subaddress.label,
+                    text = if (subaddress.displayLabel.startsWith("#")) "Subaddress #$index" else subaddress.displayLabel,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Medium
                 )

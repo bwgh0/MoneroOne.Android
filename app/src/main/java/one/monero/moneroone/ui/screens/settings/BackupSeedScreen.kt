@@ -4,7 +4,13 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,10 +28,12 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -36,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,21 +52,26 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
-import one.monero.moneroone.ui.components.PinEntryField
-import androidx.compose.foundation.border
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 
+private const val PIN_LENGTH = 6
 private const val CLIPBOARD_CLEAR_DELAY_MS = 5 * 60 * 1000L // 5 minutes
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -68,12 +82,14 @@ fun BackupSeedScreen(
 ) {
     var pin by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf<String?>(null) }
+    var shakeAnimation by remember { mutableStateOf(false) }
     var isUnlocked by remember { mutableStateOf(false) }
     var seedWords by remember { mutableStateOf<List<String>>(emptyList()) }
     var copiedToClipboard by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     // Clear clipboard after delay if seed was copied
     DisposableEffect(copiedToClipboard) {
@@ -89,95 +105,148 @@ fun BackupSeedScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 16.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back"
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Backup Seed",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
+    LaunchedEffect(shakeAnimation) {
+        if (shakeAnimation) {
+            delay(500)
+            shakeAnimation = false
         }
+    }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        if (!isUnlocked) {
-            // PIN entry screen
-            GlassCard(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Enter PIN to View Seed",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Your PIN is required to access your recovery phrase",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    PinEntryField(
-                        value = pin,
-                        onValueChange = {
-                            pin = it
-                            pinError = null
-                        },
-                        isError = pinError != null,
-                        onComplete = { enteredPin ->
-                            val verified = walletViewModel.verifyPinOnly(enteredPin)
-                            if (verified) {
-                                isUnlocked = true
-                                seedWords = walletViewModel.getSeedPhrase() ?: emptyList()
-                            } else {
-                                pinError = "Invalid PIN"
-                                pin = ""
-                            }
-                        }
-                    )
-
-                    if (pinError != null) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = pinError ?: "",
-                            color = ErrorRed,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
+    fun onDigitPress(digit: String) {
+        if (pin.length < PIN_LENGTH) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            pinError = null
+            pin += digit
+            if (pin.length == PIN_LENGTH) {
+                val verified = walletViewModel.verifyPinOnly(pin)
+                if (verified) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    isUnlocked = true
+                    seedWords = walletViewModel.getSeedPhrase() ?: emptyList()
+                } else {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    pinError = "Invalid PIN"
+                    shakeAnimation = true
+                    pin = ""
                 }
             }
-        } else {
-            // Seed display screen
+        }
+    }
+
+    fun onBackspace() {
+        if (pin.isNotEmpty()) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            pin = pin.dropLast(1)
+            pinError = null
+        }
+    }
+
+    if (!isUnlocked) {
+        // Full-screen PIN entry with custom number pad
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Back button row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back"
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(0.5f))
+
+            Text(
+                text = "Enter PIN to View Seed",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Your PIN is required to access your recovery phrase",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // PIN dots
+            PinDotsBackup(
+                enteredLength = pin.length,
+                totalLength = PIN_LENGTH,
+                shake = shakeAnimation
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Error message
+            AnimatedVisibility(
+                visible = pinError != null,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Text(
+                    text = pinError ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ErrorRed
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(0.5f))
+
+            // Number pad
+            NumberPadBackup(
+                onDigitPress = ::onDigitPress,
+                onBackspace = ::onBackspace
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    } else {
+        // Seed display screen
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back"
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Backup Seed",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // Warning banner
             GlassCard(
                 modifier = Modifier.fillMaxWidth()
@@ -241,7 +310,7 @@ fun BackupSeedScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Copy button - Orange style matching iOS
+            // Copy button
             Button(
                 onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -278,9 +347,102 @@ fun BackupSeedScreen(
                     textAlign = TextAlign.Center
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+private fun PinDotsBackup(
+    enteredLength: Int,
+    totalLength: Int,
+    shake: Boolean
+) {
+    Row(
+        modifier = Modifier.padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        repeat(totalLength) { index ->
+            val isFilled = index < enteredLength
+            val scale by animateFloatAsState(
+                targetValue = if (isFilled) 1.2f else 1f,
+                animationSpec = tween(100),
+                label = "scale$index"
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .scale(scale)
+                    .clip(CircleShape)
+                    .background(
+                        if (isFilled) MoneroOrange else Color.Gray.copy(alpha = 0.3f)
+                    )
+            )
+        }
+    }
+}
+
+@Composable
+private fun NumberPadBackup(
+    onDigitPress: (String) -> Unit,
+    onBackspace: () -> Unit
+) {
+    val buttons = listOf(
+        listOf("1", "2", "3"),
+        listOf("4", "5", "6"),
+        listOf("7", "8", "9"),
+        listOf("", "0", "back")
+    )
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        buttons.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                row.forEach { button ->
+                    when (button) {
+                        "" -> Spacer(modifier = Modifier.size(80.dp))
+                        "back" -> {
+                            IconButton(
+                                onClick = onBackspace,
+                                modifier = Modifier.size(80.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Backspace,
+                                    contentDescription = "Backspace",
+                                    modifier = Modifier.size(28.dp),
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
+                        else -> {
+                            GlassButton(
+                                onClick = { onDigitPress(button) },
+                                modifier = Modifier.size(80.dp),
+                                cornerRadius = 40.dp
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = button,
+                                        fontSize = 28.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

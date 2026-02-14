@@ -23,10 +23,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,12 +64,14 @@ private const val PIN_LENGTH = 6
 @Composable
 fun UnlockScreen(
     walletViewModel: WalletViewModel,
-    onUnlocked: () -> Unit
+    onUnlocked: () -> Unit,
+    onResetWallet: () -> Unit
 ) {
     var pin by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var shakeAnimation by remember { mutableStateOf(false) }
     var attempts by remember { mutableStateOf(0) }
+    var showResetDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -211,7 +217,52 @@ fun UnlockScreen(
             onBiometric = if (biometricAvailable) ::showBiometricPrompt else null
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        TextButton(onClick = { showResetDialog = true }) {
+            Text(
+                text = "Forgot PIN?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = {
+                Text(
+                    text = "Remove Wallet from Device?",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = "This removes wallet data from this device only. " +
+                        "Your wallet still exists on the blockchain and can be recovered with your seed phrase.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onResetWallet()
+                        showResetDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ErrorRed
+                    )
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

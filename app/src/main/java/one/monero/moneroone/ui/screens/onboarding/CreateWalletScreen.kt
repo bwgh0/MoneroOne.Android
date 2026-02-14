@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.SeedType
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.MoneroLogo
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.WarningYellow
 
@@ -143,8 +144,12 @@ private fun SeedDisplay(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        MoneroLogo(size = 80.dp)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
-            text = "Write Down Your Seed Phrase",
+            text = "Write down your seed phrase",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold
         )
@@ -171,7 +176,7 @@ private fun SeedDisplay(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Write down these words in order. Never share them with anyone. This is the only way to recover your wallet.",
+                    text = "This is the ONLY way to recover your wallet. Store it safely offline.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -210,7 +215,7 @@ private fun SeedDisplay(
                 contentColor = Color.White
             )
         ) {
-            Text("I've Saved My Seed", style = MaterialTheme.typography.titleMedium)
+            Text("Continue", style = MaterialTheme.typography.titleMedium)
         }
     }
 }

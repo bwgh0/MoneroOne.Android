@@ -94,10 +94,8 @@ fun RestoreWalletScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-
             Text(
-                text = "Enter Your Seed Phrase",
+                text = "Enter your seed phrase",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold
             )

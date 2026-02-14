@@ -61,7 +61,7 @@ object WalletManager {
 
         val newKit = MoneroKit.getInstance(
             context = context,
-            seed = seed as Seed.Bip39,
+            seed = seed,
             restoreDateOrHeight = restoreDateOrHeight,
             walletId = walletId,
             node = node,

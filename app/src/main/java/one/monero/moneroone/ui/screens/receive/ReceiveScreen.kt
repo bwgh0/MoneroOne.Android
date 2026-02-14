@@ -43,6 +43,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -51,6 +52,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -107,18 +110,29 @@ fun ReceiveScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Get the address based on selected index
-    val subaddresses = walletViewModel.getSubaddresses()
-    val address = remember(selectedAddressIndex, walletState.receiveAddress, subaddresses) {
-        if (selectedAddressIndex == 0) {
-            walletState.receiveAddress
-        } else {
-            subaddresses.getOrNull(selectedAddressIndex - 1)?.address ?: walletState.receiveAddress
-        }
+    // Load subaddresses off the main thread
+    var subaddresses by remember { mutableStateOf(walletViewModel.getSubaddresses()) }
+    LaunchedEffect(refreshKey, walletState.receiveAddress) {
+        subaddresses = withContext(Dispatchers.IO) { walletViewModel.getSubaddresses() }
     }
 
-    val addressLabel = remember(selectedAddressIndex) {
-        if (selectedAddressIndex == 0) "Main Address" else "Subaddress #$selectedAddressIndex"
+    // Derive address and label from subaddresses list
+    // subaddresses[0] = primary address, subaddresses[1+] = subaddresses
+    val address: String
+    val addressLabel: String
+    val sub = subaddresses.getOrNull(selectedAddressIndex)
+    if (sub != null) {
+        address = sub.address
+        addressLabel = if (selectedAddressIndex == 0) "Main Address" else "Subaddress #$selectedAddressIndex"
+    } else {
+        // Saved index is out of bounds or list not loaded yet — fall back to primary
+        address = subaddresses.firstOrNull()?.address ?: ""
+        addressLabel = "Main Address"
+        if (subaddresses.isNotEmpty() && selectedAddressIndex != 0) {
+            LaunchedEffect(Unit) {
+                prefs.edit().putInt("selected_address_index", 0).apply()
+            }
+        }
     }
 
     var requestAmount by remember { mutableStateOf("") }
@@ -129,10 +143,16 @@ fun ReceiveScreen(
         else "monero:$address?tx_amount=$requestAmount"
     }
 
-    val qrBitmap = remember(qrData) {
+    // Generate QR code off the main thread
+    var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(qrData) {
         if (qrData.isNotBlank()) {
-            generateQRCode(qrData, 512, context)
-        } else null
+            qrBitmap = withContext(Dispatchers.Default) {
+                generateQRCode(qrData, 512, context)
+            }
+        } else {
+            qrBitmap = null
+        }
     }
 
     Scaffold(
@@ -179,9 +199,10 @@ fun ReceiveScreen(
                         .padding(20.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (qrBitmap != null) {
+                    val bitmap = qrBitmap
+                    if (bitmap != null) {
                         Image(
-                            bitmap = qrBitmap.asImageBitmap(),
+                            bitmap = bitmap.asImageBitmap(),
                             contentDescription = "QR Code",
                             modifier = Modifier
                                 .fillMaxSize()

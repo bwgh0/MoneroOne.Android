@@ -1,6 +1,5 @@
 package one.monero.moneroone.ui.screens.onboarding
 
-import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -20,7 +19,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,15 +40,6 @@ fun SetupBiometricsScreen(
         .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
             BiometricManager.BIOMETRIC_SUCCESS
 
-    // Auto-skip if device doesn't support biometrics
-    LaunchedEffect(biometricAvailable) {
-        if (!biometricAvailable) {
-            onContinue()
-        }
-    }
-
-    if (!biometricAvailable) return
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -64,13 +53,15 @@ fun SetupBiometricsScreen(
             imageVector = Icons.Default.Fingerprint,
             contentDescription = "Biometrics",
             modifier = Modifier.size(96.dp),
-            tint = MoneroOrange
+            tint = if (biometricAvailable) MoneroOrange
+                   else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "Enable Biometric Unlock",
+            text = if (biometricAvailable) "Enable Biometrics?"
+                   else "Biometrics Unavailable",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
@@ -79,7 +70,10 @@ fun SetupBiometricsScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Use fingerprint or face recognition to quickly unlock your wallet",
+            text = if (biometricAvailable)
+                       "Unlock your wallet quickly and securely with biometrics instead of entering your PIN."
+                   else
+                       "This device does not support biometric authentication. You can enable it later in Settings if you set up biometrics on your device.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
@@ -87,37 +81,56 @@ fun SetupBiometricsScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Button(
-            onClick = {
-                walletViewModel.setBiometricsEnabled(true)
-                onContinue()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MoneroOrange,
-                contentColor = Color.White
-            )
-        ) {
-            Text(
-                text = "Enable",
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
+        if (biometricAvailable) {
+            Button(
+                onClick = {
+                    walletViewModel.setBiometricsEnabled(true)
+                    onContinue()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MoneroOrange,
+                    contentColor = Color.White
+                )
+            ) {
+                Text(
+                    text = "Enable Biometrics",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        TextButton(
-            onClick = onContinue,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = "Skip",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-            )
+            TextButton(
+                onClick = onContinue,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Skip for Now",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                )
+            }
+        } else {
+            Button(
+                onClick = onContinue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MoneroOrange,
+                    contentColor = Color.White
+                )
+            ) {
+                Text(
+                    text = "Continue",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))

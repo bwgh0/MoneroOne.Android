@@ -43,11 +43,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
-import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
+import one.monero.moneroone.ui.components.MoneroLogo
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 
@@ -66,9 +65,9 @@ fun SetPinScreen(
 
     val haptic = LocalHapticFeedback.current
 
-    val title = if (currentStep == 0) "Set Your PIN" else "Confirm Your PIN"
+    val title = if (currentStep == 0) "Set a PIN to secure your wallet" else "Confirm Your PIN"
     val subtitle = if (currentStep == 0) {
-        "Create a $PIN_LENGTH-digit PIN to secure your wallet"
+        null
     } else {
         "Enter your PIN again to confirm"
     }
@@ -92,7 +91,7 @@ fun SetPinScreen(
                         onPinSet()
                     } else {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        errorMessage = "PINs don't match. Try again."
+                        errorMessage = "PINs don't match"
                         shakeAnimation = true
                         confirmPin = ""
                     }
@@ -127,11 +126,7 @@ fun SetPinScreen(
     ) {
         Spacer(modifier = Modifier.weight(0.5f))
 
-        AsyncImage(
-            model = R.drawable.monero_logo,
-            contentDescription = "Monero",
-            modifier = Modifier.size(80.dp)
-        )
+        MoneroLogo(size = 80.dp)
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -142,14 +137,16 @@ fun SetPinScreen(
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        if (subtitle != null) {
+            Spacer(modifier = Modifier.height(8.dp))
 
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center
-        )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+        }
 
         Spacer(modifier = Modifier.height(48.dp))
 
