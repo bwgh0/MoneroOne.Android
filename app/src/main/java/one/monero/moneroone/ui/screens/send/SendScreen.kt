@@ -65,8 +65,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import one.monero.moneroone.core.util.NetworkMonitor
@@ -138,36 +136,6 @@ fun SendScreen(
         )
     }
 
-    // Sending Progress Dialog
-    if (sendState is SendState.Sending) {
-        SendingProgressDialog()
-    }
-
-    // Success Dialog
-    if (sendState is SendState.Success) {
-        SendSuccessDialog(
-            txHash = (sendState as SendState.Success).txHash,
-            onDone = {
-                // Just navigate away - DisposableEffect handles resetSendState()
-                onSent()
-            }
-        )
-    }
-
-    // Error Dialog
-    if (sendState is SendState.Error) {
-        SendErrorDialog(
-            message = (sendState as SendState.Error).message,
-            onRetry = {
-                walletViewModel.resetSendState()
-                walletViewModel.send(address, walletViewModel.parseXmr(amount))
-            },
-            onDismiss = {
-                walletViewModel.resetSendState()
-            }
-        )
-    }
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp),
@@ -191,6 +159,7 @@ fun SendScreen(
             )
         }
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -402,6 +371,30 @@ fun SendScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+
+        // Full-screen overlays for send states
+        if (sendState is SendState.Sending) {
+            SendingOverlay()
+        }
+
+        if (sendState is SendState.Success) {
+            SendSuccessOverlay(
+                txHash = (sendState as SendState.Success).txHash,
+                onDone = { onSent() }
+            )
+        }
+
+        if (sendState is SendState.Error) {
+            SendErrorOverlay(
+                message = (sendState as SendState.Error).message,
+                onRetry = {
+                    walletViewModel.resetSendState()
+                    walletViewModel.send(address, walletViewModel.parseXmr(amount))
+                },
+                onDismiss = { walletViewModel.resetSendState() }
+            )
+        }
+        } // Box
     }
 }
 
@@ -525,243 +518,236 @@ private fun SendConfirmationDialog(
 }
 
 @Composable
-private fun SendingProgressDialog() {
-    Dialog(
-        onDismissRequest = { },
-        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+private fun SendingOverlay() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(32.dp),
-            contentAlignment = Alignment.Center
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                CircularProgressIndicator(
-                    color = MoneroOrange,
-                    modifier = Modifier.size(48.dp),
-                    strokeWidth = 4.dp
-                )
+            CircularProgressIndicator(
+                color = MoneroOrange,
+                modifier = Modifier.size(64.dp),
+                strokeWidth = 5.dp
+            )
 
-                Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-                Text(
-                    text = "Sending Transaction...",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+            Text(
+                text = "Sending Transaction...",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
 
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-                Text(
-                    text = "Please wait while your transaction is being processed",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
+            Text(
+                text = "Please wait while your transaction is being processed",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
 
 @Composable
-private fun SendSuccessDialog(
+private fun SendSuccessOverlay(
     txHash: String,
     onDone: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
 
-    Dialog(
-        onDismissRequest = onDone,
-        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(32.dp),
-            contentAlignment = Alignment.Center
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+            // Large success checkmark
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(SuccessGreen.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
             ) {
-                // Success checkmark
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(SuccessGreen.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Success",
-                        tint = SuccessGreen,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Success",
+                    tint = SuccessGreen,
+                    modifier = Modifier.size(80.dp)
+                )
+            }
 
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Transaction Sent!",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = SuccessGreen
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Your transaction has been submitted to the network",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            if (txHash.isNotBlank()) {
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "Transaction Sent!",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = SuccessGreen
+                    text = "Transaction ID",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "Your transaction has been submitted to the network",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-
-                if (txHash.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Transaction ID",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = txHash.take(12) + "..." + txHash.takeLast(12),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(
-                            onClick = {
-                                clipboardManager.setText(AnnotatedString(txHash))
-                                copied = true
-                            },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-                                contentDescription = "Copy",
-                                tint = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                PrimaryButton(
-                    onClick = onDone,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    color = SuccessGreen
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Text(
-                        text = "Done",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        text = txHash.take(12) + "..." + txHash.takeLast(12),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
                     )
+                    IconButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(txHash))
+                            copied = true
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                            contentDescription = "Copy",
+                            tint = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            PrimaryButton(
+                onClick = onDone,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                color = SuccessGreen
+            ) {
+                Text(
+                    text = "Done",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
             }
         }
     }
 }
 
 @Composable
-private fun SendErrorDialog(
+private fun SendErrorOverlay(
     message: String,
     onRetry: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(32.dp),
-            contentAlignment = Alignment.Center
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+            // Large error icon
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(ErrorRed.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
             ) {
-                // Error icon
-                Box(
+                Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = "Error",
+                    tint = ErrorRed,
+                    modifier = Modifier.size(80.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Transaction Failed",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = ErrorRed
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TextButton(
+                    onClick = onDismiss,
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(ErrorRed.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
+                        .weight(1f)
+                        .height(56.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Error,
-                        contentDescription = "Error",
-                        tint = ErrorRed,
-                        modifier = Modifier.size(32.dp)
+                    Text(
+                        text = "Close",
+                        style = MaterialTheme.typography.titleMedium
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Text(
-                    text = "Transaction Failed",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = ErrorRed
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                PrimaryButton(
+                    onClick = onRetry,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp),
+                    color = MoneroOrange
                 ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Close")
-                    }
-
-                    PrimaryButton(
-                        onClick = onRetry,
-                        modifier = Modifier.weight(1f),
-                        color = MoneroOrange
-                    ) {
-                        Text(
-                            text = "Retry",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                    }
+                    Text(
+                        text = "Retry",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
                 }
             }
         }

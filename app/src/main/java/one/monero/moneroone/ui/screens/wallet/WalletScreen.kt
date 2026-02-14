@@ -121,7 +121,7 @@ fun WalletScreen(
         onRefresh = {
             scope.launch {
                 isRefreshing = true
-                walletViewModel.resetSync()
+                walletViewModel.refreshSync()
                 walletViewModel.refreshPrice()
                 delay(1500)
                 isRefreshing = false
@@ -172,7 +172,7 @@ fun WalletScreen(
             GreetingHeader()
         }
 
-        // Balance card
+        // Balance card - always show real data (iOS behavior)
         item {
             BalanceCard(
                 balance = walletViewModel.formatXmr(walletState.balance.all),
@@ -234,7 +234,6 @@ fun WalletScreen(
             }
         }
 
-        // Transactions
         if (walletState.transactions.isEmpty()) {
             item {
                 EmptyTransactionsCard(

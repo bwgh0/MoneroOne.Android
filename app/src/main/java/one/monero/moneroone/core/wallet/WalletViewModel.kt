@@ -475,53 +475,58 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private var kitObserverJobs: List<Job> = emptyList()
+
     private fun setupKitObservers() {
-        viewModelScope.launch {
-            WalletManager.syncStateFlow.collect { syncState ->
-                when (syncState) {
-                    is SyncState.NotSynced -> {
-                        Timber.d("SyncState: NotSynced, error=${syncState.error}")
+        // Cancel any existing collectors to prevent stacking
+        kitObserverJobs.forEach { it.cancel() }
+
+        kitObserverJobs = listOf(
+            viewModelScope.launch {
+                WalletManager.syncStateFlow.collect { syncState ->
+                    when (syncState) {
+                        is SyncState.NotSynced -> {
+                            Timber.d("SyncState: NotSynced, error=${syncState.error}")
+                        }
+                        is SyncState.Connecting -> {
+                            Timber.d("SyncState: Connecting, waiting=${syncState.waiting}")
+                        }
+                        is SyncState.Syncing -> {
+                            Timber.d("SyncState: Syncing, progress=${syncState.progress}")
+                        }
+                        is SyncState.Synced -> {
+                            Timber.d("SyncState: Synced")
+                        }
                     }
-                    is SyncState.Connecting -> {
-                        Timber.d("SyncState: Connecting, waiting=${syncState.waiting}")
-                    }
-                    is SyncState.Syncing -> {
-                        Timber.d("SyncState: Syncing, progress=${syncState.progress}")
-                    }
-                    is SyncState.Synced -> {
-                        Timber.d("SyncState: Synced")
-                    }
+                    _walletState.update { it.copy(syncState = syncState) }
                 }
-                _walletState.update { it.copy(syncState = syncState) }
+            },
+            viewModelScope.launch {
+                WalletManager.balanceFlow.collect { balance ->
+                    Timber.d("Balance updated: all=${balance.all}, unlocked=${balance.unlocked}")
+                    _walletState.update { it.copy(balance = balance) }
+                    // Update balance widget
+                    WidgetDataStore.saveBalance(context, balance.all, balance.unlocked)
+                    WalletWidget.updateAll(context)
+                }
+            },
+            viewModelScope.launch {
+                WalletManager.transactionsFlow.collect { transactions ->
+                    Timber.d("Transactions updated: count=${transactions.size}")
+                    _walletState.update { it.copy(transactions = transactions) }
+                    // Update transactions widget (store last 3)
+                    val txString = transactions
+                        .sortedByDescending { it.timestamp }
+                        .take(3)
+                        .joinToString(";") { tx ->
+                            val dir = if (tx.direction == io.horizontalsystems.monerokit.model.TransactionInfo.Direction.Direction_In) "in" else "out"
+                            "$dir|${tx.amount}|${tx.timestamp}"
+                        }
+                    WidgetDataStore.saveTransactions(context, txString)
+                    WalletWidget.updateAll(context)
+                }
             }
-        }
-
-        viewModelScope.launch {
-            WalletManager.balanceFlow.collect { balance ->
-                Timber.d("Balance updated: all=${balance.all}, unlocked=${balance.unlocked}")
-                _walletState.update { it.copy(balance = balance) }
-                // Update balance widget
-                WidgetDataStore.saveBalance(context, balance.all, balance.unlocked)
-                WalletWidget.updateAll(context)
-            }
-        }
-
-        viewModelScope.launch {
-            WalletManager.transactionsFlow.collect { transactions ->
-                Timber.d("Transactions updated: count=${transactions.size}")
-                _walletState.update { it.copy(transactions = transactions) }
-                // Update transactions widget (store last 3)
-                val txString = transactions
-                    .sortedByDescending { it.timestamp }
-                    .take(3)
-                    .joinToString(";") { tx ->
-                        val dir = if (tx.direction == io.horizontalsystems.monerokit.model.TransactionInfo.Direction.Direction_In) "in" else "out"
-                        "$dir|${tx.amount}|${tx.timestamp}"
-                    }
-                WidgetDataStore.saveTransactions(context, txString)
-                WalletWidget.updateAll(context)
-            }
-        }
+        )
     }
 
     fun setPin(pin: String) {
@@ -622,6 +627,26 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     it.copy(
                         syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
                         error = "Failed to change node: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    fun refreshSync() {
+        viewModelScope.launch {
+            try {
+                _walletState.update {
+                    it.copy(syncState = SyncState.Connecting(waiting = false))
+                }
+                WalletManager.stopAndRelease()
+                initializeWalletIfNeeded()
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to refresh sync")
+                _walletState.update {
+                    it.copy(
+                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                        error = "Failed to refresh: ${e.message}"
                     )
                 }
             }

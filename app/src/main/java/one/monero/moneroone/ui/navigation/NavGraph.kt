@@ -268,7 +268,11 @@ fun MoneroOneNavHost(
                 initialAmount = amount,
                 onBack = { navController.popBackStack() },
                 onScanQr = { navController.navigate(Screen.QRScanner.route) },
-                onSent = { navController.popBackStack() }
+                onSent = {
+                    navController.navigate(Screen.Main.route) {
+                        popUpTo(Screen.Main.route) { inclusive = true }
+                    }
+                }
             )
         }
 

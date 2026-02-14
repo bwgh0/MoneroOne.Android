@@ -95,3 +95,4 @@ lint/tmp/
 # Secrets
 *.env
 secrets.properties
+keystore.properties

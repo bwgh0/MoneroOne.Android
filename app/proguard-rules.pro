@@ -22,3 +22,6 @@
 
 # Timber
 -dontwarn org.jetbrains.annotations.**
+
+# Lombok (used by MoneroKit at compile time)
+-dontwarn lombok.**
