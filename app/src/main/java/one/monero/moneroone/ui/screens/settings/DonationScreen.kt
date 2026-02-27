@@ -321,37 +321,32 @@ private fun generateDonationQRCode(data: String, size: Int, context: Context): B
 private fun addMoneroLogoOverlay(qrBitmap: Bitmap, context: Context): Bitmap {
     val size = qrBitmap.width
     val logoSize = (size * 0.22).toInt()
-    val logoOffset = (size - logoSize) / 2
 
     val result = qrBitmap.copy(Bitmap.Config.ARGB_8888, true)
     val canvas = android.graphics.Canvas(result)
+    val centerX = size / 2f
+    val centerY = size / 2f
 
-    // Draw white circle background (slightly larger for border)
-    val paint = android.graphics.Paint().apply {
+    // Draw white circle background
+    val bgPaint = android.graphics.Paint().apply {
         isAntiAlias = true
         color = android.graphics.Color.WHITE
     }
-    val centerX = size / 2f
-    val centerY = size / 2f
-    val circleRadius = logoSize / 2f + 4
-    canvas.drawCircle(centerX, centerY, circleRadius, paint)
+    canvas.drawCircle(centerX, centerY, logoSize / 2f + 4f, bgPaint)
 
-    // Load and draw logo - simple scaledToFill approach like iOS
-    val logoDrawable = ContextCompat.getDrawable(context, R.drawable.monero_logo)
-    if (logoDrawable != null) {
-        // Draw at logoSize and clip to circle (no 2.2x scale)
-        val logoBitmap = logoDrawable.toBitmap(logoSize, logoSize, Bitmap.Config.ARGB_8888)
+    // Render slightly larger than clip to cover corner padding, then circle-clip
+    val logoDrawable = ContextCompat.getDrawable(context, R.drawable.monero_logo) ?: return result
+    val imgSize = (logoSize * 1.03f).toInt()
+    val logoBitmap = logoDrawable.toBitmap(imgSize, imgSize, Bitmap.Config.ARGB_8888)
 
-        // Create circular clipped version
-        val circularBitmap = Bitmap.createBitmap(logoSize, logoSize, Bitmap.Config.ARGB_8888)
-        val circleCanvas = android.graphics.Canvas(circularBitmap)
-        val circlePaint = android.graphics.Paint().apply { isAntiAlias = true }
-        circleCanvas.drawCircle(logoSize / 2f, logoSize / 2f, logoSize / 2f, circlePaint)
-        circlePaint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
-        circleCanvas.drawBitmap(logoBitmap, 0f, 0f, circlePaint)
+    // Circle-clip into logoSize bitmap
+    val clipped = Bitmap.createBitmap(logoSize, logoSize, Bitmap.Config.ARGB_8888)
+    val c = android.graphics.Canvas(clipped)
+    val p = android.graphics.Paint().apply { isAntiAlias = true }
+    c.drawCircle(logoSize / 2f, logoSize / 2f, logoSize / 2f, p)
+    p.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+    c.drawBitmap(logoBitmap, -(imgSize - logoSize) / 2f, -(imgSize - logoSize) / 2f, p)
 
-        canvas.drawBitmap(circularBitmap, logoOffset.toFloat(), logoOffset.toFloat(), null)
-    }
-
+    canvas.drawBitmap(clipped, centerX - logoSize / 2f, centerY - logoSize / 2f, null)
     return result
 }
