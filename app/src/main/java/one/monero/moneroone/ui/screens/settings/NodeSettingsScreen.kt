@@ -76,6 +76,7 @@ data class NodeInfo(
 )
 
 private val DEFAULT_NODES = listOf(
+    NodeInfo("node.monero.one:443", "Monero One", true),
     NodeInfo("xmr-node.cakewallet.com:18081", "Cake Wallet", true),
     NodeInfo("node.sethforprivacy.com:18089", "Seth For Privacy", true),
     NodeInfo("nodes.hashvault.pro:18081", "HashVault", true),
@@ -540,7 +541,9 @@ private fun AddNodeDialog(
 private suspend fun benchmarkNode(uri: String): Long = withContext(Dispatchers.IO) {
     try {
         val start = System.currentTimeMillis()
-        val url = URL("http://$uri/get_info")
+        val port = uri.substringAfter(":").toIntOrNull() ?: 0
+        val scheme = if (port == 443) "https" else "http"
+        val url = URL("$scheme://$uri/get_info")
         val connection = url.openConnection() as HttpURLConnection
         connection.connectTimeout = 5000
         connection.readTimeout = 5000

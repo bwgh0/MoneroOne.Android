@@ -402,15 +402,7 @@ private fun PriceChart(
 
         // Draw Y-axis labels (price) on the RIGHT side - only 3 labels to avoid cramping
         val yLabelCount = 2
-        val currencySymbol = when (currency) {
-            AppCurrency.USD -> "$"
-            AppCurrency.EUR -> "€"
-            AppCurrency.GBP -> "£"
-            AppCurrency.CAD -> "C$"
-            AppCurrency.AUD -> "A$"
-            AppCurrency.JPY -> "¥"
-            AppCurrency.CNY -> "¥"
-        }
+        val currencySymbol = currency.symbol
         for (i in 0..yLabelCount) {
             val price = min + (range * i / yLabelCount)
             val y = height - verticalPadding - ((price - min) / range * (height - 2 * verticalPadding)).toFloat()
@@ -550,16 +542,21 @@ private fun StatItem(
     }
 }
 
+private fun getLocaleForCurrency(currency: AppCurrency): Locale = when (currency) {
+    AppCurrency.USD -> Locale.US
+    AppCurrency.EUR -> Locale.GERMANY
+    AppCurrency.GBP -> Locale.UK
+    AppCurrency.CAD -> Locale.CANADA
+    AppCurrency.AUD -> Locale("en", "AU")
+    AppCurrency.JPY -> Locale.JAPAN
+    AppCurrency.CNY -> Locale.CHINA
+    AppCurrency.TRY -> Locale("tr", "TR")
+    AppCurrency.RUB -> Locale("ru", "RU")
+    else -> Locale(currency.code, currency.code.uppercase())
+}
+
 private fun formatCurrency(amount: Double, currency: AppCurrency): String {
-    val locale = when (currency) {
-        AppCurrency.USD -> Locale.US
-        AppCurrency.EUR -> Locale.GERMANY
-        AppCurrency.GBP -> Locale.UK
-        AppCurrency.CAD -> Locale.CANADA
-        AppCurrency.AUD -> Locale("en", "AU")
-        AppCurrency.JPY -> Locale.JAPAN
-        AppCurrency.CNY -> Locale.CHINA
-    }
+    val locale = getLocaleForCurrency(currency)
     val format = NumberFormat.getCurrencyInstance(locale)
     try {
         format.currency = Currency.getInstance(currency.code.uppercase())

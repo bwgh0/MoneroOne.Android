@@ -166,6 +166,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                             currency.code,
                             currency.symbol
                         )
+                        // Fetch 24h chart data for widget sparkline
+                        priceRepository.fetchChartData(one.monero.moneroone.ui.screens.chart.TimeRange.DAY, currency)
+                            .onSuccess { points ->
+                                WidgetDataStore.saveChartPoints(context, points.map { it.price })
+                            }
                         PriceWidget.updateAll(context)
                     }
                     fetchingCurrency = null

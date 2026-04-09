@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
@@ -204,6 +205,26 @@ fun SettingsScreen(
                     context.startActivity(intent)
                 },
                 iconColor = SettingsGreen
+            )
+
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Help & Feedback
+        SettingsSection(title = "Help & Feedback") {
+            SettingsItem(
+                icon = Icons.Default.Info,
+                title = "Contact Support",
+                subtitle = "android_support@monero.one",
+                onClick = {
+                    val intent = Intent(Intent.ACTION_SENDTO).apply {
+                        data = Uri.parse("mailto:android_support@monero.one")
+                        putExtra(Intent.EXTRA_SUBJECT, "MoneroOne Android - Feedback")
+                    }
+                    try { context.startActivity(intent) } catch (_: Exception) {}
+                },
+                iconColor = SettingsBlue
             )
 
         }

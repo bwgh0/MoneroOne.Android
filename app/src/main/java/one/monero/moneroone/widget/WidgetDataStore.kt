@@ -63,6 +63,21 @@ object WidgetDataStore {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_TRANSACTIONS, "") ?: ""
 
+    // Chart data for price widget (comma-separated doubles)
+    private const val KEY_CHART_POINTS = "chart_points"
+
+    fun saveChartPoints(context: Context, points: List<Double>) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putString(KEY_CHART_POINTS, points.joinToString(","))
+            .apply()
+    }
+
+    fun getChartPoints(context: Context): List<Double> {
+        val str = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_CHART_POINTS, null) ?: return emptyList()
+        return str.split(",").mapNotNull { it.toDoubleOrNull() }
+    }
+
     // Wallet widget enable/disable
     fun setWalletWidgetEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()

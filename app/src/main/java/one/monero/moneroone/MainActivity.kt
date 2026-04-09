@@ -19,7 +19,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Read saved theme preference and apply before setContent
         val prefs = getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         val themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
         AppCompatDelegate.setDefaultNightMode(themeMode)
@@ -27,7 +26,6 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
 
         setContent {
-            // Determine dark theme based on AppCompat delegate setting
             val darkTheme = when (themeMode) {
                 AppCompatDelegate.MODE_NIGHT_YES -> true
                 AppCompatDelegate.MODE_NIGHT_NO -> false

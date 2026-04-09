@@ -315,6 +315,9 @@ private fun formatPrice(price: Double, currency: Currency): String {
             Currency.AUD -> Locale("en", "AU")
             Currency.JPY -> Locale.JAPAN
             Currency.CNY -> Locale.CHINA
+            Currency.TRY -> Locale("tr", "TR")
+            Currency.RUB -> Locale("ru", "RU")
+            else -> Locale(currency.code, currency.code.uppercase())
         }
     )
 

@@ -358,15 +358,7 @@ private fun PortfolioChart(
 
         // Draw Y-axis labels
         val yLabelCount = 2
-        val currencySymbol = when (currency) {
-            AppCurrency.USD -> "$"
-            AppCurrency.EUR -> "€"
-            AppCurrency.GBP -> "£"
-            AppCurrency.CAD -> "C$"
-            AppCurrency.AUD -> "A$"
-            AppCurrency.JPY -> "¥"
-            AppCurrency.CNY -> "¥"
-        }
+        val currencySymbol = currency.symbol
         for (i in 0..yLabelCount) {
             val price = min + (range * i / yLabelCount)
             val y = height - verticalPadding - ((price - min) / range * (height - 2 * verticalPadding)).toFloat()
@@ -509,6 +501,9 @@ private fun formatCurrency(amount: Double, currency: AppCurrency): String {
         AppCurrency.AUD -> Locale("en", "AU")
         AppCurrency.JPY -> Locale.JAPAN
         AppCurrency.CNY -> Locale.CHINA
+        AppCurrency.TRY -> Locale("tr", "TR")
+        AppCurrency.RUB -> Locale("ru", "RU")
+        else -> Locale(currency.code, currency.code.uppercase())
     }
     val format = NumberFormat.getCurrencyInstance(locale)
     try {
