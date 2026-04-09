@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,11 +71,34 @@ fun UnlockScreen(
     var pin by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var shakeAnimation by remember { mutableStateOf(false) }
-    var attempts by remember { mutableStateOf(0) }
     var showResetDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+
+    val lockoutSeconds by walletViewModel.pinLockoutSeconds.collectAsState()
+    val attemptsRemaining by walletViewModel.pinAttemptsRemaining.collectAsState()
+    val isLockedOut = lockoutSeconds > 0
+
+    // Refresh lockout state on screen load and countdown
+    LaunchedEffect(Unit) {
+        walletViewModel.refreshLockoutState()
+    }
+    LaunchedEffect(isLockedOut) {
+        while (walletViewModel.getRemainingLockoutMs() > 0) {
+            walletViewModel.refreshLockoutState()
+            delay(1000)
+        }
+        walletViewModel.refreshLockoutState()
+    }
+
+    // Check if wallet should be wiped due to too many attempts
+    LaunchedEffect(attemptsRemaining) {
+        if (walletViewModel.shouldWipeWallet()) {
+            walletViewModel.removeWallet()
+            onResetWallet()
+        }
+    }
 
     val biometricAvailable = remember {
         val biometricManager = BiometricManager.from(context)
@@ -86,22 +110,24 @@ fun UnlockScreen(
     }
 
     fun onDigitPress(digit: String) {
-        if (pin.length < PIN_LENGTH) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            pin += digit
-            errorMessage = null
+        if (isLockedOut || pin.length >= PIN_LENGTH) return
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        pin += digit
+        errorMessage = null
 
-            if (pin.length == PIN_LENGTH) {
-                if (walletViewModel.verifyPin(pin)) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onUnlocked()
+        if (pin.length == PIN_LENGTH) {
+            if (walletViewModel.verifyPin(pin)) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onUnlocked()
+            } else {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                errorMessage = if (isLockedOut) {
+                    "Too many attempts. Try again in ${lockoutSeconds}s"
                 } else {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    attempts++
-                    errorMessage = "Incorrect PIN"
-                    shakeAnimation = true
-                    pin = ""
+                    "Incorrect PIN"
                 }
+                shakeAnimation = true
+                pin = ""
             }
         }
     }
@@ -195,9 +221,18 @@ fun UnlockScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Lockout countdown
+        if (isLockedOut) {
+            Text(
+                text = "Too many attempts. Try again in ${lockoutSeconds}s",
+                style = MaterialTheme.typography.bodyMedium,
+                color = ErrorRed
+            )
+        }
+
         // Error message
         AnimatedVisibility(
-            visible = errorMessage != null,
+            visible = errorMessage != null && !isLockedOut,
             enter = fadeIn(),
             exit = fadeOut()
         ) {
@@ -205,6 +240,15 @@ fun UnlockScreen(
                 text = errorMessage ?: "",
                 style = MaterialTheme.typography.bodyMedium,
                 color = ErrorRed
+            )
+        }
+
+        // Attempts remaining warning
+        if (attemptsRemaining in 1..10) {
+            Text(
+                text = "$attemptsRemaining attempts remaining before wallet wipe",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 

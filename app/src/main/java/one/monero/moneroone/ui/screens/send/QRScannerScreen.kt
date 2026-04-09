@@ -525,7 +525,7 @@ fun QRScannerScreen(
                             onQrCodeDetected = { rawValue ->
                                 if (!hasScanned) {
                                     hasScanned = true
-                                    Timber.d("Scanned QR: $rawValue")
+                                    Timber.d("QR code scanned")
 
                                     // Haptic feedback
                                     view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)

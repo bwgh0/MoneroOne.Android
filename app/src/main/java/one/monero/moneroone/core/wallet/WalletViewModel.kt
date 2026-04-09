@@ -31,7 +31,11 @@ import one.monero.moneroone.widget.WalletWidget
 import one.monero.moneroone.widget.WidgetDataStore
 import timber.log.Timber
 import java.math.BigDecimal
+import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.UUID
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 
 data class WalletState(
     val hasWallet: Boolean = false,
@@ -307,7 +311,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     it.copy(receiveAddress = kit.receiveAddress)
                 }
 
-                Timber.d("initializeWalletIfNeeded: Starting kit, receiveAddress=${kit.receiveAddress}")
+                Timber.d("initializeWalletIfNeeded: Starting kit")
                 WalletManager.start()
 
             } catch (e: Exception) {
@@ -389,7 +393,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 }
 
-                Timber.d("createWallet: Wallet created successfully, receiveAddress=${kit.receiveAddress}")
+                Timber.d("createWallet: Wallet created successfully")
 
                 WalletManager.start()
 
@@ -459,7 +463,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 }
 
-                Timber.d("restoreWallet: Wallet restored successfully, receiveAddress=${kit.receiveAddress}")
+                Timber.d("restoreWallet: Wallet restored successfully")
 
                 WalletManager.start()
 
@@ -503,7 +507,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             },
             viewModelScope.launch {
                 WalletManager.balanceFlow.collect { balance ->
-                    Timber.d("Balance updated: all=${balance.all}, unlocked=${balance.unlocked}")
+                    Timber.d("Balance updated")
                     _walletState.update { it.copy(balance = balance) }
                     // Update balance widget
                     WidgetDataStore.saveBalance(context, balance.all, balance.unlocked)
@@ -529,9 +533,121 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
+    // --- PBKDF2 PIN hashing ---
+
+    private companion object {
+        const val PBKDF2_ITERATIONS = 600_000
+        const val PBKDF2_KEY_LENGTH = 256
+        const val PBKDF2_SALT_LENGTH = 16
+        const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
+
+        // PIN rate limiting thresholds
+        const val RATE_LIMIT_TIER1_ATTEMPTS = 5   // 30s lockout
+        const val RATE_LIMIT_TIER2_ATTEMPTS = 10  // 5min lockout
+        const val RATE_LIMIT_WIPE_ATTEMPTS = 20   // wallet wipe
+        const val RATE_LIMIT_TIER1_DELAY_MS = 30_000L
+        const val RATE_LIMIT_TIER2_DELAY_MS = 300_000L
+    }
+
+    // --- PIN rate limiting ---
+
+    private val _pinLockoutSeconds = MutableStateFlow(0L)
+    val pinLockoutSeconds: StateFlow<Long> = _pinLockoutSeconds.asStateFlow()
+
+    private val _pinAttemptsRemaining = MutableStateFlow(RATE_LIMIT_WIPE_ATTEMPTS)
+    val pinAttemptsRemaining: StateFlow<Int> = _pinAttemptsRemaining.asStateFlow()
+
+    private fun getFailedAttempts(): Int {
+        return encryptedPrefs.getInt("pin_fail_count", 0)
+    }
+
+    private fun getLastFailTimestamp(): Long {
+        return encryptedPrefs.getLong("pin_fail_timestamp", 0L)
+    }
+
+    private fun recordFailedAttempt() {
+        val count = getFailedAttempts() + 1
+        encryptedPrefs.edit()
+            .putInt("pin_fail_count", count)
+            .putLong("pin_fail_timestamp", System.currentTimeMillis())
+            .apply()
+        _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - count).coerceAtLeast(0)
+    }
+
+    private fun resetFailedAttempts() {
+        encryptedPrefs.edit()
+            .putInt("pin_fail_count", 0)
+            .putLong("pin_fail_timestamp", 0L)
+            .apply()
+        _pinAttemptsRemaining.value = RATE_LIMIT_WIPE_ATTEMPTS
+        _pinLockoutSeconds.value = 0L
+    }
+
+    fun shouldWipeWallet(): Boolean {
+        return getFailedAttempts() >= RATE_LIMIT_WIPE_ATTEMPTS
+    }
+
+    fun getRemainingLockoutMs(): Long {
+        val attempts = getFailedAttempts()
+        val lastFail = getLastFailTimestamp()
+        if (attempts < RATE_LIMIT_TIER1_ATTEMPTS || lastFail == 0L) return 0L
+
+        val delayMs = when {
+            attempts >= RATE_LIMIT_TIER2_ATTEMPTS -> RATE_LIMIT_TIER2_DELAY_MS
+            attempts >= RATE_LIMIT_TIER1_ATTEMPTS -> RATE_LIMIT_TIER1_DELAY_MS
+            else -> 0L
+        }
+        val elapsed = System.currentTimeMillis() - lastFail
+        return (delayMs - elapsed).coerceAtLeast(0L)
+    }
+
+    fun refreshLockoutState() {
+        val remaining = getRemainingLockoutMs()
+        _pinLockoutSeconds.value = (remaining + 999) / 1000 // ceil to seconds
+        _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - getFailedAttempts()).coerceAtLeast(0)
+    }
+
+    private fun hashPin(pin: String): String {
+        val salt = ByteArray(PBKDF2_SALT_LENGTH).also { SecureRandom().nextBytes(it) }
+        val spec = PBEKeySpec(pin.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
+        val hash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).encoded
+        val saltHex = salt.joinToString("") { "%02x".format(it) }
+        val hashHex = hash.joinToString("") { "%02x".format(it) }
+        return "$saltHex:$hashHex"
+    }
+
+    private fun verifyPinHash(pin: String, stored: String): Boolean {
+        if (!stored.contains(":")) {
+            // Legacy format: String.hashCode() — migrate on success
+            return pin.hashCode().toString() == stored
+        }
+        val parts = stored.split(":")
+        if (parts.size != 2) return false
+        val salt = parts[0].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val expectedHash = parts[1]
+        val spec = PBEKeySpec(pin.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
+        val actualHash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).encoded
+            .joinToString("") { "%02x".format(it) }
+        return MessageDigest.isEqual(
+            expectedHash.toByteArray(Charsets.UTF_8),
+            actualHash.toByteArray(Charsets.UTF_8)
+        )
+    }
+
+    private fun migratePinIfNeeded(pin: String, storedHash: String) {
+        if (!storedHash.contains(":")) {
+            // Upgrade legacy hashCode() to PBKDF2
+            val newHash = hashPin(pin)
+            context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+                .edit()
+                .putString("pin_hash", newHash)
+                .apply()
+            Timber.d("PIN hash migrated to PBKDF2")
+        }
+    }
+
     fun setPin(pin: String) {
-        // Hash and store PIN securely
-        val pinHash = pin.hashCode().toString() // In production, use proper hashing
+        val pinHash = hashPin(pin)
         context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
             .edit()
             .putString("pin_hash", pinHash)
@@ -543,16 +659,23 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun verifyPin(enteredPin: String): Boolean {
+        // Check rate limiting
+        if (getRemainingLockoutMs() > 0) return false
+
         val storedHash = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
             .getString("pin_hash", null) ?: return false
 
-        val enteredHash = enteredPin.hashCode().toString()
-        val isValid = storedHash == enteredHash
+        val isValid = verifyPinHash(enteredPin, storedHash)
 
         if (isValid) {
+            resetFailedAttempts()
+            migratePinIfNeeded(enteredPin, storedHash)
             _pin.value = enteredPin
             _isLocked.value = false
             initializeWalletIfNeeded()
+        } else {
+            recordFailedAttempt()
+            refreshLockoutState()
         }
 
         return isValid
@@ -562,14 +685,17 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         val storedHash = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
             .getString("pin_hash", null) ?: return false
 
-        val enteredHash = enteredPin.hashCode().toString()
-        return storedHash == enteredHash
+        val isValid = verifyPinHash(enteredPin, storedHash)
+        if (isValid) {
+            migratePinIfNeeded(enteredPin, storedHash)
+        }
+        return isValid
     }
 
     fun changePin(oldPin: String, newPin: String): Boolean {
         if (!verifyPinOnly(oldPin)) return false
 
-        val pinHash = newPin.hashCode().toString()
+        val pinHash = hashPin(newPin)
         context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
             .edit()
             .putString("pin_hash", pinHash)
@@ -743,6 +869,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     .clear()
                     .apply()
 
+                // Delete encrypted seed storage
+                context.deleteSharedPreferences("secure_wallet_data")
+
                 // Reset state
                 walletId = null
                 _pendingSeed.value = null
@@ -810,12 +939,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun send(address: String, amount: Long, memo: String? = null) {
+    fun send(address: String, amount: Long, memo: String? = null, isSweepAll: Boolean = false) {
         viewModelScope.launch {
             _sendState.value = SendState.Sending
             try {
                 withContext(Dispatchers.IO) {
-                    WalletManager.kit?.send(amount, address, memo)
+                    WalletManager.kit?.send(amount, address, memo, sweepAll = isSweepAll)
                 }
                 // MoneroKit.send() doesn't return txHash, we'll show success without it
                 // The transaction will appear in the transactions list after sync
@@ -831,9 +960,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _sendState.value = SendState.Idle
     }
 
-    fun estimateFee(address: String, amount: Long): Long {
+    fun estimateFee(address: String, amount: Long, isSweepAll: Boolean = false): Long {
         return try {
-            WalletManager.kit?.estimateFee(amount, address, null) ?: 0L
+            WalletManager.kit?.estimateFee(amount, address, null, sweepAll = isSweepAll) ?: 0L
         } catch (e: Exception) {
             Timber.e(e, "Failed to estimate fee")
             0L
@@ -856,14 +985,21 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun parseXmr(xmrString: String): Long {
         return try {
             val xmr = BigDecimal(xmrString)
-            xmr.multiply(BigDecimal(1_000_000_000_000L)).toLong()
+            xmr.multiply(BigDecimal(1_000_000_000_000L))
+                .setScale(0, java.math.RoundingMode.DOWN)
+                .longValueExact()
+        } catch (e: ArithmeticException) {
+            -1L
         } catch (e: Exception) {
-            0L
+            -1L
         }
     }
 
     override fun onCleared() {
         super.onCleared()
+        // Zero sensitive in-memory state
+        _pin.value = null
+        _pendingSeed.value = null
         // Don't stop kit if background sync is enabled — the service keeps it alive
         val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("background_sync_enabled", false)) {

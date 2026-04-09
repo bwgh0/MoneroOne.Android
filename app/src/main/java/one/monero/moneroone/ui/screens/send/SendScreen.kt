@@ -27,10 +27,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,10 +56,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.view.MotionEvent
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import io.horizontalsystems.monerokit.MoneroKit
 import one.monero.moneroone.core.util.NetworkMonitor
 import one.monero.moneroone.core.wallet.SendState
 import one.monero.moneroone.core.wallet.WalletViewModel
@@ -88,8 +95,10 @@ fun SendScreen(
 ) {
     var address by remember(initialAddress) { mutableStateOf(initialAddress ?: "") }
     var amount by remember(initialAmount) { mutableStateOf(initialAmount ?: "") }
+    var isSweepAll by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showConfirmDialog by remember { mutableStateOf(false) }
+    val amountPrefilledFromQR = remember { initialAmount != null }
 
     val walletState by walletViewModel.walletState.collectAsState()
     val sendState by walletViewModel.sendState.collectAsState()
@@ -104,13 +113,13 @@ fun SendScreen(
 
     var estimatedFee by remember { mutableStateOf(0L) }
 
-    LaunchedEffect(address, amount) {
+    LaunchedEffect(address, amount, isSweepAll) {
         estimatedFee = if (address.isNotBlank() && amount.isNotBlank()) {
             withContext(Dispatchers.IO) {
                 try {
                     val amountLong = walletViewModel.parseXmr(amount)
                     if (amountLong > 0) {
-                        walletViewModel.estimateFee(address, amountLong)
+                        walletViewModel.estimateFee(address, amountLong, isSweepAll = isSweepAll)
                     } else 0L
                 } catch (e: Exception) {
                     0L
@@ -130,7 +139,7 @@ fun SendScreen(
             recipient = address,
             onConfirm = {
                 showConfirmDialog = false
-                walletViewModel.send(address, walletViewModel.parseXmr(amount))
+                walletViewModel.send(address, walletViewModel.parseXmr(amount), isSweepAll = isSweepAll)
             },
             onDismiss = { showConfirmDialog = false }
         )
@@ -208,6 +217,28 @@ fun SendScreen(
                 singleLine = true
             )
 
+            // Inline address validation indicator
+            if (address.isNotEmpty()) {
+                val isValid = isValidMoneroAddress(address)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 6.dp)
+                ) {
+                    Icon(
+                        if (isValid) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                        contentDescription = null,
+                        tint = if (isValid) SuccessGreen else ErrorRed,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = if (isValid) "Valid address" else "Invalid address",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isValid) SuccessGreen else ErrorRed
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
             // Amount
@@ -218,11 +249,32 @@ fun SendScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
+            if (amountPrefilledFromQR) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = Color(0xFFFFCC00),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = "Amount pre-filled from QR code",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             OutlinedTextField(
                 value = amount,
                 onValueChange = {
                     if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) {
                         amount = it
+                        isSweepAll = false
                         errorMessage = null
                     }
                 },
@@ -236,7 +288,7 @@ fun SendScreen(
                     )
                 },
                 trailingIcon = {
-                    TextButton(onClick = { amount = maxAmount }) {
+                    TextButton(onClick = { amount = maxAmount; isSweepAll = true }) {
                         Text(
                             text = "MAX",
                             color = MoneroOrange,
@@ -340,14 +392,17 @@ fun SendScreen(
                             errorMessage = "No internet connection. Please check your network."
                         }
                         address.isBlank() -> errorMessage = "Please enter a recipient address"
-                        !address.startsWith("4") && !address.startsWith("8") -> {
+                        !isValidMoneroAddress(address) -> {
                             errorMessage = "Invalid Monero address"
                         }
                         amount.isBlank() -> errorMessage = "Please enter an amount"
-                        walletViewModel.parseXmr(amount) <= 0 -> {
+                        walletViewModel.parseXmr(amount) < 0 -> {
+                            errorMessage = "Invalid amount"
+                        }
+                        walletViewModel.parseXmr(amount) == 0L -> {
                             errorMessage = "Amount must be greater than 0"
                         }
-                        walletViewModel.parseXmr(amount) > walletState.balance.unlocked -> {
+                        !isSweepAll && walletViewModel.parseXmr(amount) > walletState.balance.unlocked -> {
                             errorMessage = "Insufficient balance"
                         }
                         else -> {
@@ -503,8 +558,13 @@ private fun SendConfirmationDialog(
             }
         },
         confirmButton = {
+            @OptIn(ExperimentalComposeUiApi::class)
             TextButton(
-                onClick = onConfirm
+                onClick = onConfirm,
+                modifier = Modifier.pointerInteropFilter { event ->
+                    // Block touches when window is obscured (tapjacking protection)
+                    (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0
+                }
             ) {
                 Text("Confirm", color = MoneroOrange, fontWeight = FontWeight.SemiBold)
             }
@@ -751,5 +811,18 @@ private fun SendErrorOverlay(
                 }
             }
         }
+    }
+}
+
+private fun isValidMoneroAddress(address: String): Boolean {
+    // Quick pre-filter
+    if (address.length !in listOf(95, 106)) return false
+    if (!address.startsWith("4") && !address.startsWith("8")) return false
+    // Full native validation via JNI
+    return try {
+        MoneroKit.validateAddress(address)
+        true
+    } catch (e: Exception) {
+        false
     }
 }
