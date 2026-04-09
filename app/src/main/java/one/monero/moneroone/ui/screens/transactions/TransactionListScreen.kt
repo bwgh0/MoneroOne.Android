@@ -46,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -264,7 +265,7 @@ private fun TransactionListItem(
                     imageVector = if (isIncoming) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
                     contentDescription = null,
                     tint = iconColor,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp).rotate(45f)
                 )
             }
 

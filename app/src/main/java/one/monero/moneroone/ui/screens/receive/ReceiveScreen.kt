@@ -67,6 +67,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import one.monero.moneroone.core.wallet.WalletViewModel
 import androidx.compose.ui.graphics.toArgb
 import com.google.zxing.BarcodeFormat
@@ -136,6 +138,12 @@ fun ReceiveScreen(
     }
 
     var requestAmount by remember { mutableStateOf("") }
+    var isFiatMode by remember { mutableStateOf(false) }
+    var fiatAmount by remember { mutableStateOf("") }
+    val currentPrice by walletViewModel.currentPrice.collectAsState()
+    val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+    val xmrPrice = currentPrice?.price
+    val currencySymbol = selectedCurrency.symbol
 
     val qrData = remember(address, requestAmount) {
         if (address.isBlank()) ""
@@ -219,165 +227,39 @@ fun ReceiveScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Optional amount input
-            OutlinedTextField(
-                value = requestAmount,
-                onValueChange = {
-                    if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) {
-                        requestAmount = it
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Amount (optional)") },
-                suffix = {
-                    Text(
-                        text = "XMR",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                trailingIcon = {
-                    if (requestAmount.isNotBlank()) {
-                        IconButton(onClick = { requestAmount = "" }) {
-                            Icon(
-                                Icons.Default.Clear,
-                                contentDescription = "Clear",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MoneroOrange,
-                    cursorColor = MoneroOrange,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Address display with selector
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onSelectAddress
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = addressLabel,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MoneroOrange,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Tap to change address",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                        }
-                        if (onSelectAddress != null) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = "Select address",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = address.ifBlank { "Loading..." },
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Action buttons
+            // "Request Amount (optional)" label row with currency toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                PrimaryButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val copyText = if (requestAmount.isNotBlank()) qrData else address
-                        val clip = ClipData.newPlainText("Monero Address", copyText)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    enabled = address.isNotBlank(),
-                    color = MoneroOrange
-                ) {
+                Text(
+                    text = "Request Amount (optional)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (xmrPrice != null) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MoneroOrange.copy(alpha = 0.1f))
+                            .clickable {
+                                if (isFiatMode) {
+                                    isFiatMode = false
+                                } else {
+                                    val xmrVal = requestAmount.toDoubleOrNull() ?: 0.0
+                                    fiatAmount = if (xmrVal > 0) "%.2f".format(xmrVal * xmrPrice) else ""
+                                    isFiatMode = true
+                                }
+                            }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("⇅", style = MaterialTheme.typography.labelMedium, color = MoneroOrange)
                         Text(
-                            text = "Copy",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                    }
-                }
-
-                SecondaryButton(
-                    onClick = {
-                        val shareText = if (requestAmount.isNotBlank()) qrData else address
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Share Address"))
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    enabled = address.isNotBlank(),
-                    borderColor = MoneroOrange
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MoneroOrange
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Share",
-                            style = MaterialTheme.typography.titleSmall,
+                            text = if (isFiatMode) "XMR" else selectedCurrency.code.uppercase(),
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MoneroOrange
                         )
@@ -385,7 +267,146 @@ fun ReceiveScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Amount input field
+            if (isFiatMode) {
+                OutlinedTextField(
+                    value = fiatAmount,
+                    onValueChange = {
+                        if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+                            fiatAmount = it
+                            val price = xmrPrice
+                            if (price != null && price > 0) {
+                                val fiatVal = it.toDoubleOrNull() ?: 0.0
+                                val xmr = fiatVal / price
+                                requestAmount = if (xmr > 0) "%.12f".format(xmr).trimEnd('0').trimEnd('.') else ""
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("0.00") },
+                    prefix = { Text(currencySymbol, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    trailingIcon = {
+                        if (fiatAmount.isNotBlank()) {
+                            IconButton(onClick = { fiatAmount = ""; requestAmount = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MoneroOrange, cursorColor = MoneroOrange, unfocusedBorderColor = MaterialTheme.colorScheme.outline),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+            } else {
+                OutlinedTextField(
+                    value = requestAmount,
+                    onValueChange = {
+                        if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) requestAmount = it
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("0.0") },
+                    suffix = { Text("XMR", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    trailingIcon = {
+                        if (requestAmount.isNotBlank()) {
+                            IconButton(onClick = { requestAmount = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MoneroOrange, cursorColor = MoneroOrange, unfocusedBorderColor = MaterialTheme.colorScheme.outline),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Address card (truncated, matching iOS)
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onSelectAddress
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = addressLabel,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (address.length > 20) "${address.take(12)}. . .${address.takeLast(8)}" else address.ifBlank { "Loading..." },
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (onSelectAddress != null) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Select address",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Copy / Share buttons (tall glass cards with icon above text, matching iOS)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                GlassCard(
+                    modifier = Modifier.weight(1f).height(90.dp),
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val copyText = if (requestAmount.isNotBlank()) qrData else address
+                        val clip = ClipData.newPlainText("Monero Address", copyText)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Copy", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                GlassCard(
+                    modifier = Modifier.weight(1f).height(90.dp),
+                    onClick = {
+                        val shareText = if (requestAmount.isNotBlank()) qrData else address
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Share Address"))
+                    }
+                ) {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, tint = MoneroOrange, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Share", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium, color = MoneroOrange)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }
@@ -419,33 +440,38 @@ private fun generateQRCode(data: String, size: Int, context: Context): Bitmap? {
 private fun addMoneroLogoOverlay(qrBitmap: Bitmap, context: Context): Bitmap {
     val size = qrBitmap.width
     val logoSize = (size * 0.22).toInt()
+    val radius = logoSize / 2f
 
     val result = qrBitmap.copy(Bitmap.Config.ARGB_8888, true)
     val canvas = android.graphics.Canvas(result)
-    val centerX = size / 2f
-    val centerY = size / 2f
+    val cx = size / 2f
+    val cy = size / 2f
 
-    // Draw white circle background
+    // White circle background (slightly larger for border)
     val bgPaint = android.graphics.Paint().apply {
         isAntiAlias = true
         color = android.graphics.Color.WHITE
     }
-    canvas.drawCircle(centerX, centerY, logoSize / 2f + 4f, bgPaint)
+    canvas.drawCircle(cx, cy, radius + 4f, bgPaint)
 
-    // Render slightly larger than clip to cover corner padding, then circle-clip
+    // Draw logo into a circle-clipped bitmap
     val logoDrawable = ContextCompat.getDrawable(context, R.drawable.monero_logo) ?: return result
-    val imgSize = (logoSize * 1.03f).toInt()
-    val logoBitmap = logoDrawable.toBitmap(imgSize, imgSize, Bitmap.Config.ARGB_8888)
-
-    // Circle-clip into logoSize bitmap
     val clipped = Bitmap.createBitmap(logoSize, logoSize, Bitmap.Config.ARGB_8888)
-    val c = android.graphics.Canvas(clipped)
-    val p = android.graphics.Paint().apply { isAntiAlias = true }
-    c.drawCircle(logoSize / 2f, logoSize / 2f, logoSize / 2f, p)
-    p.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
-    // Center the larger image: offset is negative to shift it into view
-    c.drawBitmap(logoBitmap, -(imgSize - logoSize) / 2f, -(imgSize - logoSize) / 2f, p)
+    val clipCanvas = android.graphics.Canvas(clipped)
 
-    canvas.drawBitmap(clipped, centerX - logoSize / 2f, centerY - logoSize / 2f, null)
+    // Circle clip mask
+    val maskPaint = android.graphics.Paint().apply { isAntiAlias = true }
+    clipCanvas.drawCircle(radius, radius, radius, maskPaint)
+    maskPaint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+
+    // Draw the drawable centered, filling the circle
+    val logoBitmap = Bitmap.createBitmap(logoSize, logoSize, Bitmap.Config.ARGB_8888)
+    val logoCanvas = android.graphics.Canvas(logoBitmap)
+    logoDrawable.setBounds(0, 0, logoSize, logoSize)
+    logoDrawable.draw(logoCanvas)
+    clipCanvas.drawBitmap(logoBitmap, 0f, 0f, maskPaint)
+
+    // Place centered on QR
+    canvas.drawBitmap(clipped, cx - radius, cy - radius, null)
     return result
 }

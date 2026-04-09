@@ -47,6 +47,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -515,12 +516,20 @@ private fun ActionButton(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(20.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(color),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.background,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,
@@ -611,7 +620,7 @@ private fun TransactionCard(
                     imageVector = if (isIncoming) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
                     contentDescription = null,
                     tint = iconColor,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp).rotate(45f)
                 )
             }
 

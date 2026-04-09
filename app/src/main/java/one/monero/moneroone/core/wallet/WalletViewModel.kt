@@ -979,7 +979,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun formatXmr(atomicUnits: Long): String {
         val xmr = BigDecimal(atomicUnits).divide(BigDecimal(1_000_000_000_000L))
-        return xmr.setScale(4, java.math.RoundingMode.DOWN).toPlainString()
+        val full = xmr.setScale(12, java.math.RoundingMode.DOWN).stripTrailingZeros()
+        // Always show at least 4 decimal places
+        return if (full.scale() < 4) full.setScale(4).toPlainString() else full.toPlainString()
     }
 
     fun parseXmr(xmrString: String): Long {
