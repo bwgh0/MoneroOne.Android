@@ -99,7 +99,6 @@ jobs:
           releaseFiles: app/build/outputs/bundle/release/*.aab
           track: internal
           status: completed
-          changesNotSentForReview: true
 
       - name: Upload build artifacts on failure
         uses: actions/upload-artifact@v4
