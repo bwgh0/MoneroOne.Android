@@ -1,0 +1,15 @@
+Monero One is a privacy-focused Monero wallet designed for simplicity and security.
+
+Features:
+• Send and receive Monero with an intuitive multi-step wizard
+• QR code scanning and generation for easy payments
+• Real-time price charts with multiple fiat currency support
+• Biometric authentication (fingerprint, face unlock)
+• Background sync to keep your wallet up to date
+• Home screen widgets for price and balance at a glance
+• Light wallet mode for fast sync via trusted server
+• Full node support for maximum privacy
+• BIP39 and Polyseed mnemonic support
+• PIN protection with PBKDF2 hashing and rate limiting
+
+Monero One connects to public Monero nodes or your own node. Your keys never leave your device.

@@ -1,0 +1,7 @@
+• Multi-step send/receive wizard
+• 9 fiat currencies supported
+• Security audit: PBKDF2 PIN hashing, rate limiting, address validation
+• SSL node benchmarking
+• Widget chart improvements
+• Portrait lock option
+• Contact support from within the app

@@ -18,16 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Checkout monero-kit-android
-        uses: actions/checkout@v4
         with:
-          repository: bwgh0/monero-kit-android
-          path: monero-kit-android
-
-      - name: Fix MoneroKit path for CI
-        run: |
-          sed -i 's|\.\./monero-kit-android|monero-kit-android|g' settings.gradle.kts
+          submodules: true
 
       - name: Set version from tag
         run: |

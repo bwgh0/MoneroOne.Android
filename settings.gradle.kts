@@ -25,5 +25,5 @@ rootProject.name = "MoneroOne"
 include(":app")
 include(":monerokit")
 
-// Include monero-kit-android as a composite build
-project(":monerokit").projectDir = file("../monero-kit-android/monerokit")
+// Include monero-kit-android as a submodule
+project(":monerokit").projectDir = file("monero-kit-android/monerokit")

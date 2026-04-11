@@ -1,0 +1,3 @@
+[submodule "monero-kit-android"]
+	path = monero-kit-android
+	url = https://github.com/bwgh0/monero-kit-android.git
