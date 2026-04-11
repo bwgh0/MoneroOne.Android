@@ -101,6 +101,8 @@ fun MoneroOneNavHost(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 walletViewModel.checkAndApplyAutoLock()
+                // Restart wallet sync if it dropped while backgrounded
+                walletViewModel.startWallet()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -109,23 +111,22 @@ fun MoneroOneNavHost(
         }
     }
 
-    val startDestination = remember {
-        when {
-            !walletState.hasWallet -> Screen.Welcome.route
-            isLocked -> Screen.Unlock.route
-            else -> Screen.Main.route
-        }
+    // When locked, show UnlockScreen directly — no navigation delay, no content flash
+    if (isLocked && walletState.hasWallet) {
+        UnlockScreen(
+            walletViewModel = walletViewModel,
+            onUnlocked = {
+                // verifyPin already sets isLocked = false, which recomposes to show NavHost
+            },
+            onResetWallet = {
+                walletViewModel.removeWallet()
+            }
+        )
+        return
     }
 
-    androidx.compose.runtime.LaunchedEffect(isLocked, walletState.hasWallet) {
-        val currentRoute = navController.currentDestination?.route
-        if (walletState.hasWallet && !isLocked && currentRoute != Screen.Main.route) {
-            if (currentRoute == Screen.Unlock.route) {
-                navController.navigate(Screen.Main.route) {
-                    popUpTo(0) { inclusive = true }
-                }
-            }
-        }
+    val startDestination = remember(walletState.hasWallet) {
+        if (!walletState.hasWallet) Screen.Welcome.route else Screen.Main.route
     }
 
     NavHost(
@@ -212,23 +213,6 @@ fun MoneroOneNavHost(
                 walletViewModel = walletViewModel,
                 onContinue = {
                     navController.navigate(Screen.Main.route) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }
-            )
-        }
-
-        composable(Screen.Unlock.route) {
-            UnlockScreen(
-                walletViewModel = walletViewModel,
-                onUnlocked = {
-                    navController.navigate(Screen.Main.route) {
-                        popUpTo(Screen.Unlock.route) { inclusive = true }
-                    }
-                },
-                onResetWallet = {
-                    walletViewModel.removeWallet()
-                    navController.navigate(Screen.Welcome.route) {
                         popUpTo(0) { inclusive = true }
                     }
                 }

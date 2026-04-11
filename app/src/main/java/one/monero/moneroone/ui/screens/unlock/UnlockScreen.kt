@@ -37,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
@@ -75,6 +77,7 @@ fun UnlockScreen(
 
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
 
     val lockoutSeconds by walletViewModel.pinLockoutSeconds.collectAsState()
     val attemptsRemaining by walletViewModel.pinAttemptsRemaining.collectAsState()
@@ -116,18 +119,20 @@ fun UnlockScreen(
         errorMessage = null
 
         if (pin.length == PIN_LENGTH) {
-            if (walletViewModel.verifyPin(pin)) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onUnlocked()
-            } else {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                errorMessage = if (isLockedOut) {
-                    "Too many attempts. Try again in ${lockoutSeconds}s"
+            scope.launch {
+                if (walletViewModel.verifyPin(pin)) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onUnlocked()
                 } else {
-                    "Incorrect PIN"
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    errorMessage = if (isLockedOut) {
+                        "Too many attempts. Try again in ${lockoutSeconds}s"
+                    } else {
+                        "Incorrect PIN"
+                    }
+                    shakeAnimation = true
+                    pin = ""
                 }
-                shakeAnimation = true
-                pin = ""
             }
         }
     }

@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.theme.ErrorRed
@@ -70,6 +72,7 @@ fun ChangePinScreen(
     var shakeAnimation by remember { mutableStateOf(false) }
 
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
 
     val title = when (step) {
         ChangePinStep.ENTER_CURRENT -> "Enter Current PIN"
@@ -97,13 +100,15 @@ fun ChangePinScreen(
                 ChangePinStep.ENTER_CURRENT -> {
                     currentPin += digit
                     if (currentPin.length == PIN_LENGTH) {
-                        if (!walletViewModel.verifyPinOnly(currentPin)) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            error = "Incorrect PIN"
-                            shakeAnimation = true
-                            currentPin = ""
-                        } else {
-                            step = ChangePinStep.ENTER_NEW
+                        scope.launch {
+                            if (!walletViewModel.verifyPinOnly(currentPin)) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                error = "Incorrect PIN"
+                                shakeAnimation = true
+                                currentPin = ""
+                            } else {
+                                step = ChangePinStep.ENTER_NEW
+                            }
                         }
                     }
                 }
@@ -123,8 +128,10 @@ fun ChangePinScreen(
                             confirmPin = ""
                         } else {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            walletViewModel.changePin(currentPin, newPin)
-                            onSuccess()
+                            scope.launch {
+                                walletViewModel.changePin(currentPin, newPin)
+                                onSuccess()
+                            }
                         }
                     }
                 }

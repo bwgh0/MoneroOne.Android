@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.MoneroLogo
@@ -64,6 +66,7 @@ fun SetPinScreen(
     var shakeAnimation by remember { mutableStateOf(false) }
 
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
 
     val title = if (currentStep == 0) "Set a PIN to secure your wallet" else "Confirm Your PIN"
     val subtitle = if (currentStep == 0) {
@@ -87,8 +90,10 @@ fun SetPinScreen(
                 if (confirmPin.length == PIN_LENGTH) {
                     if (confirmPin == pin) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        walletViewModel.setPin(pin)
-                        onPinSet()
+                        scope.launch {
+                            walletViewModel.setPin(pin)
+                            onPinSet()
+                        }
                     } else {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         errorMessage = "PINs don't match"

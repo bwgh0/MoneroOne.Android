@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import one.monero.moneroone.core.wallet.SeedType
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
@@ -85,6 +86,9 @@ fun BackupSeedScreen(
     var shakeAnimation by remember { mutableStateOf(false) }
     var isUnlocked by remember { mutableStateOf(false) }
     var seedWords by remember { mutableStateOf<List<String>>(emptyList()) }
+    var electrumSeedWords by remember { mutableStateOf<List<String>?>(null) }
+    var seedType by remember { mutableStateOf<SeedType?>(null) }
+    var showElectrum by remember { mutableStateOf(false) }
     var copiedToClipboard by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -118,16 +122,22 @@ fun BackupSeedScreen(
             pinError = null
             pin += digit
             if (pin.length == PIN_LENGTH) {
-                val verified = walletViewModel.verifyPinOnly(pin)
-                if (verified) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    isUnlocked = true
-                    seedWords = walletViewModel.getSeedPhrase() ?: emptyList()
-                } else {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    pinError = "Invalid PIN"
-                    shakeAnimation = true
-                    pin = ""
+                scope.launch {
+                    val verified = walletViewModel.verifyPinOnly(pin)
+                    if (verified) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        isUnlocked = true
+                        seedWords = walletViewModel.getSeedPhrase() ?: emptyList()
+                        seedType = walletViewModel.getSeedType()
+                        if (seedType == SeedType.BIP39_24) {
+                            electrumSeedWords = walletViewModel.getElectrumSeedPhrase()
+                        }
+                    } else {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        pinError = "Invalid PIN"
+                        shakeAnimation = true
+                        pin = ""
+                    }
                 }
             }
         }
@@ -281,6 +291,45 @@ fun BackupSeedScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Format selector for BIP39 wallets
+            if (seedType == SeedType.BIP39_24 && electrumSeedWords != null) {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        SeedFormatTab(
+                            label = "24 Words (BIP39)",
+                            selected = !showElectrum,
+                            onClick = {
+                                showElectrum = false
+                                copiedToClipboard = false
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        SeedFormatTab(
+                            label = "25 Words (Legacy)",
+                            selected = showElectrum,
+                            onClick = {
+                                showElectrum = true
+                                copiedToClipboard = false
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            val displayWords = if (showElectrum && electrumSeedWords != null) electrumSeedWords!! else seedWords
+            val wordCount = displayWords.size
+            val formatLabel = if (showElectrum) "Legacy (Electrum)" else if (seedType == SeedType.BIP39_24) "BIP39" else "Legacy (Electrum)"
+
             // Seed words display
             GlassCard(
                 modifier = Modifier.fillMaxWidth()
@@ -288,11 +337,22 @@ fun BackupSeedScreen(
                 Column(
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Text(
-                        text = "Recovery Phrase",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Recovery Phrase",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = "$wordCount words · $formatLabel",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -301,7 +361,7 @@ fun BackupSeedScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        seedWords.forEachIndexed { index, word ->
+                        displayWords.forEachIndexed { index, word ->
                             SeedWordChip(index = index + 1, word = word)
                         }
                     }
@@ -314,7 +374,7 @@ fun BackupSeedScreen(
             Button(
                 onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clip = ClipData.newPlainText("Seed Phrase", seedWords.joinToString(" "))
+                    val clip = ClipData.newPlainText("Seed Phrase", displayWords.joinToString(" "))
                     clipboard.setPrimaryClip(clip)
                     copiedToClipboard = true
                     Toast.makeText(context, "Copied! Will clear in 5 minutes", Toast.LENGTH_LONG).show()
@@ -443,6 +503,32 @@ private fun NumberPadBackup(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SeedFormatTab(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (selected) MoneroOrange else Color.Transparent,
+            contentColor = if (selected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+        ),
+        shape = RoundedCornerShape(8.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+        modifier = modifier
+    ) {
+        Text(
+            text = label,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            fontSize = 13.sp,
+            maxLines = 1
+        )
     }
 }
 

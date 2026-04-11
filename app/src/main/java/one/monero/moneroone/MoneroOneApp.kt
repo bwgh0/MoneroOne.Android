@@ -1,9 +1,11 @@
 package one.monero.moneroone
 
+import android.app.Activity
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.os.Bundle
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -21,21 +23,30 @@ class MoneroOneApp : Application() {
     companion object {
         private const val PREFS_NAME = "monero_wallet"
         private const val KEY_BACKGROUND_TIMESTAMP = "background_timestamp"
-        private const val KEY_AUTO_LOCK_TIMEOUT = "auto_lock_timeout"
-        private const val KEY_SHOULD_LOCK = "should_lock"
         private const val KEY_BACKGROUND_SYNC = "background_sync_enabled"
     }
 
-    private val lifecycleObserver = object : DefaultLifecycleObserver {
-        override fun onStop(owner: LifecycleOwner) {
-            // App going to background - record timestamp
-            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit()
+    // ActivityLifecycleCallbacks fires immediately — no delay like ProcessLifecycleOwner
+    private val activityCallbacks = object : ActivityLifecycleCallbacks {
+        override fun onActivityPaused(activity: Activity) {
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
                 .putLong(KEY_BACKGROUND_TIMESTAMP, System.currentTimeMillis())
                 .apply()
-            Timber.d("App went to background, recorded timestamp")
+        }
 
-            // Start background sync service if enabled and wallet is initialized
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+        override fun onActivityStarted(activity: Activity) {}
+        override fun onActivityResumed(activity: Activity) {}
+        override fun onActivityStopped(activity: Activity) {}
+        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+        override fun onActivityDestroyed(activity: Activity) {}
+    }
+
+    // ProcessLifecycleOwner is still used for background sync (stop/start)
+    private val processObserver = object : DefaultLifecycleObserver {
+        override fun onStop(owner: LifecycleOwner) {
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             if (prefs.getBoolean(KEY_BACKGROUND_SYNC, false) && WalletManager.kit != null) {
                 Timber.d("Starting background sync service")
                 WalletSyncService.start(this@MoneroOneApp)
@@ -43,36 +54,7 @@ class MoneroOneApp : Application() {
         }
 
         override fun onStart(owner: LifecycleOwner) {
-            // App coming to foreground - stop the service (ViewModel handles sync now)
             WalletSyncService.stop(this@MoneroOneApp)
-
-            // Check if we should lock
-            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val backgroundTimestamp = prefs.getLong(KEY_BACKGROUND_TIMESTAMP, 0)
-            val timeoutSeconds = prefs.getInt(KEY_AUTO_LOCK_TIMEOUT, 60) // Default 1 minute
-
-            if (backgroundTimestamp > 0 && timeoutSeconds >= 0) {
-                val elapsedSeconds = (System.currentTimeMillis() - backgroundTimestamp) / 1000
-
-                val shouldLock = when {
-                    timeoutSeconds == 0 -> true // IMMEDIATE
-                    timeoutSeconds == -1 -> false // NEVER
-                    else -> elapsedSeconds >= timeoutSeconds
-                }
-
-                if (shouldLock) {
-                    Timber.d("Auto-lock triggered: elapsed=${elapsedSeconds}s, timeout=${timeoutSeconds}s")
-                    // Set flag that WalletViewModel will check
-                    prefs.edit()
-                        .putBoolean(KEY_SHOULD_LOCK, true)
-                        .apply()
-                }
-            }
-
-            // Clear the background timestamp
-            prefs.edit()
-                .remove(KEY_BACKGROUND_TIMESTAMP)
-                .apply()
         }
     }
 
@@ -89,8 +71,11 @@ class MoneroOneApp : Application() {
         // Initialize network monitor
         NetworkMonitor.init(this)
 
-        // Register lifecycle observer for auto-lock
-        ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleObserver)
+        // Activity callbacks for auto-lock timestamp (fires immediately)
+        registerActivityLifecycleCallbacks(activityCallbacks)
+
+        // Process observer for background sync only
+        ProcessLifecycleOwner.get().lifecycle.addObserver(processObserver)
 
         // Schedule price alert worker if there are enabled alerts
         if (PriceAlertManager(this).hasEnabledAlerts()) {

@@ -9,6 +9,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import io.horizontalsystems.hdwalletkit.Mnemonic
 import io.horizontalsystems.monerokit.Balance
+import io.horizontalsystems.monerokit.CakeWalletStyleConverter
 import io.horizontalsystems.monerokit.MoneroKit
 import io.horizontalsystems.monerokit.Seed
 import io.horizontalsystems.monerokit.SyncState
@@ -116,7 +117,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         loadSelectedCurrency()
         checkExistingWallet()
         fetchPrice()
-        checkAutoLock()
+        checkAndApplyAutoLock()
     }
 
     private fun loadSelectedCurrency() {
@@ -125,18 +126,27 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _selectedCurrency.value = Currency.entries.find { it.code == currencyCode } ?: Currency.USD
     }
 
-    private fun checkAutoLock() {
+    fun checkAndApplyAutoLock() {
         val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-        val shouldLock = prefs.getBoolean("should_lock", false)
+        val backgroundTimestamp = prefs.getLong("background_timestamp", 0)
+        if (backgroundTimestamp == 0L) return
+
+        val timeoutSeconds = prefs.getInt("auto_lock_timeout", 60)
+        val elapsedSeconds = (System.currentTimeMillis() - backgroundTimestamp) / 1000
+
+        // Clear timestamp so we don't re-check
+        prefs.edit().remove("background_timestamp").apply()
+
+        val shouldLock = when {
+            timeoutSeconds == 0 -> true    // IMMEDIATE
+            timeoutSeconds == -1 -> false  // NEVER
+            else -> elapsedSeconds >= timeoutSeconds
+        }
+
         if (shouldLock) {
-            Timber.d("Auto-lock flag detected, locking wallet")
-            prefs.edit().remove("should_lock").apply()
+            Timber.d("Auto-lock triggered: elapsed=${elapsedSeconds}s, timeout=${timeoutSeconds}s")
             _isLocked.value = true
         }
-    }
-
-    fun checkAndApplyAutoLock() {
-        checkAutoLock()
     }
 
     private fun fetchPrice() {
@@ -541,7 +551,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     // --- PBKDF2 PIN hashing ---
 
     private companion object {
-        const val PBKDF2_ITERATIONS = 600_000
+        const val PBKDF2_ITERATIONS = 80_000
         const val PBKDF2_KEY_LENGTH = 256
         const val PBKDF2_SALT_LENGTH = 16
         const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
@@ -612,46 +622,74 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - getFailedAttempts()).coerceAtLeast(0)
     }
 
-    private fun hashPin(pin: String): String {
+    private suspend fun hashPin(pin: String): String = withContext(Dispatchers.Default) {
         val salt = ByteArray(PBKDF2_SALT_LENGTH).also { SecureRandom().nextBytes(it) }
         val spec = PBEKeySpec(pin.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
         val hash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).encoded
         val saltHex = salt.joinToString("") { "%02x".format(it) }
         val hashHex = hash.joinToString("") { "%02x".format(it) }
-        return "$saltHex:$hashHex"
+        // Format: iterations:salt:hash
+        "$PBKDF2_ITERATIONS:$saltHex:$hashHex"
     }
 
-    private fun verifyPinHash(pin: String, stored: String): Boolean {
-        if (!stored.contains(":")) {
-            // Legacy format: String.hashCode() — migrate on success
-            return pin.hashCode().toString() == stored
-        }
+    private suspend fun verifyPinHash(pin: String, stored: String): Boolean = withContext(Dispatchers.Default) {
         val parts = stored.split(":")
-        if (parts.size != 2) return false
-        val salt = parts[0].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        val expectedHash = parts[1]
-        val spec = PBEKeySpec(pin.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
-        val actualHash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).encoded
-            .joinToString("") { "%02x".format(it) }
-        return MessageDigest.isEqual(
-            expectedHash.toByteArray(Charsets.UTF_8),
-            actualHash.toByteArray(Charsets.UTF_8)
-        )
+        when (parts.size) {
+            1 -> {
+                // Legacy format: String.hashCode()
+                pin.hashCode().toString() == stored
+            }
+            2 -> {
+                // Old PBKDF2 format (salt:hash) — used 600k iterations
+                val salt = parts[0].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+                val expectedHash = parts[1]
+                val spec = PBEKeySpec(pin.toCharArray(), salt, 600_000, PBKDF2_KEY_LENGTH)
+                val actualHash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).encoded
+                    .joinToString("") { "%02x".format(it) }
+                MessageDigest.isEqual(
+                    expectedHash.toByteArray(Charsets.UTF_8),
+                    actualHash.toByteArray(Charsets.UTF_8)
+                )
+            }
+            3 -> {
+                // Current format: iterations:salt:hash
+                val iterations = parts[0].toIntOrNull() ?: return@withContext false
+                val salt = parts[1].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+                val expectedHash = parts[2]
+                val spec = PBEKeySpec(pin.toCharArray(), salt, iterations, PBKDF2_KEY_LENGTH)
+                val actualHash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).encoded
+                    .joinToString("") { "%02x".format(it) }
+                MessageDigest.isEqual(
+                    expectedHash.toByteArray(Charsets.UTF_8),
+                    actualHash.toByteArray(Charsets.UTF_8)
+                )
+            }
+            else -> false
+        }
     }
 
-    private fun migratePinIfNeeded(pin: String, storedHash: String) {
-        if (!storedHash.contains(":")) {
-            // Upgrade legacy hashCode() to PBKDF2
+    private suspend fun migratePinIfNeeded(pin: String, storedHash: String) {
+        val needsMigration = when (storedHash.split(":").size) {
+            1 -> true    // Legacy hashCode
+            2 -> true    // Old 600k format without iteration count
+            3 -> {
+                // Current format — migrate if iteration count changed
+                val iterations = storedHash.split(":")[0].toIntOrNull()
+                iterations != PBKDF2_ITERATIONS
+            }
+            else -> false
+        }
+        if (needsMigration) {
             val newHash = hashPin(pin)
             context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
                 .edit()
                 .putString("pin_hash", newHash)
                 .apply()
-            Timber.d("PIN hash migrated to PBKDF2")
+            Timber.d("PIN hash migrated to current format ($PBKDF2_ITERATIONS iterations)")
         }
     }
 
-    fun setPin(pin: String) {
+    suspend fun setPin(pin: String) {
         val pinHash = hashPin(pin)
         context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
             .edit()
@@ -663,7 +701,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _walletState.update { it.copy(hasWallet = true) }
     }
 
-    fun verifyPin(enteredPin: String): Boolean {
+    suspend fun verifyPin(enteredPin: String): Boolean {
         // Check rate limiting
         if (getRemainingLockoutMs() > 0) return false
 
@@ -686,7 +724,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return isValid
     }
 
-    fun verifyPinOnly(enteredPin: String): Boolean {
+    suspend fun verifyPinOnly(enteredPin: String): Boolean {
         val storedHash = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
             .getString("pin_hash", null) ?: return false
 
@@ -697,7 +735,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return isValid
     }
 
-    fun changePin(oldPin: String, newPin: String): Boolean {
+    suspend fun changePin(oldPin: String, newPin: String): Boolean {
         if (!verifyPinOnly(oldPin)) return false
 
         val pinHash = hashPin(newPin)
@@ -715,6 +753,17 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
         // Otherwise, retrieve from encrypted storage
         return loadSeedEncrypted()?.first
+    }
+
+    fun getSeedType(): SeedType? {
+        _pendingSeed.value?.let { return it.type }
+        return loadSeedEncrypted()?.second
+    }
+
+    fun getElectrumSeedPhrase(): List<String>? {
+        val (words, type) = loadSeedEncrypted() ?: return null
+        if (type != SeedType.BIP39_24) return null
+        return CakeWalletStyleConverter.getLegacySeedFromBip39(words, "")
     }
 
     fun setBiometricsEnabled(enabled: Boolean) {
