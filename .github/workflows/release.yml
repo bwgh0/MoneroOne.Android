@@ -78,6 +78,7 @@ jobs:
           cat SHA256SUMS.txt
 
       - name: Attest APK provenance
+        if: github.event.repository.visibility == 'public'
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: app/build/outputs/apk/release/*.apk
