@@ -1,0 +1,8 @@
+• Redesigned send/receive as a multi-step wizard
+• 9 new fiat currencies: TRY, RUB, CHF, BRL, INR, KRW, MXN, PLN, UAH (16 total)
+• Seed export in 24-word or 25-word (Electrum) format
+• Security: PBKDF2 PIN hashing, rate limiting, address validation
+• Faster PIN entry with async hashing
+• Auto-lock fires immediately on app switch
+• Widget chart improvements and portrait lock
+• Auto-reconnect on app resume
