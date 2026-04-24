@@ -518,6 +518,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                         }
                     }
                     _walletState.update { it.copy(syncState = syncState) }
+                    val statusKey = when (syncState) {
+                        is io.horizontalsystems.monerokit.SyncState.Synced -> "synced"
+                        is io.horizontalsystems.monerokit.SyncState.Syncing -> "syncing"
+                        is io.horizontalsystems.monerokit.SyncState.Connecting -> "connecting"
+                        else -> "offline"
+                    }
+                    WidgetDataStore.saveSyncStatus(context, statusKey)
+                    WalletWidget.updateAll(context)
                 }
             },
             viewModelScope.launch {
@@ -533,10 +541,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 WalletManager.transactionsFlow.collect { transactions ->
                     Timber.d("Transactions updated: count=${transactions.size}")
                     _walletState.update { it.copy(transactions = transactions) }
-                    // Update transactions widget (store last 3)
+                    // Update transactions widget (store last 4 for the iOS-style large layout)
                     val txString = transactions
                         .sortedByDescending { it.timestamp }
-                        .take(3)
+                        .take(4)
                         .joinToString(";") { tx ->
                             val dir = if (tx.direction == io.horizontalsystems.monerokit.model.TransactionInfo.Direction.Direction_In) "in" else "out"
                             "$dir|${tx.amount}|${tx.timestamp}"

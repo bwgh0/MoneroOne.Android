@@ -16,6 +16,8 @@ import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.model.PriceDataPoint
 import one.monero.moneroone.data.repository.PriceRepository
 import one.monero.moneroone.data.util.emaSmooth
+import one.monero.moneroone.widget.PriceWidget
+import one.monero.moneroone.widget.WidgetDataStore
 import timber.log.Timber
 
 class ChartViewModel(application: Application) : AndroidViewModel(application) {
@@ -101,6 +103,10 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
                     if (open != null && close != null && open > 0) {
                         _uiState.update { it.copy(priceChange24h = ((close - open) / open) * 100) }
                     }
+                    // Keep widget data in sync with what the chart screen just computed.
+                    val ctx = getApplication<Application>().applicationContext
+                    WidgetDataStore.saveChartPoints(ctx, data.map { it.price })
+                    PriceWidget.updateAll(ctx)
                 },
                 onFailure = { /* Silently fail, badge just won't show */ }
             )

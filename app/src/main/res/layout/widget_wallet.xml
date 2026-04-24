@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- Header: logo + balance info -->
+    <!-- Header: logo + name/status (left), balance (right) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -16,18 +16,41 @@
 
         <ImageView
             android:id="@+id/wallet_logo"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:layout_marginEnd="10dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:src="@drawable/monero_logo"
             android:scaleType="centerCrop"
             android:importantForAccessibility="no" />
 
-        <!-- Left: Balance -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Monero One"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wallet_sync_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textSize="10sp"
+                android:textColor="#34C759"
+                android:text="● Synced" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
             android:orientation="vertical">
 
             <TextView
@@ -52,7 +75,7 @@
                     android:layout_height="wrap_content"
                     android:text="XMR"
                     android:textColor="#8E8E93"
-                    android:textSize="11sp" />
+                    android:textSize="10sp" />
 
                 <TextView
                     android:id="@+id/wallet_fiat_dot"
@@ -61,7 +84,7 @@
                     android:layout_marginHorizontal="4dp"
                     android:text="·"
                     android:textColor="#8E8E93"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:visibility="gone" />
 
                 <TextView
@@ -69,13 +92,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="#8E8E93"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:visibility="gone" />
-
             </LinearLayout>
-
         </LinearLayout>
-
     </LinearLayout>
 
     <!-- Divider -->
@@ -87,24 +107,34 @@
         android:background="#38383A"
         android:importantForAccessibility="no" />
 
-    <!-- Transaction rows -->
-    <!-- Row 1 -->
+    <!-- Section header -->
+    <TextView
+        android:id="@+id/wallet_recent_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Recent Activity"
+        android:textColor="#8E8E93"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <!-- Transaction rows (4) -->
     <LinearLayout
         android:id="@+id/tx_row_1"
+        android:layout_marginTop="6dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingVertical="4dp"
+        android:paddingVertical="3dp"
         android:visibility="gone">
 
-        <TextView
+        <ImageView
             android:id="@+id/tx1_icon"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:gravity="center"
-            android:textSize="10sp"
-            android:textStyle="bold" />
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:importantForAccessibility="no" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -127,7 +157,6 @@
                 android:layout_height="wrap_content"
                 android:textColor="#8E8E93"
                 android:textSize="10sp" />
-
         </LinearLayout>
 
         <TextView
@@ -136,26 +165,24 @@
             android:layout_height="wrap_content"
             android:textSize="12sp"
             android:textStyle="bold" />
-
     </LinearLayout>
 
-    <!-- Row 2 -->
     <LinearLayout
         android:id="@+id/tx_row_2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingVertical="4dp"
+        android:paddingVertical="3dp"
         android:visibility="gone">
 
-        <TextView
+        <ImageView
             android:id="@+id/tx2_icon"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:gravity="center"
-            android:textSize="10sp"
-            android:textStyle="bold" />
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:importantForAccessibility="no" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -178,7 +205,6 @@
                 android:layout_height="wrap_content"
                 android:textColor="#8E8E93"
                 android:textSize="10sp" />
-
         </LinearLayout>
 
         <TextView
@@ -187,26 +213,24 @@
             android:layout_height="wrap_content"
             android:textSize="12sp"
             android:textStyle="bold" />
-
     </LinearLayout>
 
-    <!-- Row 3 -->
     <LinearLayout
         android:id="@+id/tx_row_3"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingVertical="4dp"
+        android:paddingVertical="3dp"
         android:visibility="gone">
 
-        <TextView
+        <ImageView
             android:id="@+id/tx3_icon"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:gravity="center"
-            android:textSize="10sp"
-            android:textStyle="bold" />
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:importantForAccessibility="no" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -229,7 +253,6 @@
                 android:layout_height="wrap_content"
                 android:textColor="#8E8E93"
                 android:textSize="10sp" />
-
         </LinearLayout>
 
         <TextView
@@ -238,19 +261,79 @@
             android:layout_height="wrap_content"
             android:textSize="12sp"
             android:textStyle="bold" />
+    </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/tx_row_4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingVertical="3dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/tx4_icon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:importantForAccessibility="no" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tx4_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tx4_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8E8E93"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tx4_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <!-- No transactions placeholder -->
     <TextView
         android:id="@+id/wallet_no_tx"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
         android:gravity="center"
         android:text="No recent transactions"
         android:textColor="#8E8E93"
         android:textSize="11sp"
         android:visibility="gone" />
+
+    <!-- Footer: Updated X ago (push to bottom via weight on placeholder above) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+    <TextView
+        android:id="@+id/wallet_updated"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="start"
+        android:textColor="#8E8E93"
+        android:textSize="9sp" />
 
 </LinearLayout>

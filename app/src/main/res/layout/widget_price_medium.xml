@@ -8,16 +8,16 @@
     android:orientation="horizontal">
 
     <!-- Left: Price info -->
-    <LinearLayout
+    <FrameLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="start">
+        android:layout_weight="1">
 
+        <!-- Top: logo + Monero -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -34,39 +34,52 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:text="Monero"
-                android:textColor="#8E8E93"
+                android:textColor="@android:color/white"
                 android:textSize="13sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <TextView
-            android:id="@+id/price_value"
+        <!-- Bottom: price + change + hi/lo -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Open Monero One"
-            android:textColor="@android:color/white"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:fontFamily="monospace"
-            android:maxLines="1" />
+            android:layout_gravity="bottom|start"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/price_change"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="2dp"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+            <TextView
+                android:id="@+id/price_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Open Monero One"
+                android:textColor="@android:color/white"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:maxLines="1" />
 
-    </LinearLayout>
+            <TextView
+                android:id="@+id/price_change"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/price_hilo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="#8E8E93"
+                android:textSize="9sp"
+                android:fontFamily="monospace"
+                android:visibility="gone" />
+        </LinearLayout>
+
+    </FrameLayout>
 
     <!-- Right: Sparkline chart -->
     <ImageView
