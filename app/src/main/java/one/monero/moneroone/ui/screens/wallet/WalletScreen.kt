@@ -57,6 +57,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.horizontalsystems.monerokit.SyncState
 import io.horizontalsystems.monerokit.model.TransactionInfo
 import one.monero.moneroone.R
@@ -185,9 +186,6 @@ fun WalletScreen(
                 onClick = onBalanceClick
             )
         }
-
-        // Extra space before buttons
-        item { Spacer(modifier = Modifier.height(4.dp)) }
 
         // Action buttons
         item {
@@ -363,16 +361,26 @@ private fun BalanceCard(
                     Row(
                         verticalAlignment = Alignment.Bottom
                     ) {
+                        val balanceFontSize = when {
+                            balance.length <= 10 -> 32.sp
+                            balance.length <= 13 -> 26.sp
+                            balance.length <= 16 -> 22.sp
+                            else -> 18.sp
+                        }
                         Text(
                             text = balance,
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold
+                            fontSize = balanceFontSize,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "XMR",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            softWrap = false,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
                     }
