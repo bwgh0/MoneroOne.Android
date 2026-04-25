@@ -94,7 +94,7 @@ class PriceAlertWorker(
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.monero_logo)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("XMR Price Alert")
             .setContentText("Monero is $conditionText ${format.format(alert.targetPrice)} (now ${format.format(currentPrice)})")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

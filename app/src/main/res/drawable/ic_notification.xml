@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Monochrome silhouette: outer circle + Monero M.
+         The system tints this white in the status bar and adapts it to the
+         user's light/dark theme in the notification shade. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,14 A40,40 0 1,0 54,94 A40,40 0 1,0 54,14 Z M54,22 A32,32 0 1,1 54,86 A32,32 0 1,1 54,22 Z"
+        android:fillType="evenOdd" />
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M30,70 L30,45 L54,60 L78,45 L78,70 L72,70 L72,55 L54,66 L36,55 L36,70 Z" />
+
+</vector>
