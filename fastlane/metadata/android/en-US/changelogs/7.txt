@@ -1,0 +1,5 @@
+• Widget layouts now match iOS price and wallet widgets
+• Proper monochrome notification icon
+• Polished app icon proportions for dark theme
+• Fixed balance XMR wrap on large values
+• Tightened action button spacing
