@@ -96,3 +96,6 @@ lint/tmp/
 *.env
 secrets.properties
 keystore.properties
+
+# Claude Code
+.claude/

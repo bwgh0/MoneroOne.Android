@@ -15,8 +15,8 @@
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
 
         <!-- Android 12+ Splash Screen (Dark Mode) -->
-        <item name="android:windowSplashScreenBackground">@color/background_dark</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/background_dark</item>
+        <item name="android:windowSplashScreenBackground">#FF000000</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#FF000000</item>
     </style>
 </resources>
