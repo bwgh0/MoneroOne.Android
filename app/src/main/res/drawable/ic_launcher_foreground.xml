@@ -1,23 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-
-    <!-- Top half - Orange -->
-    <path
-        android:fillColor="#FFFF7500"
-        android:pathData="M54,14 A40,40 0 0,1 94,54 L14,54 A40,40 0 0,1 54,14 Z"/>
-
-    <!-- Bottom half - Gray -->
-    <path
-        android:fillColor="#FF4C4C4C"
-        android:pathData="M14,54 A40,40 0 0,0 94,54 L14,54 Z"/>
-
-    <!-- Monero M shape -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M30,70 L30,45 L54,60 L78,45 L78,70 L72,70 L72,55 L54,66 L36,55 L36,70 Z"/>
-
-</vector>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@mipmap/ic_launcher_foreground"
+    android:gravity="fill" />
