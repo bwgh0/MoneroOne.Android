@@ -1,6 +1,7 @@
 package one.monero.moneroone.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -19,6 +20,10 @@ fun MoneroLogo(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp
 ) {
+    // Day PNG has no padding around logo; night PNG has ~8.5% transparent
+    // padding. Use a smaller scale on day so the circle clip doesn't cut
+    // into logo content, matching night's visual proportions.
+    val scaleFactor = if (isSystemInDarkTheme()) 1.2f else 1.0f
     Box(
         modifier = modifier
             .size(size)
@@ -30,7 +35,7 @@ fun MoneroLogo(
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .matchParentSize()
-                .scale(1.2f)
+                .scale(scaleFactor)
         )
     }
 }

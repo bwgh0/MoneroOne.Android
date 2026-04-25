@@ -1,0 +1,1 @@
+• Fixed Monero logo zoom in light mode to match dark mode
