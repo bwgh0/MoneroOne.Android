@@ -1,0 +1,1 @@
+• Privacy: no network requests on first launch until you create a wallet

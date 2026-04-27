@@ -116,7 +116,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     init {
         loadSelectedCurrency()
         checkExistingWallet()
-        fetchPrice()
+        // Defer price fetch until a wallet exists. Avoids leaking IP to
+        // monero.one before the user has generated/restored a key.
+        if (_walletState.value.hasWallet) {
+            fetchPrice()
+        }
         checkAndApplyAutoLock()
     }
 
@@ -707,6 +711,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _isLocked.value = false
         // Only mark wallet as having been fully set up after PIN is also saved
         _walletState.update { it.copy(hasWallet = true) }
+        fetchPrice()
     }
 
     suspend fun verifyPin(enteredPin: String): Boolean {

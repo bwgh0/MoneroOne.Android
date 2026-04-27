@@ -46,8 +46,12 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
         // Load saved currency from preferences
         val savedCode = prefs.getString("selected_currency", Currency.USD.code)
         _selectedCurrency.value = Currency.entries.find { it.code == savedCode } ?: Currency.USD
-        loadData()
-        load24hChange()
+        // Defer network fetch until a wallet exists. Avoids leaking IP to
+        // monero.one before the user has generated/restored a key.
+        if (prefs.getString("wallet_id", null) != null) {
+            loadData()
+            load24hChange()
+        }
     }
 
     fun selectTimeRange(range: TimeRange) {
@@ -83,6 +87,7 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refresh() {
         loadData()
+        load24hChange()
     }
 
     private fun loadData() {

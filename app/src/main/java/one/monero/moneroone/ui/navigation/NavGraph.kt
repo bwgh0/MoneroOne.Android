@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -95,6 +96,15 @@ fun MoneroOneNavHost(
     val walletState by walletViewModel.walletState.collectAsState()
     val isLocked by walletViewModel.isLocked.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Kick off price/chart fetches once a wallet exists. ChartViewModel
+    // skips its init-time fetch pre-wallet so we don't leak IP to monero.one
+    // before key generation.
+    LaunchedEffect(walletState.hasWallet) {
+        if (walletState.hasWallet) {
+            chartViewModel.refresh()
+        }
+    }
 
     // Check for auto-lock when app resumes
     DisposableEffect(lifecycleOwner) {
