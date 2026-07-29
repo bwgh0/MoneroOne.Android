@@ -18,6 +18,7 @@ import io.horizontalsystems.monerokit.model.NetworkType
 import io.horizontalsystems.monerokit.model.TransactionInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -510,15 +511,18 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     when (syncState) {
                         is SyncState.NotSynced -> {
                             Timber.d("SyncState: NotSynced, error=${syncState.error}")
+                            maybeFailover(syncState)
                         }
                         is SyncState.Connecting -> {
                             Timber.d("SyncState: Connecting, waiting=${syncState.waiting}")
                         }
                         is SyncState.Syncing -> {
                             Timber.d("SyncState: Syncing, progress=${syncState.progress}")
+                            failoverAttempts = 0
                         }
                         is SyncState.Synced -> {
                             Timber.d("SyncState: Synced")
+                            failoverAttempts = 0
                         }
                     }
                     _walletState.update { it.copy(syncState = syncState) }
@@ -563,6 +567,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     // --- PBKDF2 PIN hashing ---
 
     private companion object {
+        const val FAILOVER_RETRY_DELAY_MS = 5_000L
         const val PBKDF2_ITERATIONS = 80_000
         const val PBKDF2_KEY_LENGTH = 256
         const val PBKDF2_SALT_LENGTH = 16
@@ -804,7 +809,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         editor.apply()
     }
 
-    fun changeNode() {
+    fun changeNode(resetFailover: Boolean = true) {
+        if (resetFailover) failoverAttempts = 0
         viewModelScope.launch {
             try {
                 _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
@@ -826,7 +832,34 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private var failoverJob: Job? = null
+    private var failoverAttempts = 0
+
+    // Support P1: "disconnected, always — on any node". Retrying the same dead
+    // node can never self-heal, so when a connection fails and auto-select is on,
+    // advance to the next default node. Bounded to one full pass over the list;
+    // a successful sync (or a manual node change) resets the budget.
+    private fun maybeFailover(state: SyncState.NotSynced) {
+        if (state.error is MoneroKit.SyncError.NotStarted) return
+        if (!_walletState.value.hasWallet) return
+        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("auto_select_node", true)) return
+        if (failoverAttempts >= DefaultNodes.URIS.size) return
+        if (failoverJob?.isActive == true) return
+
+        failoverJob = viewModelScope.launch {
+            delay(FAILOVER_RETRY_DELAY_MS)
+            val current = getSelectedNode()
+            val next = DefaultNodes.URIS[(DefaultNodes.URIS.indexOf(current) + 1).mod(DefaultNodes.URIS.size)]
+            failoverAttempts++
+            Timber.w("Node failover $failoverAttempts/${DefaultNodes.URIS.size}: $current -> $next (${state.error.message})")
+            prefs.edit().putString("selected_node", next).apply()
+            changeNode(resetFailover = false)
+        }
+    }
+
     fun refreshSync() {
+        failoverAttempts = 0
         viewModelScope.launch {
             try {
                 _walletState.update {
@@ -847,6 +880,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun resetSync() {
+        failoverAttempts = 0
         viewModelScope.launch {
             try {
                 val seedData = loadSeedEncrypted() ?: run {
@@ -959,7 +993,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private fun getSelectedNode(): String {
         val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         val savedNode = prefs.getString("selected_node", null)
-        val node = savedNode ?: "xmr-node.cakewallet.com:18081"
+        val node = savedNode ?: DefaultNodes.INITIAL
         Timber.d("getSelectedNode: savedNode=$savedNode, using node=$node")
         return node
     }

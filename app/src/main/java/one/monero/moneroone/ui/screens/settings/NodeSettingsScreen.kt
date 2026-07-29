@@ -61,6 +61,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import one.monero.moneroone.core.wallet.DefaultNodes
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
@@ -75,13 +76,7 @@ data class NodeInfo(
     val isDefault: Boolean = false
 )
 
-private val DEFAULT_NODES = listOf(
-    NodeInfo("node.monero.one:443", "Monero One", true),
-    NodeInfo("xmr-node.cakewallet.com:18081", "Cake Wallet", true),
-    NodeInfo("node.sethforprivacy.com:18089", "Seth For Privacy", true),
-    NodeInfo("nodes.hashvault.pro:18081", "HashVault", true),
-    NodeInfo("node.community.rino.io:18081", "RINO Community", true)
-)
+private val DEFAULT_NODES = DefaultNodes.ALL.map { NodeInfo(it.uri, it.name, true) }
 
 @Composable
 fun NodeSettingsScreen(
@@ -98,8 +93,8 @@ fun NodeSettingsScreen(
     var isBenchmarking by remember { mutableStateOf(false) }
 
     var selectedNode by remember {
-        val savedUri = prefs.getString("selected_node", DEFAULT_NODES.first().uri)
-        mutableStateOf(savedUri ?: DEFAULT_NODES.first().uri)
+        val savedUri = prefs.getString("selected_node", DefaultNodes.INITIAL)
+        mutableStateOf(savedUri ?: DefaultNodes.INITIAL)
     }
 
     var autoSelectEnabled by remember {
@@ -248,14 +243,18 @@ fun NodeSettingsScreen(
                     isSelected = node.uri == selectedNode,
                     isBenchmarking = isBenchmarking && node.uri !in latencyMap,
                     latencyMs = latencyMap[node.uri],
-                    enabled = !autoSelectEnabled,
+                    enabled = true,
                     onSelect = {
-                        if (!autoSelectEnabled) {
-                            val changed = selectedNode != node.uri
-                            selectedNode = node.uri
-                            prefs.edit().putString("selected_node", node.uri).apply()
-                            if (changed) onNodeChanged()
+                        // Manual pick always wins: turn auto-select off instead of
+                        // ignoring the tap (users stuck on a bad node couldn't escape).
+                        if (autoSelectEnabled) {
+                            autoSelectEnabled = false
+                            prefs.edit().putBoolean("auto_select_node", false).apply()
                         }
+                        val changed = selectedNode != node.uri
+                        selectedNode = node.uri
+                        prefs.edit().putString("selected_node", node.uri).apply()
+                        if (changed) onNodeChanged()
                     },
                     onDelete = null
                 )
@@ -305,14 +304,16 @@ fun NodeSettingsScreen(
                         isSelected = node.uri == selectedNode,
                         isBenchmarking = isBenchmarking && node.uri !in latencyMap,
                         latencyMs = latencyMap[node.uri],
-                        enabled = !autoSelectEnabled,
+                        enabled = true,
                         onSelect = {
-                            if (!autoSelectEnabled) {
-                                val changed = selectedNode != node.uri
-                                selectedNode = node.uri
-                                prefs.edit().putString("selected_node", node.uri).apply()
-                                if (changed) onNodeChanged()
+                            if (autoSelectEnabled) {
+                                autoSelectEnabled = false
+                                prefs.edit().putBoolean("auto_select_node", false).apply()
                             }
+                            val changed = selectedNode != node.uri
+                            selectedNode = node.uri
+                            prefs.edit().putString("selected_node", node.uri).apply()
+                            if (changed) onNodeChanged()
                         },
                         onDelete = {
                             customNodes.remove(node)
@@ -324,10 +325,10 @@ fun NodeSettingsScreen(
                             ).apply()
 
                             if (selectedNode == node.uri) {
-                                selectedNode = DEFAULT_NODES.first().uri
+                                selectedNode = DefaultNodes.INITIAL
                                 prefs.edit().putString(
                                     "selected_node",
-                                    DEFAULT_NODES.first().uri
+                                    DefaultNodes.INITIAL
                                 ).apply()
                             }
                         }
@@ -552,7 +553,10 @@ private suspend fun benchmarkNode(uri: String): Long = withContext(Dispatchers.I
         val responseCode = connection.responseCode
         connection.disconnect()
 
-        if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+        // Only HTTP 200 counts: a node answering 403 (e.g. a CDN or restricted
+        // proxy in front) is not usable by wallet2 RPC, and auto-select must
+        // never save a node the wallet layer can't actually talk to.
+        if (responseCode == HttpURLConnection.HTTP_OK) {
             System.currentTimeMillis() - start
         } else {
             -1L
