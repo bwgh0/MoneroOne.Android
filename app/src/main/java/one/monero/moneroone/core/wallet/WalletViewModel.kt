@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.model.CurrentPrice
@@ -120,8 +122,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         get() = _addWalletFlowActiveView
     private val _addWalletFlowActiveView = MutableStateFlow(false)
 
-    @Volatile
-    private var isSwitching = false
+    /**
+     * Serializes every wallet lifecycle transition (switch / add / delete /
+     * reset / refresh / node change / unlock-open). Two transitions
+     * interleaving their kit teardown + reopen leaves the kit slot and
+     * [_walletState] divergent (M1).
+     */
+    private val walletMutationMutex = Mutex()
 
     // Price data
     private val priceRepository = PriceRepository()
@@ -367,7 +374,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun unlockWithBiometrics() {
         _isLocked.value = false
-        viewModelScope.launch { openActiveWallet() }
+        viewModelScope.launch { walletMutationMutex.withLock { openActiveWallet() } }
     }
 
     /**
@@ -389,12 +396,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         var info = active
         if (info.derivedWalletId == null) {
             // Legacy row without an id: derive + persist BEFORE opening.
-            info = info.copy(
-                derivedWalletId = WalletCacheIds.derivedWalletId(seedData.first, info.syncResetCount)
-            )
-            store.updateWallet(info)
-            _activeWallet.value = info
-            _wallets.value = store.wallets()
+            info = mergeWalletUpdate(active.id) {
+                it.copy(
+                    derivedWalletId = it.derivedWalletId
+                        ?: WalletCacheIds.derivedWalletId(seedData.first, it.syncResetCount)
+                )
+            } ?: return
             Timber.i("Populated missing derivedWalletId for wallet ${info.id}")
         }
         val cacheId = info.derivedWalletId!!
@@ -467,12 +474,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             runCatching { kit.getSubaddresses().firstOrNull()?.address }.getOrNull()
         } ?: return
         val active = _activeWallet.value ?: return
-        if (active.cachedPrimaryAddress != primary) {
-            val updated = active.copy(cachedPrimaryAddress = primary)
-            store.updateWallet(updated)
-            _activeWallet.value = updated
-            _wallets.value = store.wallets()
-        }
+        mergeWalletUpdate(active.id) { it.copy(cachedPrimaryAddress = primary) }
     }
 
     fun generateNewSeed(seedType: SeedType): List<String> {
@@ -555,7 +557,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         emoji: String,
         restoreHeight: Long,
         restoreDateMillis: Long
-    ): Boolean {
+    ): Boolean = walletMutationMutex.withLock {
         val previousActive = _activeWallet.value
         var persisted: WalletInfo? = null
         try {
@@ -694,11 +696,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     // =========================================================================
 
     fun switchWallet(id: String) {
-        if (isSwitching) return
         val outgoing = _activeWallet.value
         if (outgoing?.id == id) return
         val target = _wallets.value.firstOrNull { it.id == id } ?: return
-        isSwitching = true
+        // Any lifecycle transition in flight (another switch, delete, reset,
+        // node change, add): drop the tap instead of interleaving.
+        if (!walletMutationMutex.tryLock()) return
 
         // ---- Phase 1: synchronous repaint under the new identity ----
         val oldKit = WalletManager.kit
@@ -738,13 +741,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     val primary = withContext(Dispatchers.IO) {
                         runCatching { oldKit.getSubaddresses().firstOrNull()?.address }.getOrNull()
                     }
-                    val snapshot = outgoing.copy(
-                        cachedBalance = outgoingBalance.all,
-                        cachedUnlockedBalance = outgoingBalance.unlocked,
-                        cachedPrimaryAddress = primary ?: outgoing.cachedPrimaryAddress
-                    )
-                    store.updateWallet(snapshot)
-                    _wallets.value = store.wallets()
+                    // Merge cached fields onto the freshest row — writing the
+                    // captured copy back would revert a concurrent rename etc.
+                    mergeWalletUpdate(outgoing.id) {
+                        it.copy(
+                            cachedBalance = outgoingBalance.all,
+                            cachedUnlockedBalance = outgoingBalance.unlocked,
+                            cachedPrimaryAddress = primary ?: it.cachedPrimaryAddress
+                        )
+                    }
                 }
                 // KitManager allows exactly one running kit — await teardown
                 // before opening the new wallet.
@@ -754,9 +759,29 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 Timber.e(e, "switchWallet phase 2 failed")
                 _walletState.update { it.copy(error = e.message) }
             } finally {
-                isSwitching = false
+                walletMutationMutex.unlock()
             }
         }
+    }
+
+    /**
+     * Read-modify-write a wallet row against the FRESH store state (M2):
+     * re-reading right before the write means an update that landed while a
+     * caller was suspended (rename, restore height, subaddress indices) is
+     * never reverted by writing back a stale captured copy.
+     * Returns the resulting row, or null when the wallet no longer exists.
+     */
+    private fun mergeWalletUpdate(id: String, transform: (WalletInfo) -> WalletInfo): WalletInfo? {
+        val row = store.wallets().firstOrNull { it.id == id } ?: return null
+        val updated = transform(row)
+        if (updated != row) {
+            store.updateWallet(updated)
+            _wallets.value = store.wallets()
+            if (_activeWallet.value?.id == id) {
+                _activeWallet.value = updated
+            }
+        }
+        return updated
     }
 
     /** Persist live balance/address of the active wallet into the store. */
@@ -768,15 +793,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         val primary = withContext(Dispatchers.IO) {
             runCatching { kit.getSubaddresses().firstOrNull()?.address }.getOrNull()
         }
-        val snapshot = active.copy(
-            cachedBalance = balance.all,
-            cachedUnlockedBalance = balance.unlocked,
-            cachedPrimaryAddress = primary ?: active.cachedPrimaryAddress
-        )
-        if (snapshot != active) {
-            store.updateWallet(snapshot)
-            _activeWallet.value = snapshot
-            _wallets.value = store.wallets()
+        // Merge ONLY the cached fields onto the freshest row.
+        mergeWalletUpdate(active.id) {
+            it.copy(
+                cachedBalance = balance.all,
+                cachedUnlockedBalance = balance.unlocked,
+                cachedPrimaryAddress = primary ?: it.cachedPrimaryAddress
+            )
         }
     }
 
@@ -787,13 +810,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun renameWallet(id: String, name: String, emoji: String) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
-        val target = _wallets.value.firstOrNull { it.id == id } ?: return
-        val updated = target.copy(name = trimmed, emoji = emoji.ifEmpty { target.emoji })
-        store.updateWallet(updated)
-        _wallets.value = store.wallets()
-        if (_activeWallet.value?.id == id) {
-            _activeWallet.value = updated
-        }
+        mergeWalletUpdate(id) { it.copy(name = trimmed, emoji = emoji.ifEmpty { it.emoji }) }
     }
 
     /**
@@ -808,52 +825,56 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         Timber.i("deleteWallet: ${target.id} (${target.name}), active=$wasActive")
 
         viewModelScope.launch {
-            // Cancel per-wallet work first so nothing fires against the next wallet.
-            if (wasActive) {
-                cancelKitObservers()
-                failoverJob?.cancel()
-                failoverAttempts = 0
+            walletMutationMutex.withLock { deleteWalletLocked(id, wasActive) }
+        }
+    }
+
+    private suspend fun deleteWalletLocked(id: String, wasActive: Boolean) {
+        // Cancel per-wallet work first so nothing fires against the next wallet.
+        if (wasActive) {
+            cancelKitObservers()
+            failoverJob?.cancel()
+            failoverAttempts = 0
+        }
+
+        secrets.deleteWalletSecrets(id)
+        store.removeWallet(id)
+        prefs.edit().remove("wallet.$id.selected_address_index").apply()
+        val remaining = store.wallets()
+        _wallets.value = remaining
+
+        if (!wasActive) {
+            refreshHasWallet()
+            return
+        }
+
+        WalletManager.clear()
+
+        val next = remaining.firstOrNull()
+        if (next != null) {
+            store.setActiveWalletId(next.id)
+            _activeWallet.value = next
+            _walletState.update {
+                it.copy(
+                    balance = Balance(next.cachedBalance ?: 0L, next.cachedUnlockedBalance ?: 0L),
+                    receiveAddress = next.cachedPrimaryAddress ?: "",
+                    transactions = emptyList(),
+                    subaddresses = emptyList(),
+                    syncState = SyncState.Connecting(waiting = false),
+                    error = null
+                )
             }
-
-            secrets.deleteWalletSecrets(id)
-            store.removeWallet(id)
-            prefs.edit().remove("wallet.$id.selected_address_index").apply()
-            val remaining = store.wallets()
-            _wallets.value = remaining
-
-            if (!wasActive) {
-                refreshHasWallet()
-                return@launch
-            }
-
-            WalletManager.clear()
-
-            val next = remaining.firstOrNull()
-            if (next != null) {
-                store.setActiveWalletId(next.id)
-                _activeWallet.value = next
-                _walletState.update {
-                    it.copy(
-                        balance = Balance(next.cachedBalance ?: 0L, next.cachedUnlockedBalance ?: 0L),
-                        receiveAddress = next.cachedPrimaryAddress ?: "",
-                        transactions = emptyList(),
-                        subaddresses = emptyList(),
-                        syncState = SyncState.Connecting(waiting = false),
-                        error = null
-                    )
-                }
-                _walletSessionId.value += 1
-                refreshHasWallet()
-                openActiveWallet()
-            } else {
-                store.setActiveWalletId(null)
-                _activeWallet.value = null
-                _pendingSeed.value = null
-                _pin.value = null
-                _isLocked.value = false
-                _walletSessionId.value += 1
-                _walletState.value = WalletState(hasWallet = false)
-            }
+            _walletSessionId.value += 1
+            refreshHasWallet()
+            openActiveWallet()
+        } else {
+            store.setActiveWalletId(null)
+            _activeWallet.value = null
+            _pendingSeed.value = null
+            _pin.value = null
+            _isLocked.value = false
+            _walletSessionId.value += 1
+            _walletState.value = WalletState(hasWallet = false)
         }
     }
 
@@ -989,11 +1010,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun persistCachedBalance(balance: Balance) {
         val active = _activeWallet.value ?: return
-        if (active.cachedBalance == balance.all && active.cachedUnlockedBalance == balance.unlocked) return
-        val updated = active.copy(cachedBalance = balance.all, cachedUnlockedBalance = balance.unlocked)
-        store.updateWallet(updated)
-        _activeWallet.value = updated
-        _wallets.value = store.wallets()
+        mergeWalletUpdate(active.id) {
+            it.copy(cachedBalance = balance.all, cachedUnlockedBalance = balance.unlocked)
+        }
     }
 
     // --- PBKDF2 PIN hashing ---
@@ -1169,7 +1188,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             migratePinIfNeeded(enteredPin, storedHash)
             _pin.value = enteredPin
             _isLocked.value = false
-            viewModelScope.launch { openActiveWallet() }
+            viewModelScope.launch { walletMutationMutex.withLock { openActiveWallet() } }
         } else {
             recordFailedAttempt()
             refreshLockoutState()
@@ -1272,13 +1291,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     /** Per-wallet restore height (persisted on the active WalletInfo). */
     fun setRestoreHeight(height: Long, restoreDateMillis: Long? = null) {
         val active = _activeWallet.value ?: return
-        val updated = active.copy(
-            restoreHeight = height,
-            restoreDateMillis = restoreDateMillis ?: active.restoreDateMillis
-        )
-        store.updateWallet(updated)
-        _activeWallet.value = updated
-        _wallets.value = store.wallets()
+        mergeWalletUpdate(active.id) {
+            it.copy(
+                restoreHeight = height,
+                restoreDateMillis = restoreDateMillis ?: it.restoreDateMillis
+            )
+        }
     }
 
     /** Per-wallet selected receive-address index. */
@@ -1295,22 +1313,24 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun changeNode(resetFailover: Boolean = true) {
         if (resetFailover) failoverAttempts = 0
         viewModelScope.launch {
-            try {
-                _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
+            walletMutationMutex.withLock {
+                try {
+                    _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
 
-                cancelKitObservers()
-                // Stop the current kit and release reference (wallet files preserved)
-                WalletManager.stopAndRelease()
+                    cancelKitObservers()
+                    // Stop the current kit and release reference (wallet files preserved)
+                    WalletManager.stopAndRelease()
 
-                // Reinitialize with the new node (wallet files still exist, sync resumes)
-                openActiveWallet()
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to change node")
-                _walletState.update {
-                    it.copy(
-                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                        error = "Failed to change node: ${e.message}"
-                    )
+                    // Reinitialize with the new node (wallet files still exist, sync resumes)
+                    openActiveWallet()
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to change node")
+                    _walletState.update {
+                        it.copy(
+                            syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                            error = "Failed to change node: ${e.message}"
+                        )
+                    }
                 }
             }
         }
@@ -1344,20 +1364,22 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshSync() {
         failoverAttempts = 0
         viewModelScope.launch {
-            try {
-                _walletState.update {
-                    it.copy(syncState = SyncState.Connecting(waiting = false))
-                }
-                cancelKitObservers()
-                WalletManager.stopAndRelease()
-                openActiveWallet()
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to refresh sync")
-                _walletState.update {
-                    it.copy(
-                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                        error = "Failed to refresh: ${e.message}"
-                    )
+            walletMutationMutex.withLock {
+                try {
+                    _walletState.update {
+                        it.copy(syncState = SyncState.Connecting(waiting = false))
+                    }
+                    cancelKitObservers()
+                    WalletManager.stopAndRelease()
+                    openActiveWallet()
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to refresh sync")
+                    _walletState.update {
+                        it.copy(
+                            syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                            error = "Failed to refresh: ${e.message}"
+                        )
+                    }
                 }
             }
         }
@@ -1372,51 +1394,55 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun resetSync() {
         failoverAttempts = 0
         viewModelScope.launch {
-            try {
-                val active = _activeWallet.value ?: return@launch
-                val seedData = secrets.loadSeed(active.id) ?: run {
-                    Timber.w("No stored seed, cannot reset sync")
-                    _walletState.update { it.copy(error = "No wallet seed to reset sync") }
-                    return@launch
-                }
+            walletMutationMutex.withLock { resetSyncLocked() }
+        }
+    }
 
-                val oldCacheId = active.derivedWalletId
-                val newCount = active.syncResetCount + 1
-                val newCacheId = WalletCacheIds.derivedWalletId(seedData.first, newCount)
+    private suspend fun resetSyncLocked() {
+        try {
+            val active = _activeWallet.value ?: return
+            val seedData = secrets.loadSeed(active.id) ?: run {
+                Timber.w("No stored seed, cannot reset sync")
+                _walletState.update { it.copy(error = "No wallet seed to reset sync") }
+                return
+            }
 
-                // Persist the new id FIRST — lockstep with what open will use.
-                val updated = active.copy(syncResetCount = newCount, derivedWalletId = newCacheId)
-                store.updateWallet(updated)
-                _activeWallet.value = updated
-                _wallets.value = store.wallets()
-                Timber.i("resetSync: count=$newCount cacheId $oldCacheId -> $newCacheId")
+            val oldCacheId = active.derivedWalletId
+            val newCount = active.syncResetCount + 1
+            val newCacheId = WalletCacheIds.derivedWalletId(seedData.first, newCount)
 
-                _walletState.update {
-                    it.copy(
-                        balance = Balance(0, 0),
-                        transactions = emptyList(),
-                        syncState = SyncState.Connecting(waiting = false)
-                    )
-                }
+            // Persist the new id FIRST — lockstep with what open will use.
+            // Merge onto the freshest stored row (M2).
+            mergeWalletUpdate(active.id) {
+                it.copy(syncResetCount = newCount, derivedWalletId = newCacheId)
+            } ?: return
+            Timber.i("resetSync: count=$newCount cacheId $oldCacheId -> $newCacheId")
 
-                cancelKitObservers()
-                WalletManager.stopAndRelease()
+            _walletState.update {
+                it.copy(
+                    balance = Balance(0, 0),
+                    transactions = emptyList(),
+                    syncState = SyncState.Connecting(waiting = false)
+                )
+            }
 
-                // Delete ONLY this wallet's old cache files.
-                oldCacheId?.let {
-                    withContext(Dispatchers.IO) { MoneroKit.deleteWallet(context, it) }
-                }
+            cancelKitObservers()
+            WalletManager.stopAndRelease()
 
-                openActiveWallet()
-                Timber.d("resetSync: Wallet resync started successfully")
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to reset sync")
-                _walletState.update {
-                    it.copy(
-                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                        error = "Failed to reset sync: ${e.message}"
-                    )
-                }
+            // Delete ONLY this wallet's old cache files.
+            oldCacheId?.let {
+                withContext(Dispatchers.IO) { MoneroKit.deleteWallet(context, it) }
+            }
+
+            openActiveWallet()
+            Timber.d("resetSync: Wallet resync started successfully")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to reset sync")
+            _walletState.update {
+                it.copy(
+                    syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                    error = "Failed to reset sync: ${e.message}"
+                )
             }
         }
     }
@@ -1478,8 +1504,18 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             _sendState.value = SendState.Sending
             try {
+                // Null kit (switch/reset/node-change teardown window) must be a
+                // LOUD failure — a silent no-op here reported Success for a
+                // payment that was never sent (M3).
+                val kit = WalletManager.kit
+                if (kit == null || WalletManager.currentWalletId != _activeWallet.value?.derivedWalletId) {
+                    _sendState.value = SendState.Error(
+                        "Wallet is not connected yet. Wait for the wallet to reconnect and try again."
+                    )
+                    return@launch
+                }
                 withContext(Dispatchers.IO) {
-                    WalletManager.kit?.send(amount, address, memo, sweepAll = isSweepAll)
+                    kit.send(amount, address, memo, sweepAll = isSweepAll)
                 }
                 // MoneroKit.send() doesn't return txHash, we'll show success without it
                 // The transaction will appear in the transactions list after sync
@@ -1519,13 +1555,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             0
         }
         val index = count - 1
-        if (index > 0 && index !in active.userCreatedSubaddressIndices) {
-            val updated = active.copy(
-                userCreatedSubaddressIndices = active.userCreatedSubaddressIndices + index
-            )
-            store.updateWallet(updated)
-            _activeWallet.value = updated
-            _wallets.value = store.wallets()
+        if (index > 0) {
+            mergeWalletUpdate(active.id) {
+                if (index in it.userCreatedSubaddressIndices) it
+                else it.copy(userCreatedSubaddressIndices = it.userCreatedSubaddressIndices + index)
+            }
         }
         return result
     }

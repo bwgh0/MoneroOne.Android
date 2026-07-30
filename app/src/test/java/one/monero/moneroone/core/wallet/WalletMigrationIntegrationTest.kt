@@ -122,6 +122,71 @@ class WalletMigrationIntegrationTest {
         assertNull(plain.getString("wallet_id", null))
     }
 
+    // --- Post-migration legacy leftovers (M4) --------------------------------
+
+    @Test
+    fun `post-migration launch with no legacy fragments is a no-op`() {
+        seedLegacyInstall()
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+        val before = store.wallets()
+
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+
+        assertEquals(before, store.wallets())
+    }
+
+    @Test
+    fun `legacy wallet written by a downgraded build is imported, not destroyed`() {
+        seedLegacyInstall()
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+
+        // Downgraded single-wallet build ran and created a NEW wallet.
+        val otherSeed = List(24) { "other$it" }
+        plain.edit()
+            .putString("wallet_id", "aaaaaaaa-bbbb-cccc-dddd-eeeeffff0000")
+            .putString("pin_hash", "80000:cc:dd")
+            .apply()
+        encrypted.edit()
+            .putString("seed_words", otherSeed.joinToString(" "))
+            .putString("seed_type", "BIP39_24")
+            .apply()
+
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+
+        val wallets = store.wallets()
+        assertEquals(2, wallets.size)
+        val imported = wallets.first { it.derivedWalletId == "aaaaaaaa-bbbb-cccc-dddd-eeeeffff0000" }
+        // The seed survives — the old behavior wiped it unseen.
+        assertEquals(otherSeed, secrets.loadSeed(imported.id)?.first)
+        // One-app-wide-PIN invariant: imported row gets the existing hash.
+        assertEquals("80000:aa:bb", secrets.pinHash(imported.id))
+        // Legacy keys wiped after import.
+        assertNull(plain.getString("wallet_id", null))
+        assertNull(encrypted.getString("seed_words", null))
+    }
+
+    @Test
+    fun `post-migration legacy wallet with an already-known seed is wiped without import`() {
+        seedLegacyInstall()
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+
+        // Downgraded build restored the SAME seed under a fresh cache UUID.
+        plain.edit()
+            .putString("wallet_id", "aaaaaaaa-bbbb-cccc-dddd-eeeeffff0000")
+            .putString("pin_hash", "80000:cc:dd")
+            .apply()
+        encrypted.edit()
+            .putString("seed_words", seedWords.joinToString(" "))
+            .putString("seed_type", "BIP39_24")
+            .apply()
+
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+
+        assertEquals(1, store.wallets().size)
+        assertNull(plain.getString("wallet_id", null))
+        assertNull(encrypted.getString("seed_words", null))
+    }
+
     @Test
     fun `migration never wipes legacy before new data is written`() {
         // Guarded by ordering in migrateIfNeeded; verify the migrated wallet's

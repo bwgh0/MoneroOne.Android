@@ -72,10 +72,10 @@ object WalletMigration {
         store: WalletStore
     ) {
         // Already migrated, or a previous run wrote the store but crashed
-        // before setting the flag — just clean up leftovers.
+        // before setting the flag — import or clean up any legacy leftovers.
         if (store.migrated || store.wallets().isNotEmpty()) {
             if (!store.migrated) store.migrated = true
-            wipeLegacyKeys(plainPrefs, secrets)
+            importOrClearLegacyLeftovers(plainPrefs, secrets, store)
             return
         }
 
@@ -110,6 +110,55 @@ object WalletMigration {
         store.migrated = true
 
         // 4. Only now wipe legacy keys.
+        wipeLegacyKeys(plainPrefs, secrets)
+    }
+
+    /**
+     * Post-migration launches: legacy keys are normally absent, so this is a
+     * no-op (the old behavior wiped them on EVERY launch). When legacy keys
+     * reappear after migration it means a downgraded single-wallet build ran
+     * and wrote a wallet — destroying that seed unseen loses funds. Import a
+     * complete legacy wallet as a new row (unless its seed already exists),
+     * then wipe the legacy keys.
+     */
+    private fun importOrClearLegacyLeftovers(
+        plainPrefs: SharedPreferences,
+        secrets: WalletSecrets,
+        store: WalletStore
+    ) {
+        val legacy = readLegacySnapshot(plainPrefs, secrets)
+        val hasAnyFragment =
+            legacy.walletId != null || legacy.pinHash != null || !legacy.seedWords.isNullOrEmpty()
+        if (!hasAnyFragment) return
+
+        if (legacy.hasCompleteWallet) {
+            val existing = store.wallets()
+            val duplicate =
+                // The crash-recovery case: the store row IS this legacy wallet
+                // (its cache id was kept verbatim).
+                existing.any { it.derivedWalletId == legacy.walletId } ||
+                    WalletCacheIds.findWalletWithSeed(legacy.seedWords!!, existing) { id ->
+                        secrets.loadSeed(id)?.first
+                    } != null
+            if (!duplicate) {
+                val newId = UUID.randomUUID().toString()
+                val info = buildMigratedWallet(legacy, newId, System.currentTimeMillis())!!
+                Timber.i("WalletMigration: importing post-migration legacy wallet -> $newId (cache ${info.derivedWalletId})")
+                secrets.saveSeed(newId, legacy.seedWords!!, legacy.seedType!!)
+                // Keep the one-app-wide-PIN invariant: prefer the existing
+                // wallets' hash; fall back to the legacy build's hash.
+                val appPinHash = existing.firstNotNullOfOrNull { secrets.pinHash(it.id) }
+                secrets.savePinHash(newId, appPinHash ?: legacy.pinHash!!)
+                plainPrefs.edit()
+                    .putInt("wallet.$newId.selected_address_index", legacy.selectedAddressIndex)
+                    .apply()
+                store.addWallet(info)
+            } else {
+                Timber.i("WalletMigration: post-migration legacy wallet duplicates an existing row; wiping")
+            }
+        } else {
+            Timber.w("WalletMigration: clearing incomplete post-migration legacy fragments")
+        }
         wipeLegacyKeys(plainPrefs, secrets)
     }
 
