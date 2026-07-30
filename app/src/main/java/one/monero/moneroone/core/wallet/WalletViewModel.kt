@@ -165,7 +165,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         loadSelectedCurrency()
-        WalletMigration.migrateIfNeeded(prefs, secrets, store)
+        try {
+            WalletMigration.migrateIfNeeded(prefs, secrets, store)
+        } catch (e: Exception) {
+            // Keystore/EncryptedSharedPreferences failures must not crash the
+            // constructor into a loop; migration is idempotent and will be
+            // retried next launch.
+            Timber.e(e, "Wallet migration failed; continuing with existing state")
+        }
         loadWalletsFromStore()
         cleanOrphanedWalletCaches()
         // Defer price fetch until a wallet exists. Avoids leaking IP to
@@ -186,18 +193,25 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         // Stale onboarding cleanup: a wallet row without a stored seed, or a
         // store where no wallet has a PIN hash yet (crash mid-onboarding),
         // cannot be unlocked — clear it so the user can start fresh.
-        val withSeeds = list.filter { secrets.hasSeed(it.id) }
-        if (withSeeds.size != list.size) {
-            Timber.w("Clearing ${list.size - withSeeds.size} wallet row(s) without stored seed")
-            list.filterNot { secrets.hasSeed(it.id) }.forEach { secrets.deleteWalletSecrets(it.id) }
-            store.saveWallets(withSeeds)
-            list = withSeeds
-        }
-        if (list.isNotEmpty() && list.none { secrets.pinHash(it.id) != null }) {
-            Timber.w("Clearing wallet store: no wallet has a PIN hash (incomplete onboarding)")
-            list.forEach { secrets.deleteWalletSecrets(it.id) }
-            store.deleteAll()
-            list = emptyList()
+        // Guarded: a keystore/EncryptedSharedPreferences read failure must
+        // NOT crash the constructor or be mistaken for "no seeds stored" —
+        // that would wipe live rows. Skip cleanup for this launch instead.
+        try {
+            val withSeeds = list.filter { secrets.hasSeed(it.id) }
+            if (withSeeds.size != list.size) {
+                Timber.w("Clearing ${list.size - withSeeds.size} wallet row(s) without stored seed")
+                list.filterNot { secrets.hasSeed(it.id) }.forEach { secrets.deleteWalletSecrets(it.id) }
+                store.saveWallets(withSeeds)
+                list = withSeeds
+            }
+            if (list.isNotEmpty() && list.none { secrets.pinHash(it.id) != null }) {
+                Timber.w("Clearing wallet store: no wallet has a PIN hash (incomplete onboarding)")
+                list.forEach { secrets.deleteWalletSecrets(it.id) }
+                store.deleteAll()
+                list = emptyList()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Secret store unreadable; skipping onboarding cleanup this launch")
         }
 
         _wallets.value = list
@@ -212,7 +226,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun refreshHasWallet() {
         val list = _wallets.value
-        val has = list.isNotEmpty() && list.any { secrets.pinHash(it.id) != null }
+        val has = list.isNotEmpty() && list.any {
+            runCatching { secrets.pinHash(it.id) }.getOrNull() != null
+        }
         _walletState.update { it.copy(hasWallet = has) }
     }
 
