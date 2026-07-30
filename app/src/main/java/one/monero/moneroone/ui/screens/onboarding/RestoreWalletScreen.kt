@@ -31,6 +31,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,15 +59,25 @@ import java.util.Locale
 fun RestoreWalletScreen(
     walletViewModel: WalletViewModel,
     onWalletRestored: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isAddingWallet: Boolean = false
 ) {
     var seedPhrase by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf<Long?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var namingStep by remember { mutableStateOf(false) }
 
     val walletState by walletViewModel.walletState.collectAsState()
     val scope = rememberCoroutineScope()
+
+    // Suppress auto-lock while the add-wallet flow is open (iOS parity).
+    if (isAddingWallet) {
+        DisposableEffect(Unit) {
+            walletViewModel.setAddWalletFlowActive(true)
+            onDispose { walletViewModel.setAddWalletFlowActive(false) }
+        }
+    }
 
     val dateFormatter = remember {
         SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).apply {
@@ -79,7 +90,7 @@ fun RestoreWalletScreen(
             TopAppBar(
                 title = { Text("Restore Wallet") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (namingStep) namingStep = false else onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -97,6 +108,39 @@ fun RestoreWalletScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (namingStep) {
+                Spacer(modifier = Modifier.height(16.dp))
+                NameWalletStep(
+                    defaultName = walletViewModel.nextWalletName(),
+                    buttonLabel = "Restore Wallet",
+                    isBusy = walletState.isInitializing,
+                    onDone = { name, emoji ->
+                        val words = seedPhrase.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+                        val restoreHeightValue = selectedDate?.let { dateToRestoreHeight(it) }?.toString()
+                        scope.launch {
+                            val ok = walletViewModel.restoreWallet(
+                                seed = words,
+                                restoreHeight = restoreHeightValue,
+                                restoreDateMillis = selectedDate,
+                                name = name,
+                                emoji = emoji
+                            )
+                            if (ok) onWalletRestored()
+                        }
+                    }
+                )
+                if (walletState.error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = walletState.error!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+                return@Column
+            }
+
             Text(
                 text = "Enter your seed phrase",
                 style = MaterialTheme.typography.headlineSmall,
@@ -210,16 +254,8 @@ fun RestoreWalletScreen(
                             errorMessage = "Seed phrase must be 24 or 25 words"
                         }
                         else -> {
-                            // Convert selected date to restore height
-                            val restoreHeightValue = selectedDate?.let { dateToRestoreHeight(it) }?.toString()
-                            scope.launch {
-                                val ok = walletViewModel.restoreWallet(
-                                    seed = words,
-                                    restoreHeight = restoreHeightValue,
-                                    restoreDateMillis = selectedDate
-                                )
-                                if (ok) onWalletRestored()
-                            }
+                            // Naming happens at the end (iOS parity).
+                            namingStep = true
                         }
                     }
                 },
@@ -235,7 +271,7 @@ fun RestoreWalletScreen(
                 )
             ) {
                 Text(
-                    text = if (walletState.isInitializing) "Restoring..." else "Restore Wallet",
+                    text = if (walletState.isInitializing) "Restoring..." else "Continue",
                     style = MaterialTheme.typography.titleMedium
                 )
             }

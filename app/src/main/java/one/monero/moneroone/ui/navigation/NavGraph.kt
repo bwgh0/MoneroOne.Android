@@ -35,6 +35,7 @@ import one.monero.moneroone.ui.screens.send.SendScreen
 import one.monero.moneroone.ui.screens.transactions.TransactionDetailScreen
 import one.monero.moneroone.ui.screens.transactions.TransactionListScreen
 import one.monero.moneroone.ui.screens.unlock.UnlockScreen
+import one.monero.moneroone.ui.screens.wallet.AddWalletScreen
 import one.monero.moneroone.ui.screens.wallet.PortfolioChartScreen
 import one.monero.moneroone.ui.screens.settings.BackupSeedScreen
 import one.monero.moneroone.ui.screens.settings.ChangePinScreen
@@ -51,8 +52,13 @@ import one.monero.moneroone.ui.screens.chart.ChartViewModel
 
 sealed class Screen(val route: String) {
     data object Welcome : Screen("welcome")
-    data object CreateWallet : Screen("create_wallet")
-    data object RestoreWallet : Screen("restore_wallet")
+    data object CreateWallet : Screen("create_wallet?adding={adding}") {
+        fun createRoute(adding: Boolean = false) = "create_wallet?adding=$adding"
+    }
+    data object RestoreWallet : Screen("restore_wallet?adding={adding}") {
+        fun createRoute(adding: Boolean = false) = "restore_wallet?adding=$adding"
+    }
+    data object AddWallet : Screen("add_wallet")
     data object SetPin : Screen("set_pin")
     data object SetupBiometrics : Screen("setup_biometrics")
     data object Unlock : Screen("unlock")
@@ -178,29 +184,67 @@ fun MoneroOneNavHost(
     ) {
         composable(Screen.Welcome.route) {
             WelcomeScreen(
-                onCreateWallet = { navController.navigate(Screen.CreateWallet.route) },
-                onRestoreWallet = { navController.navigate(Screen.RestoreWallet.route) }
+                onCreateWallet = { navController.navigate(Screen.CreateWallet.createRoute(adding = false)) },
+                onRestoreWallet = { navController.navigate(Screen.RestoreWallet.createRoute(adding = false)) }
             )
         }
 
-        composable(Screen.CreateWallet.route) {
+        composable(Screen.AddWallet.route) {
+            AddWalletScreen(
+                walletViewModel = walletViewModel,
+                onCreateWallet = { navController.navigate(Screen.CreateWallet.createRoute(adding = true)) },
+                onRestoreWallet = { navController.navigate(Screen.RestoreWallet.createRoute(adding = true)) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.CreateWallet.route,
+            arguments = listOf(
+                navArgument("adding") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { backStackEntry ->
+            val adding = backStackEntry.arguments?.getBoolean("adding") ?: false
             CreateWalletScreen(
                 walletViewModel = walletViewModel,
+                isAddingWallet = adding,
                 onWalletCreated = {
-                    navController.navigate(Screen.SetPin.route) {
-                        popUpTo(Screen.Welcome.route) { inclusive = true }
+                    if (adding) {
+                        // 2nd+ wallet: PIN step is skipped, return to Main.
+                        navController.popBackStack(Screen.Main.route, inclusive = false)
+                    } else {
+                        navController.navigate(Screen.SetPin.route) {
+                            popUpTo(Screen.Welcome.route) { inclusive = true }
+                        }
                     }
                 },
                 onBack = { navController.popBackStack() }
             )
         }
 
-        composable(Screen.RestoreWallet.route) {
+        composable(
+            route = Screen.RestoreWallet.route,
+            arguments = listOf(
+                navArgument("adding") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { backStackEntry ->
+            val adding = backStackEntry.arguments?.getBoolean("adding") ?: false
             RestoreWalletScreen(
                 walletViewModel = walletViewModel,
+                isAddingWallet = adding,
                 onWalletRestored = {
-                    navController.navigate(Screen.SetPin.route) {
-                        popUpTo(Screen.Welcome.route) { inclusive = true }
+                    if (adding) {
+                        navController.popBackStack(Screen.Main.route, inclusive = false)
+                    } else {
+                        navController.navigate(Screen.SetPin.route) {
+                            popUpTo(Screen.Welcome.route) { inclusive = true }
+                        }
                     }
                 },
                 onBack = { navController.popBackStack() }

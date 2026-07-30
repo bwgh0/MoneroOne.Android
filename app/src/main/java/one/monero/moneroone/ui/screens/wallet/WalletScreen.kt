@@ -41,6 +41,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -93,11 +94,15 @@ fun WalletScreen(
     onTransactionClick: (TransactionInfo) -> Unit,
     onSeeAllTransactionsClick: () -> Unit,
     onBalanceClick: (() -> Unit)? = null,
+    onAddWalletClick: () -> Unit = {},
     priceChange24h: Double? = null
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
     val currentPrice by walletViewModel.currentPrice.collectAsState()
     val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+    val wallets by walletViewModel.wallets.collectAsState()
+    val activeWallet by walletViewModel.activeWallet.collectAsState()
+    val walletSessionId by walletViewModel.walletSessionId.collectAsState()
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
     val isOnline by NetworkMonitor.isConnected.collectAsState()
@@ -133,6 +138,11 @@ fun WalletScreen(
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
+    // Key the per-wallet subtree on the wallet session epoch so no stale
+    // per-wallet state (scroll, expansion, remembered values) survives a switch.
+    key(walletSessionId) {
+    var switcherExpanded by remember { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -169,10 +179,40 @@ fun WalletScreen(
             }
         }
 
-        // Greeting header
+        // Greeting header with inline wallet switcher chip
         item {
-            GreetingHeader()
+            GreetingHeader(
+                activeWallet = activeWallet,
+                onToggleSwitcher = { switcherExpanded = !switcherExpanded }
+            )
         }
+
+        if (switcherExpanded) {
+            // Expanded wallet manager replaces the balance/actions/activity
+            // content (iOS collapses them while the switcher is open).
+            item {
+                WalletManagerRows(
+                    wallets = wallets,
+                    activeWallet = activeWallet,
+                    liveBalanceText = "${walletViewModel.formatXmr(walletState.balance.all)} XMR",
+                    formatXmr = walletViewModel::formatXmr,
+                    onSwitch = { wallet ->
+                        switcherExpanded = false
+                        walletViewModel.switchWallet(wallet.id)
+                    },
+                    onDelete = { wallet ->
+                        walletViewModel.deleteWallet(wallet.id)
+                    },
+                    onRename = { wallet, name, emoji ->
+                        walletViewModel.renameWallet(wallet.id, name, emoji)
+                    },
+                    onAddWallet = {
+                        switcherExpanded = false
+                        onAddWalletClick()
+                    }
+                )
+            }
+        } else {
 
         // Balance card - always show real data (iOS behavior)
         item {
@@ -258,13 +298,19 @@ fun WalletScreen(
             }
         }
 
+        } // switcherExpanded else
+
         item { Spacer(modifier = Modifier.height(8.dp)) }
     }
+    } // key(walletSessionId)
     } // PullToRefreshBox
 }
 
 @Composable
-private fun GreetingHeader() {
+private fun GreetingHeader(
+    activeWallet: one.monero.moneroone.core.wallet.WalletInfo?,
+    onToggleSwitcher: () -> Unit
+) {
     val greeting = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
         in 0..11 -> "Good Morning"
         in 12..16 -> "Good Afternoon"
@@ -282,22 +328,10 @@ private fun GreetingHeader() {
             fontWeight = FontWeight.Bold
         )
 
-        // Wallet icon (matching iOS - same background as GlassCard)
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .shadow(4.dp, RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.AccountBalanceWallet,
-                contentDescription = "Wallet",
-                tint = MoneroOrange,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+        WalletSwitcherButton(
+            wallet = activeWallet,
+            onToggle = onToggleSwitcher
+        )
     }
 }
 

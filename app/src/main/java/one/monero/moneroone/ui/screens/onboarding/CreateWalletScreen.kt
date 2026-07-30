@@ -37,7 +37,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -65,17 +67,28 @@ import one.monero.moneroone.ui.theme.WarningYellow
 fun CreateWalletScreen(
     walletViewModel: WalletViewModel,
     onWalletCreated: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isAddingWallet: Boolean = false
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
     var generatedSeed by remember { mutableStateOf<List<String>>(emptyList()) }
     var seedConfirmed by remember { mutableStateOf(false) }
+    var isCreating by remember { mutableStateOf(false) }
+    val walletState by walletViewModel.walletState.collectAsState()
     val scope = rememberCoroutineScope()
 
     // Generate seed immediately on screen entry
     LaunchedEffect(Unit) {
         if (generatedSeed.isEmpty()) {
             generatedSeed = walletViewModel.generateNewSeed(SeedType.BIP39_24)
+        }
+    }
+
+    // Suppress auto-lock while the add-wallet flow is open (iOS parity).
+    if (isAddingWallet) {
+        DisposableEffect(Unit) {
+            walletViewModel.setAddWalletFlowActive(true)
+            onDispose { walletViewModel.setAddWalletFlowActive(false) }
         }
     }
 
@@ -111,7 +124,7 @@ fun CreateWalletScreen(
                     .padding(vertical = 16.dp),
                 horizontalArrangement = Arrangement.Center
             ) {
-                repeat(2) { step ->
+                repeat(3) { step ->
                     Box(
                         modifier = Modifier
                             .size(if (step == currentStep) 12.dp else 8.dp)
@@ -120,7 +133,7 @@ fun CreateWalletScreen(
                                 shape = RoundedCornerShape(50)
                             )
                     )
-                    if (step < 1) Spacer(modifier = Modifier.width(8.dp))
+                    if (step < 2) Spacer(modifier = Modifier.width(8.dp))
                 }
             }
 
@@ -133,13 +146,36 @@ fun CreateWalletScreen(
                     seed = generatedSeed,
                     onConfirmed = {
                         seedConfirmed = true
-                        scope.launch {
-                            if (walletViewModel.createWallet(generatedSeed, SeedType.BIP39_24)) {
-                                onWalletCreated()
-                            }
-                        }
+                        currentStep = 2
                     }
                 )
+                2 -> {
+                    // Naming at the END, prefilled with the next default name.
+                    NameWalletStep(
+                        defaultName = walletViewModel.nextWalletName(),
+                        buttonLabel = "Create Wallet",
+                        isBusy = isCreating,
+                        onDone = { name, emoji ->
+                            if (isCreating) return@NameWalletStep
+                            isCreating = true
+                            scope.launch {
+                                val ok = walletViewModel.createWallet(
+                                    generatedSeed, SeedType.BIP39_24, name, emoji
+                                )
+                                isCreating = false
+                                if (ok) onWalletCreated()
+                            }
+                        }
+                    )
+                    if (walletState.error != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = walletState.error!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             }
         }
     }
