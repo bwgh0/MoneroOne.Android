@@ -37,6 +37,56 @@ class WalletCacheIdsTest {
         assertTrue(id.all { it in "0123456789abcdef" })
     }
 
+    // --- Duplicate-seed detection (H2 regressions) ----------------------------
+
+    private fun row(id: String, name: String, derivedId: String?, resetCount: Int = 0) = WalletInfo(
+        id = id, name = name, derivedWalletId = derivedId, syncResetCount = resetCount
+    )
+
+    @Test
+    fun `duplicate of a fresh wallet is found by stored id equality`() {
+        val fresh = row("a", "Fresh", WalletCacheIds.derivedWalletId(seed, 0))
+        val dup = WalletCacheIds.findWalletWithSeed(seed, listOf(fresh)) { null }
+        assertEquals(fresh, dup)
+    }
+
+    @Test
+    fun `duplicate of a MIGRATED wallet (legacy UUID id) is found via stored seed`() {
+        // Migrated rows keep the legacy random-UUID cache id verbatim — the
+        // stored id is NOT seed-derived, so id equality alone can never match.
+        val migrated = row("m", "Personal Wallet", "123e4567-e89b-12d3-a456-426614174000")
+        val dup = WalletCacheIds.findWalletWithSeed(seed, listOf(migrated)) { id ->
+            if (id == "m") seed else null
+        }
+        assertEquals(migrated, dup)
+    }
+
+    @Test
+    fun `duplicate of a RESET wallet (sha seed+N id) is found via base derivation`() {
+        val reset = row("r", "Reset Wallet", WalletCacheIds.derivedWalletId(seed, 2), resetCount = 2)
+        val dup = WalletCacheIds.findWalletWithSeed(seed, listOf(reset)) { id ->
+            if (id == "r") seed else null
+        }
+        assertEquals(reset, dup)
+    }
+
+    @Test
+    fun `different seed is not a duplicate of migrated or reset rows`() {
+        val otherSeed = List(24) { "word$it" }
+        val migrated = row("m", "Personal Wallet", "123e4567-e89b-12d3-a456-426614174000")
+        val reset = row("r", "Reset Wallet", WalletCacheIds.derivedWalletId(otherSeed, 1), resetCount = 1)
+        val dup = WalletCacheIds.findWalletWithSeed(seed, listOf(migrated, reset)) { id ->
+            if (id == "m" || id == "r") otherSeed else null
+        }
+        assertEquals(null, dup)
+    }
+
+    @Test
+    fun `row with unreadable seed and non-derived id is not claimed as duplicate`() {
+        val opaque = row("x", "Opaque", "123e4567-e89b-12d3-a456-426614174000")
+        assertEquals(null, WalletCacheIds.findWalletWithSeed(seed, listOf(opaque)) { null })
+    }
+
     // --- Cache base names ----------------------------------------------------
 
     @Test

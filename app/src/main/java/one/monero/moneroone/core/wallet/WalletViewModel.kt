@@ -16,6 +16,7 @@ import io.horizontalsystems.monerokit.SyncState
 import io.horizontalsystems.monerokit.data.Subaddress
 import io.horizontalsystems.monerokit.model.NetworkType
 import io.horizontalsystems.monerokit.model.TransactionInfo
+import io.horizontalsystems.monerokit.toElectrum
 import io.horizontalsystems.monerokit.util.Helper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -71,6 +72,9 @@ sealed class SendState {
 
 class DuplicateWalletException(val existingName: String) :
     Exception("This wallet is already added as \"$existingName\"")
+
+class InvalidSeedException :
+    Exception("Invalid seed phrase. Check the words and try again.")
 
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -521,18 +525,21 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         name: String? = null,
         emoji: String = "💰"
     ): Boolean {
-        val seedType = when (seed.size) {
+        // Normalize: the same seed typed with different casing/whitespace must
+        // derive the same cache id (dedupe) and convert cleanly.
+        val normalized = seed.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        val seedType = when (normalized.size) {
             25 -> SeedType.ELECTRUM_25
             24 -> SeedType.BIP39_24
             else -> {
                 _walletState.update {
-                    it.copy(error = "Invalid seed word count: ${seed.size}. Only 24 (BIP39) or 25 (Monero legacy) words supported.")
+                    it.copy(error = "Invalid seed word count: ${normalized.size}. Only 24 (BIP39) or 25 (Monero legacy) words supported.")
                 }
                 return false
             }
         }
         return addWalletInternal(
-            seed = seed,
+            seed = normalized,
             seedType = seedType,
             name = name,
             emoji = emoji,
@@ -549,13 +556,29 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         restoreHeight: Long,
         restoreDateMillis: Long
     ): Boolean {
+        val previousActive = _activeWallet.value
+        var persisted: WalletInfo? = null
         try {
             _walletState.update { it.copy(isInitializing = true, error = null) }
 
-            // Duplicate-seed rejection by derived cache id (fresh wallet, count 0).
+            // Duplicate-seed rejection against EVERY row's base derivation —
+            // stored id equality alone misses migrated (legacy UUID id) and
+            // reset (sha(seed+N)) wallets.
             val derived = WalletCacheIds.derivedWalletId(seed, 0)
-            _wallets.value.firstOrNull { it.derivedWalletId == derived }?.let {
-                throw DuplicateWalletException(it.name)
+            WalletCacheIds.findWalletWithSeed(seed, _wallets.value) { id ->
+                secrets.loadSeed(id)?.first
+            }?.let { throw DuplicateWalletException(it.name) }
+
+            // Validate + convert the seed BEFORE anything is persisted or the
+            // running kit is touched. For BIP39 this runs the eager
+            // Bip39→Electrum conversion that MoneroKit.getInstance would do,
+            // which throws for any invalid mnemonic — a typo'd restore must
+            // fail here, not after the wallet is stored as active.
+            val kitSeed = try {
+                moneroSeed(seed, seedType).toElectrum()
+            } catch (e: Exception) {
+                Timber.w(e, "addWallet: seed validation failed")
+                throw InvalidSeedException()
             }
 
             // Snapshot the outgoing wallet's live data before switching away.
@@ -583,12 +606,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             _wallets.value = store.wallets()
             _activeWallet.value = info
             _walletSessionId.value += 1
+            persisted = info
 
             cancelKitObservers()
 
             val kit = WalletManager.initialize(
                 context = context,
-                seed = moneroSeed(seed, seedType),
+                seed = kitSeed,
                 restoreDateOrHeight = restoreHeight.toString(),
                 walletId = derived,
                 node = getSelectedNode(),
@@ -620,10 +644,41 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             return false
         } catch (e: Exception) {
             Timber.e(e, "Failed to add wallet")
+            // Roll back cleanly: remove the half-added wallet and put the
+            // previous active wallet back in charge (its kit was already torn
+            // down by WalletManager.initialize, so reopen it).
+            persisted?.let { rollbackFailedAdd(it, previousActive) }
             _walletState.update {
                 it.copy(isInitializing = false, error = e.message ?: "Failed to create wallet")
             }
             return false
+        }
+    }
+
+    /**
+     * Undo a wallet add that failed after persisting: wipe the new row's
+     * secrets + store entry, restore the previous active wallet, and reopen
+     * its kit so the session keeps running (H1: an invalid restore must not
+     * brick the session or steal active).
+     */
+    private suspend fun rollbackFailedAdd(added: WalletInfo, previous: WalletInfo?) {
+        Timber.w("Rolling back failed wallet add ${added.id} (${added.name})")
+        try {
+            secrets.deleteWalletSecrets(added.id)
+            store.removeWallet(added.id)
+            store.setActiveWalletId(previous?.id)
+            val list = store.wallets()
+            _wallets.value = list
+            val prev = previous?.let { p -> list.firstOrNull { it.id == p.id } }
+            _activeWallet.value = prev
+            _walletSessionId.value += 1
+            refreshHasWallet()
+            if (prev != null) {
+                paintCachedState(prev)
+                openActiveWallet()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "rollbackFailedAdd failed")
         }
     }
 

@@ -32,6 +32,31 @@ object WalletCacheIds {
         return stableWalletId(seedWords.joinToString(" ") + resetSuffix)
     }
 
+    // --- Duplicate-seed detection --------------------------------------------
+
+    /**
+     * Find an existing wallet that holds the same seed. Comparison is by BASE
+     * derivation (syncResetCount 0, no suffix) so it catches every row shape:
+     *  - fresh rows: stored `derivedWalletId` IS the base id;
+     *  - reset rows: stored id is `sha(seed+N)` — recompute base from the
+     *    row's stored seed;
+     *  - migrated rows: stored id is the legacy random UUID (not seed-derived
+     *    at all) — recompute base from the row's stored seed.
+     * Rows whose seed cannot be read and whose stored id doesn't match are
+     * skipped (they cannot be proven duplicates).
+     */
+    fun findWalletWithSeed(
+        seedWords: List<String>,
+        wallets: List<WalletInfo>,
+        storedSeedOf: (walletId: String) -> List<String>?
+    ): WalletInfo? {
+        val base = derivedWalletId(seedWords, 0)
+        return wallets.firstOrNull { row ->
+            row.derivedWalletId == base ||
+                storedSeedOf(row.id)?.let { derivedWalletId(it, 0) == base } == true
+        }
+    }
+
     // --- Orphan-cache sweep -------------------------------------------------
 
     private val HEX_32 = Regex("^[0-9a-fA-F]{32}$")
