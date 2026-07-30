@@ -278,7 +278,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setAddWalletFlowActive(active: Boolean) {
         _addWalletFlowDepth.update { (it + if (active) 1 else -1).coerceAtLeast(0) }
-        _addWalletFlowActiveView.value = _addWalletFlowDepth.value > 0
+        val open = _addWalletFlowDepth.value > 0
+        _addWalletFlowActiveView.value = open
+        if (!open) {
+            // Add-wallet flow fully closed (completed OR abandoned). A seed
+            // generated for a wallet that was never created must not survive —
+            // a stale pendingSeed would otherwise be served by getSeedPhrase()
+            // and end up "backed up" as an existing wallet's seed.
+            _pendingSeed.value = null
+        }
     }
 
     private fun fetchPrice() {
@@ -1158,22 +1166,32 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * another wallet's seed; returns null on mismatch.
      */
     fun getSeedPhrase(expectedWalletId: String? = null): List<String>? {
-        // Return the pending seed if available (during wallet creation)
-        _pendingSeed.value?.let { return it.words }
-
-        val active = _activeWallet.value ?: return null
-        if (expectedWalletId != null && active.id != expectedWalletId) {
-            Timber.w("getSeedPhrase: wallet mismatch (expected $expectedWalletId, active ${active.id})")
-            return null
+        val active = _activeWallet.value
+        if (expectedWalletId != null) {
+            // Export bound to an EXISTING wallet: the id gate applies before
+            // ANY shortcut. A pending (not-yet-created) seed must never
+            // satisfy an existing wallet's backup — that is exactly how the
+            // wrong seed gets backed up (iOS a31683d class).
+            if (active == null || active.id != expectedWalletId) {
+                Timber.w("getSeedPhrase: wallet mismatch (expected $expectedWalletId, active ${active?.id})")
+                return null
+            }
+            return secrets.loadSeed(active.id)?.first
         }
-        return secrets.loadSeed(active.id)?.first
+        // Ungated call: only meaningful during wallet creation, where the
+        // pending seed is the wallet being created.
+        _pendingSeed.value?.let { return it.words }
+        return active?.let { secrets.loadSeed(it.id)?.first }
     }
 
     fun getSeedType(expectedWalletId: String? = null): SeedType? {
+        val active = _activeWallet.value
+        if (expectedWalletId != null) {
+            if (active == null || active.id != expectedWalletId) return null
+            return secrets.loadSeed(active.id)?.second
+        }
         _pendingSeed.value?.let { return it.type }
-        val active = _activeWallet.value ?: return null
-        if (expectedWalletId != null && active.id != expectedWalletId) return null
-        return secrets.loadSeed(active.id)?.second
+        return active?.let { secrets.loadSeed(it.id)?.second }
     }
 
     fun getElectrumSeedPhrase(expectedWalletId: String? = null): List<String>? {
