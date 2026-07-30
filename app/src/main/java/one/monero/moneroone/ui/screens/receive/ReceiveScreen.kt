@@ -92,12 +92,11 @@ fun ReceiveScreen(
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE) }
 
     // Use a refresh key to force re-read from prefs when screen resumes
     var refreshKey by remember { mutableIntStateOf(0) }
     val selectedAddressIndex = remember(refreshKey) {
-        prefs.getInt("selected_address_index", 0)
+        walletViewModel.selectedAddressIndex()
     }
 
     // Re-read when screen resumes (e.g., returning from AddressPickerScreen)
@@ -132,7 +131,7 @@ fun ReceiveScreen(
         addressLabel = "Main Address"
         if (subaddresses.isNotEmpty() && selectedAddressIndex != 0) {
             LaunchedEffect(Unit) {
-                prefs.edit().putInt("selected_address_index", 0).apply()
+                walletViewModel.setSelectedAddressIndex(0)
             }
         }
     }

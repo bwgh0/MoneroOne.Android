@@ -105,9 +105,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _walletSessionId = MutableStateFlow(0L)
     val walletSessionId: StateFlow<Long> = _walletSessionId.asStateFlow()
 
-    /** True while the add-wallet flow is open; suppresses auto-lock. */
-    private val _addWalletFlowActive = MutableStateFlow(false)
-    val addWalletFlowActive: StateFlow<Boolean> = _addWalletFlowActive.asStateFlow()
+    /**
+     * Depth counter of open add-wallet-flow screens; suppresses auto-lock
+     * while > 0. A counter (not a boolean) because during navigation
+     * transitions the incoming screen composes before the outgoing one
+     * disposes — a boolean would be reset to false by the outgoing screen.
+     */
+    private val _addWalletFlowDepth = MutableStateFlow(0)
+    val addWalletFlowActive: StateFlow<Boolean>
+        get() = _addWalletFlowActiveView
+    private val _addWalletFlowActiveView = MutableStateFlow(false)
 
     @Volatile
     private var isSwitching = false
@@ -255,7 +262,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         prefs.edit().remove("background_timestamp").apply()
 
         // Suppress auto-lock while the add-wallet flow is open (iOS parity).
-        if (_addWalletFlowActive.value) return
+        if (_addWalletFlowDepth.value > 0) return
 
         val shouldLock = when {
             timeoutSeconds == 0 -> true    // IMMEDIATE
@@ -270,7 +277,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setAddWalletFlowActive(active: Boolean) {
-        _addWalletFlowActive.value = active
+        _addWalletFlowDepth.update { (it + if (active) 1 else -1).coerceAtLeast(0) }
+        _addWalletFlowActiveView.value = _addWalletFlowDepth.value > 0
     }
 
     private fun fetchPrice() {

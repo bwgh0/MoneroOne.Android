@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,6 +96,17 @@ fun BackupSeedScreen(
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
 
+    // Bind this screen to the wallet that was active when it opened. If the
+    // active wallet changes mid-view (switch/delete), close immediately so we
+    // can never show another wallet's seed (iOS a31683d).
+    val activeWallet by walletViewModel.activeWallet.collectAsState()
+    val boundWalletId = remember { activeWallet?.id }
+    LaunchedEffect(activeWallet?.id) {
+        if (activeWallet?.id != boundWalletId) {
+            onBack()
+        }
+    }
+
     // Clear clipboard after delay if seed was copied
     DisposableEffect(copiedToClipboard) {
         if (copiedToClipboard) {
@@ -127,10 +139,10 @@ fun BackupSeedScreen(
                     if (verified) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         isUnlocked = true
-                        seedWords = walletViewModel.getSeedPhrase() ?: emptyList()
-                        seedType = walletViewModel.getSeedType()
+                        seedWords = walletViewModel.getSeedPhrase(boundWalletId) ?: emptyList()
+                        seedType = walletViewModel.getSeedType(boundWalletId)
                         if (seedType == SeedType.BIP39_24) {
-                            electrumSeedWords = walletViewModel.getElectrumSeedPhrase()
+                            electrumSeedWords = walletViewModel.getElectrumSeedPhrase(boundWalletId)
                         }
                     } else {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)

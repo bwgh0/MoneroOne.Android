@@ -74,8 +74,7 @@ fun AddressPickerScreen(
         subaddresses = withContext(Dispatchers.IO) { walletViewModel.getSubaddresses() }
     }
 
-    val prefs = remember { context.getSharedPreferences("monero_wallet", android.content.Context.MODE_PRIVATE) }
-    var selectedIndex by remember { mutableIntStateOf(prefs.getInt("selected_address_index", 0)) }
+    var selectedIndex by remember { mutableIntStateOf(walletViewModel.selectedAddressIndex()) }
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -127,7 +126,7 @@ fun AddressPickerScreen(
                     isSelected = selectedIndex == 0,
                     onClick = {
                         selectedIndex = 0
-                        prefs.edit().putInt("selected_address_index", 0).apply()
+                        walletViewModel.setSelectedAddressIndex(0)
                         onAddressSelected(mainAddress, 0)
                     }
                 )
@@ -155,7 +154,7 @@ fun AddressPickerScreen(
                         isSelected = selectedIndex == subIndex,
                         onClick = {
                             selectedIndex = subIndex
-                            prefs.edit().putInt("selected_address_index", subIndex).apply()
+                            walletViewModel.setSelectedAddressIndex(subIndex)
                             onAddressSelected(subaddress.address, subIndex)
                         }
                     )
