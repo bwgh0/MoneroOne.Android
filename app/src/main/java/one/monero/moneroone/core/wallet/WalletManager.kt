@@ -9,6 +9,7 @@ import io.horizontalsystems.monerokit.model.NetworkType
 import io.horizontalsystems.monerokit.model.TransactionInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,14 +19,27 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 /**
- * Singleton that owns the MoneroKit instance, allowing both WalletViewModel
- * and WalletSyncService to share the same wallet connection.
+ * Singleton that owns the one running MoneroKit instance (KitManager allows a
+ * single running kit process-wide), shared by WalletViewModel and
+ * WalletSyncService.
+ *
+ * Multi-wallet rules:
+ *  - [currentWalletId] tracks which cache id the kit was opened for, so the
+ *    caller can tell whether the running kit belongs to the active wallet.
+ *  - Collectors are cancelled and flows reset on every (re)initialize so a
+ *    replaced kit can never republish stale data into the new wallet's UI
+ *    (the old observeKit leak).
  */
 object WalletManager {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var observeJobs: List<Job> = emptyList()
 
     var kit: MoneroKit? = null
+        private set
+
+    /** Cache id (walletId) the current kit was opened with, null when no kit. */
+    var currentWalletId: String? = null
         private set
 
     private val _syncStateFlow = MutableStateFlow<SyncState>(
@@ -41,7 +55,7 @@ object WalletManager {
 
     /**
      * Create a new MoneroKit instance and wire up flow observers.
-     * Any previously held kit is stopped first.
+     * Any previously held kit is fully stopped (awaited) first.
      */
     suspend fun initialize(
         context: Context,
@@ -52,12 +66,9 @@ object WalletManager {
         trustNode: Boolean,
         networkType: NetworkType = NetworkType.NetworkType_Mainnet
     ): MoneroKit {
-        // Stop any existing kit
-        kit?.let {
-            try { it.stop() } catch (e: Exception) {
-                Timber.w(e, "Error stopping previous kit during initialize")
-            }
-        }
+        // Fully tear down any existing kit — cancels collectors BEFORE the new
+        // kit exists so nothing stale leaks across.
+        stopAndRelease()
 
         val newKit = MoneroKit.getInstance(
             context = context,
@@ -69,27 +80,38 @@ object WalletManager {
         )
 
         kit = newKit
+        currentWalletId = walletId
+        resetFlows()
         observeKit(newKit)
         Timber.d("WalletManager: initialized kit for walletId=$walletId")
         return newKit
     }
 
+    private fun resetFlows() {
+        _syncStateFlow.value = SyncState.NotSynced(MoneroKit.SyncError.NotStarted)
+        _balanceFlow.value = Balance(0, 0)
+        _transactionsFlow.value = emptyList()
+    }
+
     private fun observeKit(kit: MoneroKit) {
-        scope.launch {
-            kit.syncStateFlow.collect { state ->
-                _syncStateFlow.value = state
+        observeJobs.forEach { it.cancel() }
+        observeJobs = listOf(
+            scope.launch {
+                kit.syncStateFlow.collect { state ->
+                    _syncStateFlow.value = state
+                }
+            },
+            scope.launch {
+                kit.balanceFlow.collect { balance ->
+                    _balanceFlow.value = balance
+                }
+            },
+            scope.launch {
+                kit.allTransactionsFlow.collect { txs ->
+                    _transactionsFlow.value = txs
+                }
             }
-        }
-        scope.launch {
-            kit.balanceFlow.collect { balance ->
-                _balanceFlow.value = balance
-            }
-        }
-        scope.launch {
-            kit.allTransactionsFlow.collect { txs ->
-                _transactionsFlow.value = txs
-            }
-        }
+        )
     }
 
     suspend fun start() {
@@ -111,34 +133,29 @@ object WalletManager {
     }
 
     /**
-     * Stop the kit and release the reference, but preserve flow state (balance, txs).
-     * Used for node switching where we want to reinitialize without losing UI state.
+     * Await full teardown of the kit and release the reference. Collectors are
+     * cancelled first so no republish can land after release. Flow state
+     * (balance, txs) is preserved for UI continuity on node changes.
      */
     suspend fun stopAndRelease() {
+        observeJobs.forEach { it.cancel() }
+        observeJobs = emptyList()
         try {
             kit?.stop()
         } catch (e: Exception) {
             Timber.w(e, "WalletManager.stopAndRelease() stop failed")
         }
         kit = null
+        currentWalletId = null
         Timber.d("WalletManager: stopped and released kit")
     }
 
     /**
      * Stop and release the kit. Resets flows to defaults.
      */
-    fun clear() {
-        scope.launch {
-            try {
-                kit?.stop()
-            } catch (e: Exception) {
-                Timber.e(e, "WalletManager.clear() stop failed")
-            }
-            kit = null
-            _syncStateFlow.value = SyncState.NotSynced(MoneroKit.SyncError.NotStarted)
-            _balanceFlow.value = Balance(0, 0)
-            _transactionsFlow.value = emptyList()
-            Timber.d("WalletManager: cleared")
-        }
+    suspend fun clear() {
+        stopAndRelease()
+        resetFlows()
+        Timber.d("WalletManager: cleared")
     }
 }

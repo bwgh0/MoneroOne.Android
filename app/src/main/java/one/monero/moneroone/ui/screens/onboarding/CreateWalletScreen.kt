@@ -42,7 +42,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,6 +70,7 @@ fun CreateWalletScreen(
     var currentStep by remember { mutableIntStateOf(0) }
     var generatedSeed by remember { mutableStateOf<List<String>>(emptyList()) }
     var seedConfirmed by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     // Generate seed immediately on screen entry
     LaunchedEffect(Unit) {
@@ -130,8 +133,11 @@ fun CreateWalletScreen(
                     seed = generatedSeed,
                     onConfirmed = {
                         seedConfirmed = true
-                        walletViewModel.createWallet(generatedSeed, SeedType.BIP39_24)
-                        onWalletCreated()
+                        scope.launch {
+                            if (walletViewModel.createWallet(generatedSeed, SeedType.BIP39_24)) {
+                                onWalletCreated()
+                            }
+                        }
                     }
                 )
             }
