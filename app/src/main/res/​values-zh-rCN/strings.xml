@@ -1,1 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
 
+    <string name="app_name">Monero One</string>
+
+    <!-- Onboarding -->
+    <string name="welcome_title">欢迎使用\nMonero One</string>
+    <string name="welcome_subtitle">开启去中心化隐私货币之旅</string>
+    <string name="create_wallet">创建新钱包</string>
+    <string name="restore_wallet">恢复钱包</string>
+
+    <!-- Create Wallet -->
+    <string name="create_wallet_title">创建钱包</string>
+    <string name="seed_type_title">选择助记词类型</string>
+    <string name="polyseed_title">Polyseed（16 个单词）</string>
+    <string name="polyseed_description">内置创建日期的现代紧凑型助记词格式</string>
+    <string name="legacy_seed_title">传统助记词（25 个单词）</string>
+    <string name="legacy_seed_description">传统的门罗币助记词格式</string>
+    <string name="your_seed_phrase">您的助记词</string>
+    <string name="seed_warning">请按顺序抄写以下单词，切勿向任何人泄露。这是恢复钱包的唯一方式。</string>
+    <string name="i_saved_my_seed">我已备份助记词</string>
+
+    <!-- Restore Wallet -->
+    <string name="restore_wallet_title">恢复钱包</string>
+    <string name="enter_seed_phrase">输入您的助记词</string>
+    <string name="restore_height_hint">恢复区块高度（可选）</string>
+    <string name="restore_date_hint">或恢复日期（YYYY-MM-DD，例如 2024-01-01）</string>
+    <string name="restore">恢复</string>
+
+    <!-- PIN -->
+    <string name="set_pin_title">设置 PIN 码</string>
+    <string name="confirm_pin_title">确认 PIN 码</string>
+    <string name="enter_pin">输入 PIN 码</string>
+    <string name="pin_mismatch">两次输入的 PIN 码不一致</string>
+    <string name="enable_biometrics">启用生物识别解锁</string>
+    <string name="biometrics_description">使用指纹或面部识别快速解锁钱包</string>
+
+    <!-- Unlock -->
+    <string name="unlock_title">欢迎回来</string>
+    <string name="use_biometrics">使用生物识别解锁</string>
+    <string name="forgot_pin">忘记 PIN 码？</string>
+
+    <!-- Wallet -->
+    <string name="balance">余额</string>
+    <string name="unlocked_balance">可用余额</string>
+    <string name="send">发送</string>
+    <string name="receive">接收</string>
+    <string name="recent_activity">最近交易</string>
+    <string name="see_all">查看全部</string>
+    <string name="no_transactions">暂无交易记录</string>
+    <string name="syncing">同步中...</string>
+    <string name="synced">已同步</string>
+
+    <!-- Send -->
+    <string name="send_xmr">发送 XMR</string>
+    <string name="recipient_address">收款地址</string>
+    <string name="amount">数量</string>
+    <string name="max">最大</string>
+    <string name="fee">网络手续费</string>
+    <string name="total">总计</string>
+    <string name="confirm_send">确认发送</string>
+    <string name="scan_qr">扫描二维码</string>
+
+    <!-- Receive -->
+    <string name="receive_xmr">接收 XMR</string>
+    <string name="your_address">您的地址</string>
+    <string name="copy_address">复制地址</string>
+    <string name="share_address">分享地址</string>
+    <string name="new_subaddress">新建子地址</string>
+
+    <!-- Transactions -->
+    <string name="transactions">交易记录</string>
+    <string name="received">已接收</string>
+    <string name="sent">已发送</string>
+    <string name="pending">待确认</string>
+    <string name="confirmed">已确认</string>
+    <string name="failed">失败</string>
+    <string name="confirmations">确认数</string>
+    <string name="transaction_id">交易 ID</string>
+    <string name="view_on_explorer">在区块浏览器中查看</string>
+
+    <!-- Settings -->
+    <string name="settings">设置</string>
+    <string name="security">安全</string>
+    <string name="change_pin">修改 PIN 码</string>
+    <string name="biometric_login">生物识别解锁</string>
+    <string name="backup">备份</string>
+    <string name="view_seed">查看助记词</string>
+    <string name="network">网络</string>
+    <string name="node_settings">节点设置</string>
+    <string name="current_node">当前节点</string>
+    <string name="about">关于</string>
+    <string name="version">版本</string>
+    <string name="delete_wallet">删除钱包</string>
+    <string name="delete_wallet_warning">此操作将永久删除您的钱包。请确保您已备份助记词！</string>
+
+    <!-- Common -->
+    <string name="continue_button">继续</string>
+    <string name="cancel">取消</string>
+    <string name="done">完成</string>
+    <string name="error">错误</string>
+    <string name="success">成功</string>
+    <string name="copied">已复制到剪贴板</string>
+    <string name="xmr">XMR</string>
+
+    <!-- Errors -->
+    <string name="invalid_address">无效地址</string>
+    <string name="invalid_amount">无效数量</string>
+    <string name="insufficient_balance">余额不足</string>
+    <string name="connection_error">网络连接失败</string>
+    <string name="sync_error">同步失败</string>
+
+    <!-- Widgets -->
+    <string name="widget_description">显示当前门罗币价格及 24 小时涨跌幅</string>
+    <string name="wallet_widget_description">显示您的门罗币余额和最近交易</string>
+
+</resources>
