@@ -2,6 +2,7 @@ package one.monero.moneroone
 
 import android.app.Activity
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -92,6 +93,12 @@ class MoneroOneApp : Application() {
     private fun createNotificationChannels() {
         val nm = getSystemService(NotificationManager::class.java)
 
+        // createNotificationChannel never updates lockscreenVisibility on an
+        // existing channel, so the hidden-from-lock-screen variants ship under
+        // new ids and the originals are removed from installs that have them.
+        nm.deleteNotificationChannel("wallet_sync")
+        nm.deleteNotificationChannel("price_alerts")
+
         val syncChannel = NotificationChannel(
             WalletSyncService.CHANNEL_ID,
             "Wallet Sync",
@@ -99,6 +106,9 @@ class MoneroOneApp : Application() {
         ).apply {
             description = "Shows wallet sync progress while running in the background"
             setShowBadge(false)
+            // Keep wallet activity off the lock screen — a visible sync/price
+            // notification tells a shoulder-surfer this device holds Monero.
+            lockscreenVisibility = Notification.VISIBILITY_SECRET
         }
         nm.createNotificationChannel(syncChannel)
 
@@ -108,6 +118,7 @@ class MoneroOneApp : Application() {
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "Notifications when XMR price hits your target"
+            lockscreenVisibility = Notification.VISIBILITY_SECRET
         }
         nm.createNotificationChannel(alertChannel)
     }

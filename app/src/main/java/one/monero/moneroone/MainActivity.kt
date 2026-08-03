@@ -2,6 +2,7 @@ package one.monero.moneroone
 
 import android.content.Context
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -18,6 +19,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Block screenshots, screen recording and the recents-screen thumbnail.
+        // Single-Activity app, so this covers seed backup, PIN entry and balances.
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
 
         val prefs = getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         val themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)

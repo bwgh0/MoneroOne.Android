@@ -102,6 +102,7 @@ import kotlinx.coroutines.withContext
 import one.monero.moneroone.core.util.NetworkMonitor
 import one.monero.moneroone.core.wallet.SendState
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.AuthGateDialog
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.PrimaryButton
@@ -121,10 +122,30 @@ fun SendScreen(
     onScanQr: () -> Unit,
     onSent: () -> Unit
 ) {
+    val walletState by walletViewModel.walletState.collectAsState()
+    val sendState by walletViewModel.sendState.collectAsState()
+
+    // Pre-fill arrives via QR / deep link and is untrusted: it must pass the
+    // same checks as manual entry or be dropped, so the flow can never skip
+    // the phase where the dropped value would have been entered.
+    val prefilledAddress = remember {
+        initialAddress?.trim()?.takeIf { isValidMoneroAddress(it) }
+    }
+    val prefilledAmount = remember {
+        initialAmount?.trim()?.takeIf { walletViewModel.parseXmr(it) > 0 }
+    }
+    // Only skip past the amount step once the balance is actually known to cover
+    // it; an unloaded balance reads as 0, which must not silently drop a legitimate
+    // amount nor let an over-balance one reach review unchecked.
+    val prefillCoveredByBalance = remember {
+        val parsed = prefilledAmount?.let { walletViewModel.parseXmr(it) } ?: 0L
+        parsed > 0 && parsed <= walletState.balance.unlocked
+    }
+
     // Determine starting phase based on pre-fill
     val startPhase = when {
-        initialAddress != null && initialAmount != null -> SendPhase.REVIEW
-        initialAddress != null -> SendPhase.AMOUNT
+        prefilledAddress != null && prefillCoveredByBalance -> SendPhase.REVIEW
+        prefilledAddress != null -> SendPhase.AMOUNT
         else -> SendPhase.ADDRESS
     }
 
@@ -132,20 +153,20 @@ fun SendScreen(
     var navigatingForward by remember { mutableStateOf(true) }
 
     // Send flow state
-    var address by remember { mutableStateOf(initialAddress ?: "") }
-    var amount by remember { mutableStateOf(initialAmount ?: "") }
+    var address by remember { mutableStateOf(prefilledAddress ?: "") }
+    var amount by remember { mutableStateOf(prefilledAmount ?: "") }
     var isSweepAll by remember { mutableStateOf(false) }
     var memo by remember { mutableStateOf("") }
     var sendInProgress by remember { mutableStateOf(false) }
-    val amountPrefilledFromQR = remember { initialAmount != null }
+    // Re-authentication is required between confirming and broadcasting: an
+    // unlocked, unattended phone must not be able to drain the wallet.
+    var showAuthGate by remember { mutableStateOf(false) }
+    var amountPrefilledFromQR by remember { mutableStateOf(prefilledAmount != null) }
 
     // Fee state (estimated on REVIEW phase)
     var estimatedFee by remember { mutableLongStateOf(0L) }
     var feeLoading by remember { mutableStateOf(false) }
     var feeError by remember { mutableStateOf<String?>(null) }
-
-    val walletState by walletViewModel.walletState.collectAsState()
-    val sendState by walletViewModel.sendState.collectAsState()
 
     // React to send state changes from ViewModel
     LaunchedEffect(sendState) {
@@ -249,11 +270,12 @@ fun SendScreen(
                     val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
                     AmountPhase(
                         amount = amount,
-                        onAmountChange = { amount = it; isSweepAll = false },
+                        onAmountChange = { amount = it; isSweepAll = false; amountPrefilledFromQR = false },
                         isSweepAll = isSweepAll,
                         onMaxTap = {
                             amount = walletViewModel.formatXmr(walletState.balance.unlocked)
                             isSweepAll = true
+                            amountPrefilledFromQR = false
                         },
                         availableBalance = walletViewModel.formatXmr(walletState.balance.unlocked),
                         unlockedBalance = walletState.balance.unlocked,
@@ -273,6 +295,7 @@ fun SendScreen(
                         address = address,
                         amount = amount,
                         isSweepAll = isSweepAll,
+                        amountPrefilledFromQR = amountPrefilledFromQR,
                         onUpgradeToSweepAll = { isSweepAll = true },
                         estimatedFee = estimatedFee,
                         feeLoading = feeLoading,
@@ -291,11 +314,7 @@ fun SendScreen(
                         sendInProgress = sendInProgress,
                         onConfirm = {
                         sendInProgress = true
-                        walletViewModel.send(
-                            address,
-                            walletViewModel.parseXmr(amount),
-                            isSweepAll = isSweepAll
-                        )
+                        showAuthGate = true
                     }
                 )
                 }
@@ -317,6 +336,26 @@ fun SendScreen(
                 )
             }
         }
+    }
+
+    if (showAuthGate) {
+        AuthGateDialog(
+            walletViewModel = walletViewModel,
+            title = "Confirm transaction",
+            subtitle = "Authenticate to send ${if (isSweepAll) "your full balance" else "$amount XMR"}",
+            onAuthenticated = {
+                showAuthGate = false
+                walletViewModel.send(
+                    address,
+                    walletViewModel.parseXmr(amount),
+                    isSweepAll = isSweepAll
+                )
+            },
+            onCancel = {
+                showAuthGate = false
+                sendInProgress = false
+            }
+        )
     }
 }
 
@@ -734,6 +773,7 @@ private fun ReviewPhase(
     address: String,
     amount: String,
     isSweepAll: Boolean,
+    amountPrefilledFromQR: Boolean,
     onUpgradeToSweepAll: () -> Unit,
     estimatedFee: Long,
     feeLoading: Boolean,
@@ -759,8 +799,10 @@ private fun ReviewPhase(
             }
             onEstimateFee(fee, false, null)
 
-            // Auto-upgrade to sweep-all if amount + fee > balance
-            if (!isSweepAll && parsedAmount + fee > unlockedBalance) {
+            // Auto-upgrade to sweep-all if amount + fee > balance. An amount
+            // the user did not type must never silently become the full
+            // balance — that upgrade requires an explicit tap instead.
+            if (!isSweepAll && !amountPrefilledFromQR && parsedAmount + fee > unlockedBalance) {
                 onUpgradeToSweepAll()
             }
         } catch (e: Exception) {
@@ -775,6 +817,8 @@ private fun ReviewPhase(
     val offsetY by animateFloatAsState(if (visible) 0f else 20f, tween(400), label = "reviewOffset")
 
     val feeReady = !feeLoading && feeError == null && estimatedFee > 0
+    val needsSweepAllChoice = amountPrefilledFromQR && !isSweepAll && feeReady &&
+        parsedAmount + estimatedFee > unlockedBalance
 
     Column(
         modifier = Modifier
@@ -783,6 +827,18 @@ private fun ReviewPhase(
             .graphicsLayer { this.alpha = alpha; translationY = offsetY.dp.toPx() }
     ) {
         Spacer(modifier = Modifier.height(16.dp))
+
+        // QR warning
+        if (amountPrefilledFromQR && !isSweepAll) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFFCC00), modifier = Modifier.size(14.dp))
+                Text("Amount pre-filled from QR code", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
 
         // Transaction card
         GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -914,6 +970,33 @@ private fun ReviewPhase(
             }
         }
 
+        // Pre-filled amount + fee no longer fits the balance
+        if (needsSweepAllChoice) {
+            Spacer(modifier = Modifier.height(12.dp))
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFFCC00), modifier = Modifier.size(18.dp))
+                        Text(
+                            "Amount plus network fee exceeds your available balance",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    TextButton(
+                        onClick = onUpgradeToSweepAll,
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Send all funds instead", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MoneroOrange)
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         // Send button
@@ -926,7 +1009,7 @@ private fun ReviewPhase(
                 .pointerInteropFilter { event ->
                     (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0
                 },
-            enabled = feeReady && !sendInProgress,
+            enabled = feeReady && !sendInProgress && !needsSweepAllChoice,
             color = MoneroOrange
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

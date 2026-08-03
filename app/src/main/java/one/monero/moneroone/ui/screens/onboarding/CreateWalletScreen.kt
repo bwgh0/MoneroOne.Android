@@ -1,5 +1,7 @@
 package one.monero.moneroone.ui.screens.onboarding
 
+import android.content.Context
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -68,6 +71,13 @@ fun CreateWalletScreen(
     var currentStep by remember { mutableIntStateOf(0) }
     var generatedSeed by remember { mutableStateOf<List<String>>(emptyList()) }
     var seedConfirmed by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val screenReaderActive = remember {
+        val accessibilityManager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        accessibilityManager.isTouchExplorationEnabled
+    }
+    var screenReaderWarningAccepted by remember { mutableStateOf(false) }
 
     // Generate seed immediately on screen entry
     LaunchedEffect(Unit) {
@@ -122,10 +132,17 @@ fun CreateWalletScreen(
             }
 
             when (currentStep) {
-                0 -> SeedDisplay(
-                    seed = generatedSeed,
-                    onContinue = { currentStep = 1 }
-                )
+                // Screen readers speak visible text, so the seed must not render until the user opts in
+                0 -> if (screenReaderActive && !screenReaderWarningAccepted) {
+                    ScreenReaderSeedWarning(
+                        onReveal = { screenReaderWarningAccepted = true }
+                    )
+                } else {
+                    SeedDisplay(
+                        seed = generatedSeed,
+                        onContinue = { currentStep = 1 }
+                    )
+                }
                 1 -> SeedConfirmation(
                     seed = generatedSeed,
                     onConfirmed = {
@@ -249,6 +266,72 @@ private fun SeedDisplay(
             )
         ) {
             Text("Continue", style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+private fun ScreenReaderSeedWarning(
+    onReveal: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        MoneroLogo(size = 80.dp)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Screen reader is on",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Warning card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = WarningYellow.copy(alpha = 0.15f)
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = WarningYellow,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Your screen reader will read your seed phrase out loud. Anyone who hears it can steal your funds. Use headphones or make sure nobody can hear your device before continuing.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = onReveal,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MoneroOrange,
+                contentColor = Color.White
+            )
+        ) {
+            Text("Show Seed Phrase", style = MaterialTheme.typography.titleMedium)
         }
     }
 }

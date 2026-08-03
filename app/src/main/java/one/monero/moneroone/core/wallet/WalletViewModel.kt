@@ -18,6 +18,7 @@ import io.horizontalsystems.monerokit.model.NetworkType
 import io.horizontalsystems.monerokit.model.TransactionInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -232,7 +233,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         // Check if wallet exists in secure storage
         val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         val existingWalletId = prefs.getString("wallet_id", null)
-        val hasPin = prefs.getString("pin_hash", null) != null
+        val hasPin = readPinHash() != null
         val hasEncryptedSeed = encryptedPrefs.getString("seed_words", null) != null
 
         if (existingWalletId != null && hasPin && hasEncryptedSeed) {
@@ -243,10 +244,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             // This can happen if app was updated or seed was never stored
             // Clear the stale state to allow user to restore wallet
             Timber.w("Clearing stale wallet state: wallet_id and PIN exist but no encrypted seed found")
-            prefs.edit()
-                .remove("wallet_id")
-                .remove("pin_hash")
-                .apply()
+            prefs.edit().remove("wallet_id").apply()
+            encryptedPrefs.edit().remove("pin_hash").apply()
         } else if (existingWalletId != null && !hasPin) {
             // Stale state: wallet_id exists but PIN was never set (incomplete onboarding)
             // Clear the wallet_id to allow fresh onboarding
@@ -568,7 +567,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     private companion object {
         const val FAILOVER_RETRY_DELAY_MS = 5_000L
-        const val PBKDF2_ITERATIONS = 80_000
+        // OWASP's floor for PBKDF2-HMAC-SHA256. Existing hashes are rewritten at
+        // this count on the next successful unlock (see migratePinIfNeeded).
+        const val PBKDF2_ITERATIONS = 600_000
         const val PBKDF2_KEY_LENGTH = 256
         const val PBKDF2_SALT_LENGTH = 16
         const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
@@ -639,6 +640,45 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - getFailedAttempts()).coerceAtLeast(0)
     }
 
+    /**
+     * The PIN hash lives in Keystore-backed encrypted storage, not in the plaintext
+     * prefs file — an imaged device must not yield a hash that can be attacked
+     * offline. Installs predating this read once from the old location and are
+     * migrated in place.
+     */
+    private fun readPinHash(): String? {
+        encryptedPrefs.getString("pin_hash", null)?.let { return it }
+
+        val plainPrefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+        val legacy = plainPrefs.getString("pin_hash", null) ?: return null
+        // Only drop the old copy once the encrypted write is known to have landed.
+        // Deleting it after a failed write would leave no PIN hash at all, which
+        // reads as "no wallet" and locks the user out of their funds.
+        if (runCatching { encryptedPrefs.edit().putString("pin_hash", legacy).commit() }
+                .getOrDefault(false)
+        ) {
+            plainPrefs.edit().remove("pin_hash").apply()
+            Timber.d("Relocated pin_hash into encrypted storage")
+        } else {
+            Timber.w("Could not relocate pin_hash; leaving the existing copy in place")
+        }
+        return legacy
+    }
+
+    private fun writePinHash(hash: String) {
+        val stored = runCatching { encryptedPrefs.edit().putString("pin_hash", hash).commit() }
+            .getOrDefault(false)
+        if (!stored) {
+            // Never leave the wallet with no retrievable PIN hash.
+            throw IllegalStateException("Failed to persist PIN")
+        }
+        // Drop any copy left in the plaintext file by an older install.
+        context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+            .edit()
+            .remove("pin_hash")
+            .apply()
+    }
+
     private suspend fun hashPin(pin: String): String = withContext(Dispatchers.Default) {
         val salt = ByteArray(PBKDF2_SALT_LENGTH).also { SecureRandom().nextBytes(it) }
         val spec = PBEKeySpec(pin.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
@@ -697,25 +737,20 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             else -> false
         }
         if (needsMigration) {
-            val newHash = hashPin(pin)
-            context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-                .edit()
-                .putString("pin_hash", newHash)
-                .apply()
+            writePinHash(hashPin(pin))
             Timber.d("PIN hash migrated to current format ($PBKDF2_ITERATIONS iterations)")
         }
     }
 
     suspend fun setPin(pin: String) {
-        val pinHash = hashPin(pin)
-        context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .edit()
-            .putString("pin_hash", pinHash)
-            .apply()
+        writePinHash(hashPin(pin))
         _pin.value = pin
         _isLocked.value = false
         // Only mark wallet as having been fully set up after PIN is also saved
         _walletState.update { it.copy(hasWallet = true) }
+        // The generated seed has been persisted encrypted by now; drop the copy
+        // held for the confirmation step rather than keeping it for the session.
+        _pendingSeed.value = null
         fetchPrice()
     }
 
@@ -723,8 +758,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         // Check rate limiting
         if (getRemainingLockoutMs() > 0) return false
 
-        val storedHash = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .getString("pin_hash", null) ?: return false
+        val storedHash = readPinHash() ?: return false
 
         val isValid = verifyPinHash(enteredPin, storedHash)
 
@@ -742,9 +776,30 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return isValid
     }
 
+    /**
+     * PIN check for re-authorising a sensitive action (broadcasting a transaction)
+     * without unlocking or re-initialising the wallet. Shares the unlock rate
+     * limiter so this cannot be used as an unthrottled PIN oracle.
+     */
+    suspend fun verifyPinForAction(enteredPin: String): Boolean {
+        if (getRemainingLockoutMs() > 0) return false
+
+        val storedHash = readPinHash() ?: return false
+        val isValid = verifyPinHash(enteredPin, storedHash)
+
+        if (isValid) {
+            resetFailedAttempts()
+            migratePinIfNeeded(enteredPin, storedHash)
+        } else {
+            recordFailedAttempt()
+            refreshLockoutState()
+        }
+
+        return isValid
+    }
+
     suspend fun verifyPinOnly(enteredPin: String): Boolean {
-        val storedHash = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .getString("pin_hash", null) ?: return false
+        val storedHash = readPinHash() ?: return false
 
         val isValid = verifyPinHash(enteredPin, storedHash)
         if (isValid) {
@@ -756,11 +811,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     suspend fun changePin(oldPin: String, newPin: String): Boolean {
         if (!verifyPinOnly(oldPin)) return false
 
-        val pinHash = hashPin(newPin)
-        context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .edit()
-            .putString("pin_hash", pinHash)
-            .apply()
+        writePinHash(hashPin(newPin))
         _pin.value = newPin
         return true
     }
@@ -959,10 +1010,25 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun removeWallet() {
-        viewModelScope.launch {
+        // NonCancellable: this runs while the UI navigates away, and a half-done
+        // wipe (kit stopped, seed still on disk) is worse than either outcome.
+        viewModelScope.launch(NonCancellable) {
             try {
-                // Stop and release the kit via WalletManager
-                WalletManager.clear()
+                val removedWalletId = walletId
+
+                // Await full shutdown before deleting files: stopping the kit stores
+                // the wallet, which would re-create what we delete below.
+                WalletManager.clearAndAwait()
+
+                // Delete the wallet2 files (cache, .keys, .address.txt). The keys file
+                // is written with an empty password, so leaving it behind hands the
+                // spend key to whoever holds the device next.
+                removedWalletId?.let { id ->
+                    withContext(Dispatchers.IO) {
+                        runCatching { MoneroKit.deleteWallet(context, id) }
+                            .onFailure { Timber.e(it, "Failed to delete wallet files for $id") }
+                    }
+                }
 
                 // Clear all wallet data from SharedPreferences
                 context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
@@ -970,8 +1036,18 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     .clear()
                     .apply()
 
-                // Delete encrypted seed storage
+                // Empty the encrypted seed store before deleting it — deleteSharedPreferences
+                // is unreliable while this process still holds an open reference to it.
+                runCatching { encryptedPrefs.edit().clear().commit() }
+                    .onFailure { Timber.e(it, "Failed to clear encrypted seed store") }
                 context.deleteSharedPreferences("secure_wallet_data")
+
+                // Widget cache holds the removed wallet's balance and recent tx hashes.
+                context.getSharedPreferences("monero_widget_data", Context.MODE_PRIVATE)
+                    .edit()
+                    .clear()
+                    .apply()
+                WalletWidget.updateAll(context)
 
                 // Reset state
                 walletId = null
@@ -993,7 +1069,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private fun getSelectedNode(): String {
         val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         val savedNode = prefs.getString("selected_node", null)
-        val node = savedNode ?: DefaultNodes.INITIAL
+        val node = savedNode ?: DefaultNodes.initial(context)
         Timber.d("getSelectedNode: savedNode=$savedNode, using node=$node")
         return node
     }
@@ -1041,6 +1117,17 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun send(address: String, amount: Long, memo: String? = null, isSweepAll: Boolean = false) {
+        // Reentrancy guard at the source of truth, so a UI regression can never
+        // broadcast the same transaction twice.
+        if (_sendState.value is SendState.Sending) {
+            Timber.w("send() ignored: a transaction is already in flight")
+            return
+        }
+        if (!isSweepAll && amount <= 0L) {
+            Timber.w("send() ignored: non-positive amount")
+            _sendState.value = SendState.Error("Invalid amount")
+            return
+        }
         viewModelScope.launch {
             _sendState.value = SendState.Sending
             try {

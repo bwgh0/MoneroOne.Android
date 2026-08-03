@@ -66,6 +66,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import io.horizontalsystems.monerokit.MoneroKit
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.theme.MoneroOrange
@@ -101,11 +102,16 @@ fun parseMoneroUri(uri: String): MoneroUriData? {
         else -> return null
     }
 
-    // Validate address format (basic check)
+    // Validate address format
     if (!address.startsWith("4") && !address.startsWith("8")) {
         return null
     }
-    if (address.length < 95) {
+    if (address.length !in listOf(95, 106)) {
+        return null
+    }
+    try {
+        MoneroKit.validateAddress(address)
+    } catch (e: Exception) {
         return null
     }
 
@@ -123,9 +129,13 @@ fun parseMoneroUri(uri: String): MoneroUriData? {
             val parts = param.split("=", limit = 2)
             if (parts.size == 2) {
                 val key = parts[0].lowercase()
-                val value = java.net.URLDecoder.decode(parts[1], "UTF-8")
+                val value = try {
+                    java.net.URLDecoder.decode(parts[1], "UTF-8")
+                } catch (e: Exception) {
+                    parts[1]
+                }
                 when (key) {
-                    "tx_amount", "amount" -> amount = value
+                    "tx_amount", "amount" -> if (isValidUriAmount(value)) amount = value
                     "recipient_name" -> recipientName = value
                     "tx_description", "description", "message" -> description = value
                     "tx_payment_id", "payment_id" -> paymentId = value
@@ -141,6 +151,16 @@ fun parseMoneroUri(uri: String): MoneroUriData? {
         description = description,
         paymentId = paymentId
     )
+}
+
+/**
+ * True only for a plain positive decimal; the amount is embedded verbatim
+ * in the send route, so no signs, exponents or other notation may pass.
+ */
+private fun isValidUriAmount(value: String): Boolean {
+    if (!value.matches(Regex("""\d+(\.\d+)?"""))) return false
+    val numeric = value.toBigDecimalOrNull() ?: return false
+    return numeric > java.math.BigDecimal.ZERO
 }
 
 /**

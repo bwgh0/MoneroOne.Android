@@ -19,6 +19,7 @@ import timber.log.Timber
 import java.text.NumberFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 class PriceAlertWorker(
     private val context: Context,
@@ -27,16 +28,23 @@ class PriceAlertWorker(
 
     companion object {
         private const val WORK_NAME = "price_alert_check"
-        const val CHANNEL_ID = "price_alerts"
+        // v2: hidden from the lock screen. Channel settings cannot be changed
+        // after creation, so the id is versioned instead.
+        const val CHANNEL_ID = "price_alerts_v2"
 
         fun schedule(context: Context) {
+            // Flex window plus a random phase so checks don't hit monero.one
+            // on an exact 15-minute clock an observer could fingerprint.
             val request = PeriodicWorkRequestBuilder<PriceAlertWorker>(
-                15, TimeUnit.MINUTES
-            ).build()
+                15, TimeUnit.MINUTES,
+                5, TimeUnit.MINUTES
+            )
+                .setInitialDelay(Random.nextLong(TimeUnit.MINUTES.toMillis(5)), TimeUnit.MILLISECONDS)
+                .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 request
             )
             Timber.d("Price alert worker scheduled")
@@ -49,6 +57,13 @@ class PriceAlertWorker(
     }
 
     override suspend fun doWork(): Result {
+        // No fetch until a wallet exists. Avoids leaking IP to monero.one
+        // before the user has generated/restored a key.
+        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+        if (prefs.getString("wallet_id", null) == null) {
+            return Result.success()
+        }
+
         val manager = PriceAlertManager(context)
 
         if (!manager.hasEnabledAlerts()) {

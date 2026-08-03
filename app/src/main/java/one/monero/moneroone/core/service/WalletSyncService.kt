@@ -22,7 +22,9 @@ import timber.log.Timber
 class WalletSyncService : Service() {
 
     companion object {
-        const val CHANNEL_ID = "wallet_sync"
+        // v2: hidden from the lock screen. Channel settings cannot be changed
+        // after creation, so the id is versioned instead.
+        const val CHANNEL_ID = "wallet_sync_v2"
         const val NOTIFICATION_ID = 1
         private const val ACTION_STOP = "one.monero.moneroone.STOP_SYNC"
 

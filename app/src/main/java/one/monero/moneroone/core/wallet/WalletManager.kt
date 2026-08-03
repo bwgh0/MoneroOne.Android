@@ -125,6 +125,27 @@ object WalletManager {
     }
 
     /**
+     * Stop and release the kit, resetting flows, and suspend until the kit has
+     * fully stopped. Callers that delete wallet files afterwards must use this
+     * rather than [clear]: stopping the kit stores the wallet, which would
+     * re-create the very files being deleted.
+     */
+    suspend fun clearAndAwait() {
+        try {
+            // stop() stores and closes the wallet through the native layer, which
+            // blocks; callers run on Main.
+            withContext(Dispatchers.IO) { kit?.stop() }
+        } catch (e: Exception) {
+            Timber.e(e, "WalletManager.clearAndAwait() stop failed")
+        }
+        kit = null
+        _syncStateFlow.value = SyncState.NotSynced(MoneroKit.SyncError.NotStarted)
+        _balanceFlow.value = Balance(0, 0)
+        _transactionsFlow.value = emptyList()
+        Timber.d("WalletManager: cleared (awaited)")
+    }
+
+    /**
      * Stop and release the kit. Resets flows to defaults.
      */
     fun clear() {

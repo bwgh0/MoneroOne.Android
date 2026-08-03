@@ -3,6 +3,7 @@ package one.monero.moneroone.ui.screens.settings
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -94,6 +95,12 @@ fun BackupSeedScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+
+    val screenReaderActive = remember {
+        val accessibilityManager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        accessibilityManager.isTouchExplorationEnabled
+    }
+    var screenReaderWarningAccepted by remember { mutableStateOf(false) }
 
     // Clear clipboard after delay if seed was copied
     DisposableEffect(copiedToClipboard) {
@@ -222,6 +229,87 @@ fun BackupSeedScreen(
                 onDigitPress = ::onDigitPress,
                 onBackspace = ::onBackspace
             )
+
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    } else if (screenReaderActive && !screenReaderWarningAccepted) {
+        // Screen readers speak visible text, so the seed must not render until the user opts in
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back"
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Backup Seed",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            GlassCard(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = ErrorRed,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "Screen Reader Is On",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = ErrorRed
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Your screen reader will read your recovery phrase out loud. Anyone who hears it can steal your funds. Use headphones or make sure nobody can hear your device before continuing.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = { screenReaderWarningAccepted = true },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MoneroOrange,
+                    contentColor = Color.White
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Show Recovery Phrase",
+                    fontWeight = FontWeight.Medium
+                )
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
         }

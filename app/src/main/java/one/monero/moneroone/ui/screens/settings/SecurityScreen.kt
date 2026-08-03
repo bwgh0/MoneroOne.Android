@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.WarningYellow
 
 enum class AutoLockTimeout(val label: String, val seconds: Int) {
     IMMEDIATE("Immediately", 0),
@@ -290,24 +291,36 @@ private fun AutoLockDialog(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onSelect(timeout) }
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .padding(16.dp)
                         ) {
-                            Text(
-                                text = timeout.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (timeout == selected) MoneroOrange else MaterialTheme.colorScheme.onSurface
-                            )
-                            if (timeout == selected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Selected",
-                                    tint = MoneroOrange,
-                                    modifier = Modifier.size(20.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = timeout.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (timeout == selected) MoneroOrange else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (timeout == selected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = MoneroOrange,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            if (timeout == AutoLockTimeout.NEVER) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "The wallet stays unlocked until the app is force-closed",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = WarningYellow
                                 )
                             }
                         }

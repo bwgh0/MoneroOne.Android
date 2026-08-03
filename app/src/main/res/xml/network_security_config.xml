@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Monero daemon RPC uses HTTP. Allow cleartext for all nodes (local and remote). -->
+    <!-- Most public Monero daemons only speak plain-HTTP RPC, and self-hosted
+         LAN/Tor nodes have no CA certificates, so cleartext must stay permitted
+         app-wide. TLS is used whenever a node offers it (port 443); per-node
+         encryption status is surfaced in the node settings UI. -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <!-- First-party nodes always serve TLS on 443; never allow an accidental
+         cleartext request to them. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">node.monero.one</domain>
+    </domain-config>
 </network-security-config>

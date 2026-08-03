@@ -121,6 +121,17 @@ fun MoneroOneNavHost(
         }
     }
 
+    // Locking drops any in-flight send flow so unlock lands on Main,
+    // never on a stale pre-filled send screen
+    LaunchedEffect(isLocked) {
+        if (isLocked) {
+            val route = navController.currentDestination?.route
+            if (route == Screen.Send.route || route == Screen.QRScanner.route) {
+                navController.popBackStack(Screen.Main.route, inclusive = false)
+            }
+        }
+    }
+
     // When locked, show UnlockScreen directly — no navigation delay, no content flash
     if (isLocked && walletState.hasWallet) {
         UnlockScreen(

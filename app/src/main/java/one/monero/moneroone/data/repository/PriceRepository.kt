@@ -117,7 +117,9 @@ class PriceRepository {
         return try {
             connection.requestMethod = "GET"
             connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "MoneroOne/1.0 Android")
+            // Generic UA on purpose: the platform default advertises Android and
+            // device model, and naming the app ties this IP to Monero ownership.
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
             connection.connectTimeout = 10000
             connection.readTimeout = 10000
 
