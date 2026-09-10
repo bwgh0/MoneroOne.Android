@@ -72,11 +72,13 @@ object WalletCacheIds {
 
     /**
      * Reduce a wallet-dir file name to its cache base name.
-     * Wallet files are `<id>`, `<id>.keys`, `<id>.address.txt`.
+     * Wallet files are `<id>`, `<id>.keys`, `<id>.address.txt`, plus the
+     * `<id>.unportable` marker wallet2 drops next to the cache on store().
      */
     fun cacheBaseName(fileName: String): String = fileName
         .removeSuffix(".address.txt")
         .removeSuffix(".keys")
+        .removeSuffix(".unportable")
 
     /**
      * Decide which cache base names are orphans safe to delete.

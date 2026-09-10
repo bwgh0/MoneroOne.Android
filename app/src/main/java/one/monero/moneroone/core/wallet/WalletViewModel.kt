@@ -37,6 +37,7 @@ import one.monero.moneroone.widget.PriceWidget
 import one.monero.moneroone.widget.WalletWidget
 import one.monero.moneroone.widget.WidgetDataStore
 import timber.log.Timber
+import java.io.File
 import java.math.BigDecimal
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -77,6 +78,9 @@ class DuplicateWalletException(val existingName: String) :
 
 class InvalidSeedException :
     Exception("Invalid seed phrase. Check the words and try again.")
+
+/** The kit could not create/open the wallet for a seed that passed validation. */
+class WalletOpenException(message: String) : Exception(message)
 
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -204,7 +208,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 store.saveWallets(withSeeds)
                 list = withSeeds
             }
-            if (list.isNotEmpty() && list.none { secrets.pinHash(it.id) != null }) {
+            if (list.isNotEmpty() && !store.hasUndecodableRows() &&
+                list.none { secrets.pinHash(it.id) != null }
+            ) {
                 Timber.w("Clearing wallet store: no wallet has a PIN hash (incomplete onboarding)")
                 list.forEach { secrets.deleteWalletSecrets(it.id) }
                 store.deleteAll()
@@ -249,6 +255,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      */
     private fun cleanOrphanedWalletCaches() {
         if (!store.migrated) return
+        // Rows this build cannot decode (a newer build's rows, a damaged
+        // value) have unknown cache ids: nothing on disk can be proven
+        // orphaned, so sweep nothing.
+        val undecodable = try { store.hasUndecodableRows() } catch (e: Exception) { true }
+        if (undecodable) {
+            Timber.w("Orphan cache sweep skipped: wallet store has undecodable rows")
+            return
+        }
         val list = _wallets.value
         val knownIds = (list.mapNotNull { it.derivedWalletId } +
             list.mapNotNull { it.deviceWalletId }).toSet()
@@ -261,12 +275,22 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 val orphans = WalletCacheIds.orphanedCacheBaseNames(entries, knownIds, allKnown)
                 orphans.forEach { name ->
                     Timber.i("Sweeping orphaned wallet cache: $name")
-                    MoneroKit.deleteWallet(context, name)
+                    deleteWalletFiles(name)
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Orphan cache sweep failed")
             }
         }
+    }
+
+    /**
+     * Delete every file wallet2 writes for one cache id. MoneroKit.deleteWallet
+     * covers the cache, `.keys` and `.address.txt`; wallet2 also drops a
+     * `<id>.unportable` marker next to the cache on store().
+     */
+    private fun deleteWalletFiles(cacheId: String) {
+        MoneroKit.deleteWallet(context, cacheId)
+        runCatching { File(Helper.getWalletRoot(context), "$cacheId.unportable").delete() }
     }
 
     // =========================================================================
@@ -422,10 +446,30 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
         val cacheId = info.derivedWalletId!!
 
-        // Kit already running for this exact wallet: just start it.
-        if (WalletManager.kit != null && WalletManager.currentWalletId == cacheId) {
-            WalletManager.start()
-            return
+        // Kit already held for this exact wallet (lock/unlock, or a fresh
+        // ViewModel after the Activity was recreated while the process lived):
+        // (re)start it. A fresh VM has NO collectors on that kit — attach them
+        // and repaint from the kit's live values, or the UI stays frozen on
+        // the cached snapshot for good (the drop(1) collectors skip current values).
+        WalletManager.kit?.let { running ->
+            if (WalletManager.currentWalletId == cacheId) {
+                if (observedKit !== running) {
+                    setupKitObservers(running)
+                    val liveSync = running.syncStateFlow.value
+                    val notStarted = liveSync is SyncState.NotSynced &&
+                        liveSync.error is MoneroKit.SyncError.NotStarted
+                    _walletState.update {
+                        it.copy(
+                            balance = running.balance,
+                            transactions = running.allTransactionsFlow.value,
+                            receiveAddress = running.receiveAddress.ifEmpty { it.receiveAddress },
+                            syncState = if (notStarted) SyncState.Connecting(waiting = false) else liveSync
+                        )
+                    }
+                }
+                WalletManager.start()
+                return
+            }
         }
 
         try {
@@ -451,7 +495,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
             WalletManager.start()
             ensureUserSubaddresses(info, kit)
-            persistPrimaryAddress(kit)
+            val primary = persistPrimaryAddress(kit)
+            failClosedOnNullKey(primary)
         } catch (e: Exception) {
             Timber.e(e, "Failed to open wallet")
             _walletState.update {
@@ -485,12 +530,44 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /** Cache the primary (index 0) address for instant display on switch. */
-    private suspend fun persistPrimaryAddress(kit: MoneroKit) {
+    private suspend fun persistPrimaryAddress(kit: MoneroKit): String? {
         val primary = withContext(Dispatchers.IO) {
             runCatching { kit.getSubaddresses().firstOrNull()?.address }.getOrNull()
-        } ?: return
-        val active = _activeWallet.value ?: return
+        } ?: return null
+        val active = _activeWallet.value ?: return primary
         mergeWalletUpdate(active.id) { it.copy(cachedPrimaryAddress = primary) }
+        return primary
+    }
+
+    /**
+     * A wallet whose primary address carries a null (all-zero) spend key is a
+     * burn address: anything received there is unspendable. New wallets are
+     * rejected up front by [SeedValidation]; for a pre-existing row, refuse to
+     * advertise the address and say why (fail closed, iOS parity).
+     */
+    private fun failClosedOnNullKey(primary: String?) {
+        if (primary == null || SeedValidation.isPlausiblePrimaryAddress(primary)) return
+        Timber.e("Active wallet has a null-key/malformed primary address; hiding it")
+        _walletState.update {
+            it.copy(
+                receiveAddress = "",
+                error = "This wallet's keys are invalid (null spend key). Do not receive funds with it."
+            )
+        }
+    }
+
+    /**
+     * Kit start failures that are about the WALLET (seed recovery/creation,
+     * unreadable cache), not the node. These must never trigger node
+     * failover, and during an add they mean the add failed.
+     */
+    private fun isWalletLevelStartError(error: Throwable): Boolean {
+        val message = error.message ?: return false
+        return when (error) {
+            is MoneroKit.SyncError.StartError -> message.startsWith("Wallet recovery error")
+            is MoneroKit.SyncError.InvalidNode -> message == "Invalid wallet"
+            else -> false
+        }
     }
 
     fun generateNewSeed(seedType: SeedType): List<String> {
@@ -588,12 +665,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             }?.let { throw DuplicateWalletException(it.name) }
 
             // Validate + convert the seed BEFORE anything is persisted or the
-            // running kit is touched. For BIP39 this runs the eager
-            // Bip39→Electrum conversion that MoneroKit.getInstance would do,
-            // which throws for any invalid mnemonic — a typo'd restore must
-            // fail here, not after the wallet is stored as active.
+            // running kit is touched: BIP39 checksum, Electrum wordlist +
+            // checksum word, non-null derived keys and a plausible primary
+            // address. A typo'd or degenerate seed must fail here, not after
+            // the wallet is stored as active (and never as a burn address).
             val kitSeed = try {
-                moneroSeed(seed, seedType).toElectrum()
+                withContext(Dispatchers.Default) { SeedValidation.validate(seed, seedType) }.electrum
+            } catch (e: InvalidSeedException) {
+                throw e
             } catch (e: Exception) {
                 Timber.w(e, "addWallet: seed validation failed")
                 throw InvalidSeedException()
@@ -654,6 +733,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             _pendingSeed.value = null
 
             WalletManager.start()
+            // Second line of defense: the kit reports a wallet-level failure
+            // (recovery/creation error) through its sync state, not an
+            // exception. Treat it as a failed add so the row is rolled back
+            // instead of persisting a wallet that can never open.
+            val startState = kit.syncStateFlow.value
+            if (startState is SyncState.NotSynced && isWalletLevelStartError(startState.error)) {
+                throw WalletOpenException(startState.error.message ?: "Wallet could not be created")
+            }
             persistPrimaryAddress(kit)
             return true
         } catch (e: DuplicateWalletException) {
@@ -682,6 +769,18 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun rollbackFailedAdd(added: WalletInfo, previous: WalletInfo?) {
         Timber.w("Rolling back failed wallet add ${added.id} (${added.name})")
         try {
+            // A wallet-level start error may already have scheduled a node
+            // failover; it belongs to the failed row, not the one we restore.
+            failoverJob?.cancel()
+            failoverAttempts = 0
+            cancelKitObservers()
+            WalletManager.stopAndRelease()
+            added.derivedWalletId?.let { id ->
+                // Never touch another row's files (the dup check guarantees uniqueness).
+                if (store.wallets().none { it.id != added.id && it.derivedWalletId == id }) {
+                    withContext(Dispatchers.IO) { deleteWalletFiles(id) }
+                }
+            }
             secrets.deleteWalletSecrets(added.id)
             store.removeWallet(added.id)
             store.setActiveWalletId(previous?.id)
@@ -901,6 +1000,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun removeWallet() {
         viewModelScope.launch {
+            walletMutationMutex.withLock { removeWalletLocked() }
+        }
+    }
+
+    private suspend fun removeWalletLocked() {
+        run {
             try {
                 cancelKitObservers()
                 failoverJob?.cancel()
@@ -909,7 +1014,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 val all = store.wallets()
                 withContext(Dispatchers.IO) {
                     all.forEach { w ->
-                        w.derivedWalletId?.let { MoneroKit.deleteWallet(context, it) }
+                        w.derivedWalletId?.let { deleteWalletFiles(it) }
                     }
                 }
                 all.forEach { secrets.deleteWalletSecrets(it.id) }
@@ -940,9 +1045,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     private var kitObserverJobs: List<Job> = emptyList()
 
+    /** The kit instance the current collectors are attached to (null = none). */
+    private var observedKit: MoneroKit? = null
+
     private fun cancelKitObservers() {
         kitObserverJobs.forEach { it.cancel() }
         kitObserverJobs = emptyList()
+        observedKit = null
     }
 
     /**
@@ -952,6 +1061,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      */
     private fun setupKitObservers(kit: MoneroKit) {
         cancelKitObservers()
+        observedKit = kit
 
         kitObserverJobs = listOf(
             viewModelScope.launch {
@@ -1183,7 +1293,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      */
     suspend fun setPin(pin: String) {
         val pinHash = hashPin(pin)
-        _wallets.value.forEach { secrets.savePinHash(it.id, pinHash) }
+        // Under the lifecycle mutex so an add in flight cannot inherit a
+        // stale hash and leave one wallet on a different PIN.
+        walletMutationMutex.withLock {
+            store.wallets().forEach { secrets.savePinHash(it.id, pinHash) }
+        }
         _pin.value = pin
         _isLocked.value = false
         // Only mark wallet as having been fully set up after PIN is also saved
@@ -1239,9 +1353,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             return false
         }
 
-        // Pass 2: write the new hash everywhere.
+        // Pass 2: write the new hash everywhere, serialized against adds so
+        // a wallet added mid-change cannot keep the old hash.
         val pinHash = hashPin(newPin)
-        allWallets.forEach { secrets.savePinHash(it.id, pinHash) }
+        walletMutationMutex.withLock {
+            store.wallets().forEach { secrets.savePinHash(it.id, pinHash) }
+        }
         _pin.value = newPin
         return true
     }
@@ -1361,6 +1478,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     // a successful sync (or a manual node change) resets the budget.
     private fun maybeFailover(state: SyncState.NotSynced) {
         if (state.error is MoneroKit.SyncError.NotStarted) return
+        // A seed/cache problem is not a node problem: rotating the global node
+        // setting cannot fix it and silently changes every wallet's node.
+        if (isWalletLevelStartError(state.error)) return
         if (_wallets.value.isEmpty() || _activeWallet.value == null) return
         if (!prefs.getBoolean("auto_select_node", true)) return
         if (failoverAttempts >= DefaultNodes.URIS.size) return
@@ -1447,7 +1567,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
             // Delete ONLY this wallet's old cache files.
             oldCacheId?.let {
-                withContext(Dispatchers.IO) { MoneroKit.deleteWallet(context, it) }
+                withContext(Dispatchers.IO) { deleteWalletFiles(it) }
             }
 
             openActiveWallet()

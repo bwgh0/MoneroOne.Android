@@ -35,6 +35,9 @@ object WalletManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var observeJobs: List<Job> = emptyList()
 
+    /** In-flight fire-and-forget stop (see [stop]); joined before any start/reopen. */
+    private var pendingStop: Job? = null
+
     var kit: MoneroKit? = null
         private set
 
@@ -115,6 +118,7 @@ object WalletManager {
     }
 
     suspend fun start() {
+        awaitPendingStop()
         val k = kit ?: run {
             Timber.w("WalletManager.start() called but kit is null")
             return
@@ -122,14 +126,26 @@ object WalletManager {
         withContext(Dispatchers.IO) { k.start() }
     }
 
+    /**
+     * Fire-and-forget stop (ViewModel teardown). The job is remembered so a
+     * new ViewModel's start()/initialize() awaits it instead of racing the
+     * kit's 1s-delayed stop: start-then-stop left the kit dead until the
+     * next resume while the UI showed it as running.
+     */
     fun stop() {
-        scope.launch {
+        val k = kit ?: return
+        pendingStop = scope.launch {
             try {
-                kit?.stop()
+                k.stop()
             } catch (e: Exception) {
                 Timber.e(e, "WalletManager.stop() failed")
             }
         }
+    }
+
+    private suspend fun awaitPendingStop() {
+        pendingStop?.join()
+        pendingStop = null
     }
 
     /**
@@ -138,6 +154,7 @@ object WalletManager {
      * (balance, txs) is preserved for UI continuity on node changes.
      */
     suspend fun stopAndRelease() {
+        awaitPendingStop()
         observeJobs.forEach { it.cancel() }
         observeJobs = emptyList()
         try {
