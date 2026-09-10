@@ -156,6 +156,9 @@ class WalletMigrationIntegrationTest {
         val wallets = store.wallets()
         assertEquals(2, wallets.size)
         val imported = wallets.first { it.derivedWalletId == "aaaaaaaa-bbbb-cccc-dddd-eeeeffff0000" }
+        // Distinct name: the migrated row already owns "Personal Wallet".
+        assertEquals("Wallet 2", imported.name)
+        assertEquals("Personal Wallet", wallets.first { it.id != imported.id }.name)
         // The seed survives — the old behavior wiped it unseen.
         assertEquals(otherSeed, secrets.loadSeed(imported.id)?.first)
         // One-app-wide-PIN invariant: imported row gets the existing hash.

@@ -142,7 +142,10 @@ object WalletMigration {
                     } != null
             if (!duplicate) {
                 val newId = UUID.randomUUID().toString()
+                // "Personal Wallet" already exists from the real migration; give
+                // the imported row the next free name instead of a duplicate.
                 val info = buildMigratedWallet(legacy, newId, System.currentTimeMillis())!!
+                    .let { it.copy(name = WalletStore.nextWalletName(existing.map { w -> w.name })) }
                 Timber.i("WalletMigration: importing post-migration legacy wallet -> $newId (cache ${info.derivedWalletId})")
                 secrets.saveSeed(newId, legacy.seedWords!!, legacy.seedType!!)
                 // Keep the one-app-wide-PIN invariant: prefer the existing
