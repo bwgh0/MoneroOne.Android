@@ -422,7 +422,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * open is ALWAYS the wallet's persisted derivedWalletId — derived and
      * persisted through the single shared function if missing (lockstep).
      */
-    private suspend fun openActiveWallet() {
+    private suspend fun openActiveWallet(healed: Boolean = false) {
         val active = _activeWallet.value ?: run {
             Timber.w("openActiveWallet: no active wallet")
             return
@@ -494,6 +494,21 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             _walletState.update { it.copy(receiveAddress = kit.receiveAddress) }
 
             WalletManager.start()
+
+            // An unloadable cache (process killed mid-store, downgrade to an
+            // older wallet2, disk damage) used to leave the wallet on
+            // "Not connected" for good; the keys/seed are intact, so rebuild
+            // the cache from the seed once (in-session heal, iOS parity).
+            val startState = kit.syncStateFlow.value
+            if (!healed && startState is SyncState.NotSynced && isUnloadableCacheError(startState.error)) {
+                Timber.w("openActiveWallet: cache $cacheId failed to load; rebuilding it from the seed")
+                cancelKitObservers()
+                WalletManager.stopAndRelease()
+                withContext(Dispatchers.IO) { deleteWalletFiles(cacheId) }
+                openActiveWallet(healed = true)
+                return
+            }
+
             ensureUserSubaddresses(info, kit)
             val primary = persistPrimaryAddress(kit)
             failClosedOnNullKey(primary)
@@ -569,6 +584,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             else -> false
         }
     }
+
+    /** The kit found wallet files but wallet2 could not load them (openWallet returned null). */
+    private fun isUnloadableCacheError(error: Throwable): Boolean =
+        error is MoneroKit.SyncError.InvalidNode && error.message == "Invalid wallet"
 
     fun generateNewSeed(seedType: SeedType): List<String> {
         val mnemonic = Mnemonic()
@@ -745,6 +764,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             return true
         } catch (e: DuplicateWalletException) {
             Timber.w("addWallet rejected: duplicate of ${e.existingName}")
+            _walletState.update { it.copy(isInitializing = false, error = e.message) }
+            return false
+        } catch (e: InvalidSeedException) {
+            // Expected user error (nothing was persisted): no stack trace.
+            Timber.w("addWallet rejected: invalid seed")
             _walletState.update { it.copy(isInitializing = false, error = e.message) }
             return false
         } catch (e: Exception) {
