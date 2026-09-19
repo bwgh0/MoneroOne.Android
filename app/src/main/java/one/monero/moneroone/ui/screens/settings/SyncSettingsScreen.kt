@@ -67,6 +67,7 @@ fun SyncSettingsScreen(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE) }
     val walletState by walletViewModel.walletState.collectAsState()
+    val activeWallet by walletViewModel.activeWallet.collectAsState()
 
     var backgroundSyncEnabled by remember {
         mutableStateOf(prefs.getBoolean("background_sync_enabled", false))
@@ -74,14 +75,9 @@ fun SyncSettingsScreen(
     val (hasNotificationPermission, requestNotificationPermission) = rememberNotificationPermission()
 
     var showDatePicker by remember { mutableStateOf(false) }
-    var restoreHeight by remember {
-        val longVal = prefs.getLong("restore_height", 0L)
-        val strVal = prefs.getString("restore_height_str", "0")?.toLongOrNull() ?: 0L
-        mutableStateOf(if (longVal > 0L) longVal else strVal)
-    }
-    var restoreDateMillis by remember {
-        mutableStateOf(prefs.getLong("restore_date_millis", 0L))
-    }
+    // Restore height/date are per-wallet, from the active WalletInfo.
+    val restoreHeight = activeWallet?.restoreHeight ?: 0L
+    val restoreDateMillis = activeWallet?.restoreDateMillis ?: 0L
 
     val dateFormatter = remember {
         SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).apply {
@@ -347,13 +343,7 @@ fun SyncSettingsScreen(
                     onClick = {
                         datePickerState.selectedDateMillis?.let { dateMillis ->
                             val newHeight = dateToRestoreHeight(dateMillis)
-                            restoreHeight = newHeight
-                            restoreDateMillis = dateMillis
-                            prefs.edit()
-                                .putLong("restore_height", newHeight)
-                                .putLong("restore_date_millis", dateMillis)
-                                .apply()
-                            walletViewModel.setRestoreHeight(newHeight)
+                            walletViewModel.setRestoreHeight(newHeight, dateMillis)
                             walletViewModel.resetSync()
                         }
                         showDatePicker = false
@@ -366,13 +356,7 @@ fun SyncSettingsScreen(
                 TextButton(
                     onClick = {
                         // Clear / scan from beginning
-                        restoreHeight = 0L
-                        restoreDateMillis = 0L
-                        prefs.edit()
-                            .putLong("restore_height", 0L)
-                            .putLong("restore_date_millis", 0L)
-                            .apply()
-                        walletViewModel.setRestoreHeight(0L)
+                        walletViewModel.setRestoreHeight(0L, 0L)
                         walletViewModel.resetSync()
                         showDatePicker = false
                     }

@@ -16,6 +16,8 @@ import io.horizontalsystems.monerokit.SyncState
 import io.horizontalsystems.monerokit.data.Subaddress
 import io.horizontalsystems.monerokit.model.NetworkType
 import io.horizontalsystems.monerokit.model.TransactionInfo
+import io.horizontalsystems.monerokit.toElectrum
+import io.horizontalsystems.monerokit.util.Helper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -23,8 +25,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.model.CurrentPrice
@@ -33,6 +38,7 @@ import one.monero.moneroone.widget.PriceWidget
 import one.monero.moneroone.widget.WalletWidget
 import one.monero.moneroone.widget.WidgetDataStore
 import timber.log.Timber
+import java.io.File
 import java.math.BigDecimal
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -68,9 +74,21 @@ sealed class SendState {
     data class Error(val message: String) : SendState()
 }
 
+class DuplicateWalletException(val existingName: String) :
+    Exception("This wallet is already added as \"$existingName\"")
+
+class InvalidSeedException :
+    Exception("Invalid seed phrase. Check the words and try again.")
+
+/** The kit could not create/open the wallet for a seed that passed validation. */
+class WalletOpenException(message: String) : Exception(message)
+
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context = application.applicationContext
+
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
 
     private val _walletState = MutableStateFlow(WalletState())
     val walletState: StateFlow<WalletState> = _walletState.asStateFlow()
@@ -83,7 +101,39 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _pin = MutableStateFlow<String?>(null)
 
-    private var walletId: String? = null
+    // --- Multi-wallet state ---
+
+    private val _wallets = MutableStateFlow<List<WalletInfo>>(emptyList())
+    val wallets: StateFlow<List<WalletInfo>> = _wallets.asStateFlow()
+
+    private val _activeWallet = MutableStateFlow<WalletInfo?>(null)
+    val activeWallet: StateFlow<WalletInfo?> = _activeWallet.asStateFlow()
+
+    /**
+     * Epoch token bumped on every active-wallet change. Key the per-wallet UI
+     * subtree on this so no stale per-wallet state survives a switch.
+     */
+    private val _walletSessionId = MutableStateFlow(0L)
+    val walletSessionId: StateFlow<Long> = _walletSessionId.asStateFlow()
+
+    /**
+     * Depth counter of open add-wallet-flow screens; suppresses auto-lock
+     * while > 0. A counter (not a boolean) because during navigation
+     * transitions the incoming screen composes before the outgoing one
+     * disposes — a boolean would be reset to false by the outgoing screen.
+     */
+    private val _addWalletFlowDepth = MutableStateFlow(0)
+    val addWalletFlowActive: StateFlow<Boolean>
+        get() = _addWalletFlowActiveView
+    private val _addWalletFlowActiveView = MutableStateFlow(false)
+
+    /**
+     * Serializes every wallet lifecycle transition (switch / add / delete /
+     * reset / refresh / node change / unlock-open). Two transitions
+     * interleaving their kit teardown + reopen leaves the kit slot and
+     * [_walletState] divergent (M1).
+     */
+    private val walletMutationMutex = Mutex()
 
     // Price data
     private val priceRepository = PriceRepository()
@@ -100,7 +150,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _sendState = MutableStateFlow<SendState>(SendState.Idle)
     val sendState: StateFlow<SendState> = _sendState.asStateFlow()
 
-    // Encrypted storage for seed
+    // Encrypted storage for seeds + per-wallet PIN hashes
     private val encryptedPrefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -115,9 +165,21 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
+    private val store by lazy { WalletStore(prefs) }
+    private val secrets by lazy { WalletSecrets(encryptedPrefs) }
+
     init {
         loadSelectedCurrency()
-        checkExistingWallet()
+        try {
+            WalletMigration.migrateIfNeeded(prefs, secrets, store)
+        } catch (e: Exception) {
+            // Keystore/EncryptedSharedPreferences failures must not crash the
+            // constructor into a loop; migration is idempotent and will be
+            // retried next launch.
+            Timber.e(e, "Wallet migration failed; continuing with existing state")
+        }
+        loadWalletsFromStore()
+        cleanOrphanedWalletCaches()
         // Defer price fetch until a wallet exists. Avoids leaking IP to
         // monero.one before the user has generated/restored a key.
         if (_walletState.value.hasWallet) {
@@ -126,14 +188,126 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         checkAndApplyAutoLock()
     }
 
+    // =========================================================================
+    // Store loading / orphan sweep
+    // =========================================================================
+
+    private fun loadWalletsFromStore() {
+        var list = store.wallets()
+
+        // Stale onboarding cleanup: a wallet row without a stored seed, or a
+        // store where no wallet has a PIN hash yet (crash mid-onboarding),
+        // cannot be unlocked — clear it so the user can start fresh.
+        // Guarded: a keystore/EncryptedSharedPreferences read failure must
+        // NOT crash the constructor or be mistaken for "no seeds stored" —
+        // that would wipe live rows. Skip cleanup for this launch instead.
+        try {
+            val withSeeds = list.filter { secrets.hasSeed(it.id) }
+            if (withSeeds.size != list.size) {
+                Timber.w("Clearing ${list.size - withSeeds.size} wallet row(s) without stored seed")
+                list.filterNot { secrets.hasSeed(it.id) }.forEach { secrets.deleteWalletSecrets(it.id) }
+                store.saveWallets(withSeeds)
+                list = withSeeds
+            }
+            if (list.isNotEmpty() && !store.hasUndecodableRows() &&
+                list.none { secrets.pinHash(it.id) != null }
+            ) {
+                Timber.w("Clearing wallet store: no wallet has a PIN hash (incomplete onboarding)")
+                list.forEach { secrets.deleteWalletSecrets(it.id) }
+                store.deleteAll()
+                list = emptyList()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Secret store unreadable; skipping onboarding cleanup this launch")
+        }
+
+        _wallets.value = list
+        val active = list.firstOrNull { it.id == store.activeWalletId() } ?: list.firstOrNull()
+        _activeWallet.value = active
+        if (active != null && active.id != store.activeWalletId()) {
+            store.setActiveWalletId(active.id)
+        }
+        refreshHasWallet()
+        active?.let { paintCachedState(it) }
+    }
+
+    private fun refreshHasWallet() {
+        val list = _wallets.value
+        val has = list.isNotEmpty() && list.any {
+            runCatching { secrets.pinHash(it.id) }.getOrNull() != null
+        }
+        _walletState.update { it.copy(hasWallet = has) }
+    }
+
+    /** Paint cached balance/address so the UI is instant before unlock/sync. */
+    private fun paintCachedState(info: WalletInfo) {
+        _walletState.update {
+            it.copy(
+                balance = Balance(info.cachedBalance ?: 0L, info.cachedUnlockedBalance ?: 0L),
+                receiveAddress = info.cachedPrimaryAddress ?: ""
+            )
+        }
+    }
+
+    /**
+     * Launch sweep of orphaned wallet cache files (port of iOS
+     * `cleanOrphanedWalletCaches`). Runs once at startup, after migration.
+     * Bails entirely when any wallet's cache id is unresolved.
+     */
+    private fun cleanOrphanedWalletCaches() {
+        if (!store.migrated) return
+        // Rows this build cannot decode (a newer build's rows, a damaged
+        // value) have unknown cache ids: nothing on disk can be proven
+        // orphaned, so sweep nothing.
+        val undecodable = try { store.hasUndecodableRows() } catch (e: Exception) { true }
+        if (undecodable) {
+            Timber.w("Orphan cache sweep skipped: wallet store has undecodable rows")
+            return
+        }
+        val list = _wallets.value
+        // A legacy single wallet whose prefs still exist (fragments the
+        // migration refused to wipe) owns its UUID cache; never sweep it.
+        val legacyCacheId = WalletMigration.legacyCacheId(prefs)
+        val knownIds = (list.mapNotNull { it.derivedWalletId } +
+            list.mapNotNull { it.deviceWalletId } +
+            listOfNotNull(legacyCacheId)).toSet()
+        val allKnown = list.all { it.derivedWalletId != null || it.deviceWalletId != null }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val root = Helper.getWalletRoot(context)
+                val entries = root.listFiles()?.map { it.name } ?: return@launch
+                val orphans = WalletCacheIds.orphanedCacheBaseNames(entries, knownIds, allKnown)
+                orphans.forEach { name ->
+                    Timber.i("Sweeping orphaned wallet cache: $name")
+                    deleteWalletFiles(name)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Orphan cache sweep failed")
+            }
+        }
+    }
+
+    /**
+     * Delete every file wallet2 writes for one cache id. MoneroKit.deleteWallet
+     * covers the cache, `.keys` and `.address.txt`; wallet2 also drops a
+     * `<id>.unportable` marker next to the cache on store().
+     */
+    private fun deleteWalletFiles(cacheId: String) {
+        MoneroKit.deleteWallet(context, cacheId)
+        runCatching { File(Helper.getWalletRoot(context), "$cacheId.unportable").delete() }
+    }
+
+    // =========================================================================
+    // Currency / price
+    // =========================================================================
+
     private fun loadSelectedCurrency() {
-        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         val currencyCode = prefs.getString("selected_currency", Currency.USD.code)
         _selectedCurrency.value = Currency.entries.find { it.code == currencyCode } ?: Currency.USD
     }
 
     fun checkAndApplyAutoLock() {
-        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         val backgroundTimestamp = prefs.getLong("background_timestamp", 0)
         if (backgroundTimestamp == 0L) return
 
@@ -142,6 +316,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
         // Clear timestamp so we don't re-check
         prefs.edit().remove("background_timestamp").apply()
+
+        // Suppress auto-lock while the add-wallet flow is open (iOS parity).
+        if (_addWalletFlowDepth.value > 0) return
 
         val shouldLock = when {
             timeoutSeconds == 0 -> true    // IMMEDIATE
@@ -152,6 +329,19 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         if (shouldLock) {
             Timber.d("Auto-lock triggered: elapsed=${elapsedSeconds}s, timeout=${timeoutSeconds}s")
             _isLocked.value = true
+        }
+    }
+
+    fun setAddWalletFlowActive(active: Boolean) {
+        _addWalletFlowDepth.update { (it + if (active) 1 else -1).coerceAtLeast(0) }
+        val open = _addWalletFlowDepth.value > 0
+        _addWalletFlowActiveView.value = open
+        if (!open) {
+            // Add-wallet flow fully closed (completed OR abandoned). A seed
+            // generated for a wallet that was never created must not survive —
+            // a stale pendingSeed would otherwise be served by getSeedPhrase()
+            // and end up "backed up" as an existing wallet's seed.
+            _pendingSeed.value = null
         }
     }
 
@@ -214,136 +404,195 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             _currentPrice.value = null
             _selectedCurrency.value = currency
             // Persist to SharedPreferences so selection survives app restart
-            context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-                .edit()
-                .putString("selected_currency", currency.code)
-                .apply()
+            prefs.edit().putString("selected_currency", currency.code).apply()
         } else if (currency != null) {
             _selectedCurrency.value = currency
             // Also persist even if same currency (defensive)
-            context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-                .edit()
-                .putString("selected_currency", currency.code)
-                .apply()
+            prefs.edit().putString("selected_currency", currency.code).apply()
         }
         fetchPrice()
     }
 
-    private fun checkExistingWallet() {
-        // Check if wallet exists in secure storage
-        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-        val existingWalletId = prefs.getString("wallet_id", null)
-        val hasPin = readPinHash() != null
-        val hasEncryptedSeed = encryptedPrefs.getString("seed_words", null) != null
-
-        if (existingWalletId != null && hasPin && hasEncryptedSeed) {
-            walletId = existingWalletId
-            _walletState.update { it.copy(hasWallet = true) }
-        } else if (existingWalletId != null && hasPin && !hasEncryptedSeed) {
-            // Stale state: wallet_id and PIN exist but no encrypted seed
-            // This can happen if app was updated or seed was never stored
-            // Clear the stale state to allow user to restore wallet
-            Timber.w("Clearing stale wallet state: wallet_id and PIN exist but no encrypted seed found")
-            prefs.edit().remove("wallet_id").apply()
-            encryptedPrefs.edit().remove("pin_hash").apply()
-        } else if (existingWalletId != null && !hasPin) {
-            // Stale state: wallet_id exists but PIN was never set (incomplete onboarding)
-            // Clear the wallet_id to allow fresh onboarding
-            Timber.w("Clearing stale wallet state: wallet_id exists but no PIN was set")
-            prefs.edit().remove("wallet_id").apply()
-        }
-    }
-
-    private fun storeSeedEncrypted(seed: List<String>, seedType: SeedType) {
-        encryptedPrefs.edit()
-            .putString("seed_words", seed.joinToString(" "))
-            .putString("seed_type", seedType.name)
-            .apply()
-    }
-
-    private fun loadSeedEncrypted(): Pair<List<String>, SeedType>? {
-        val seedWords = encryptedPrefs.getString("seed_words", null) ?: return null
-        val seedTypeName = encryptedPrefs.getString("seed_type", null) ?: return null
-
-        return try {
-            val words = seedWords.split(" ")
-            val type = SeedType.valueOf(seedTypeName)
-            Pair(words, type)
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to load encrypted seed")
-            null
-        }
-    }
+    // =========================================================================
+    // Kit lifecycle
+    // =========================================================================
 
     fun unlockWithBiometrics() {
         _isLocked.value = false
-        initializeWalletIfNeeded()
+        viewModelScope.launch { walletMutationMutex.withLock { openActiveWallet() } }
     }
 
-    private fun initializeWalletIfNeeded() {
-        Timber.d("initializeWalletIfNeeded: kit=${WalletManager.kit != null}, walletId=$walletId")
-
-        // If kit is already initialized, just start it
-        if (WalletManager.kit != null) {
-            Timber.d("MoneroKit already initialized, starting wallet")
-            startWallet()
+    /**
+     * Open (or resume) the kit for the active wallet. The cache id used to
+     * open is ALWAYS the wallet's persisted derivedWalletId — derived and
+     * persisted through the single shared function if missing (lockstep).
+     */
+    private suspend fun openActiveWallet(healed: Boolean = false) {
+        val active = _activeWallet.value ?: run {
+            Timber.w("openActiveWallet: no active wallet")
             return
         }
 
-        // Need to reinitialize the wallet from encrypted seed
-        val savedWalletId = walletId ?: run {
-            Timber.w("No walletId found, cannot reinitialize wallet")
-            return
-        }
-        val seedData = loadSeedEncrypted() ?: run {
-            Timber.w("No encrypted seed found, cannot reinitialize wallet")
+        val seedData = secrets.loadSeed(active.id) ?: run {
+            Timber.w("openActiveWallet: no stored seed for wallet ${active.id}")
             return
         }
 
-        viewModelScope.launch {
-            try {
-                _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
-
-                val (seedWords, seedType) = seedData
-                val node = getSelectedNode()
-                val networkType = NetworkType.NetworkType_Mainnet
-                Timber.d("initializeWalletIfNeeded: Connecting to node=$node, seedType=$seedType, networkType=$networkType")
-
-                val moneroSeed = when (seedType) {
-                    SeedType.ELECTRUM_25 -> Seed.Electrum(seedWords, "")
-                    SeedType.BIP39_24 -> Seed.Bip39(seedWords, "")
-                }
-
-                val kit = WalletManager.initialize(
-                    context = context,
-                    seed = moneroSeed,
-                    restoreDateOrHeight = "0", // Wallet files exist, height from files
-                    walletId = savedWalletId,
-                    node = node,
-                    trustNode = false,
-                    networkType = networkType
+        var info = active
+        if (info.derivedWalletId == null) {
+            // Legacy row without an id: derive + persist BEFORE opening.
+            info = mergeWalletUpdate(active.id) {
+                it.copy(
+                    derivedWalletId = it.derivedWalletId
+                        ?: WalletCacheIds.derivedWalletId(seedData.first, it.syncResetCount)
                 )
+            } ?: return
+            Timber.i("Populated missing derivedWalletId for wallet ${info.id}")
+        }
+        val cacheId = info.derivedWalletId!!
 
-                setupKitObservers()
-
-                _walletState.update {
-                    it.copy(receiveAddress = kit.receiveAddress)
+        // Kit already held for this exact wallet (lock/unlock, or a fresh
+        // ViewModel after the Activity was recreated while the process lived):
+        // (re)start it. A fresh VM has NO collectors on that kit — attach them
+        // and repaint from the kit's live values, or the UI stays frozen on
+        // the cached snapshot for good (the drop(1) collectors skip current values).
+        WalletManager.kit?.let { running ->
+            if (WalletManager.currentWalletId == cacheId) {
+                if (observedKit !== running) {
+                    setupKitObservers(running)
+                    val liveSync = running.syncStateFlow.value
+                    val notStarted = liveSync is SyncState.NotSynced &&
+                        liveSync.error is MoneroKit.SyncError.NotStarted
+                    _walletState.update {
+                        it.copy(
+                            balance = running.balance,
+                            transactions = running.allTransactionsFlow.value,
+                            receiveAddress = running.receiveAddress.ifEmpty { it.receiveAddress },
+                            syncState = if (notStarted) SyncState.Connecting(waiting = false) else liveSync
+                        )
+                    }
                 }
-
-                Timber.d("initializeWalletIfNeeded: Starting kit")
                 WalletManager.start()
+                return
+            }
+        }
 
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to reinitialize wallet")
-                _walletState.update {
-                    it.copy(
-                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                        error = e.message
-                    )
-                }
+        try {
+            _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
+
+            val (seedWords, seedType) = seedData
+            val node = getSelectedNode()
+            Timber.d("openActiveWallet: wallet=${info.id} cacheId=$cacheId node=$node seedType=$seedType")
+
+            val kit = WalletManager.initialize(
+                context = context,
+                seed = moneroSeed(seedWords, seedType),
+                restoreDateOrHeight = info.restoreHeight.toString(),
+                walletId = cacheId,
+                node = node,
+                trustNode = false,
+                networkType = NetworkType.NetworkType_Mainnet
+            )
+
+            setupKitObservers(kit)
+
+            _walletState.update { it.copy(receiveAddress = kit.receiveAddress) }
+
+            WalletManager.start()
+
+            // An unloadable cache (process killed mid-store, downgrade to an
+            // older wallet2, disk damage) used to leave the wallet on
+            // "Not connected" for good; the keys/seed are intact, so rebuild
+            // the cache from the seed once (in-session heal, iOS parity).
+            val startState = kit.syncStateFlow.value
+            if (!healed && startState is SyncState.NotSynced && isUnloadableCacheError(startState.error)) {
+                Timber.w("openActiveWallet: cache $cacheId failed to load; rebuilding it from the seed")
+                cancelKitObservers()
+                WalletManager.stopAndRelease()
+                withContext(Dispatchers.IO) { deleteWalletFiles(cacheId) }
+                openActiveWallet(healed = true)
+                return
+            }
+
+            ensureUserSubaddresses(info, kit)
+            val primary = persistPrimaryAddress(kit)
+            failClosedOnNullKey(primary)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to open wallet")
+            _walletState.update {
+                it.copy(
+                    syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                    error = e.message
+                )
             }
         }
     }
+
+    private fun moneroSeed(words: List<String>, type: SeedType): Seed = when (type) {
+        SeedType.ELECTRUM_25 -> Seed.Electrum(words, "")
+        SeedType.BIP39_24 -> Seed.Bip39(words, "")
+    }
+
+    /** Re-create user-created subaddresses after a cache rebuild (iOS parity). */
+    private suspend fun ensureUserSubaddresses(info: WalletInfo, kit: MoneroKit) {
+        val maxIdx = info.userCreatedSubaddressIndices.maxOrNull() ?: return
+        withContext(Dispatchers.IO) {
+            try {
+                var count = kit.getSubaddresses().size
+                while (count <= maxIdx) {
+                    kit.createSubaddress() ?: break
+                    count++
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "ensureUserSubaddresses failed")
+            }
+        }
+    }
+
+    /** Cache the primary (index 0) address for instant display on switch. */
+    private suspend fun persistPrimaryAddress(kit: MoneroKit): String? {
+        val primary = withContext(Dispatchers.IO) {
+            runCatching { kit.getSubaddresses().firstOrNull()?.address }.getOrNull()
+        } ?: return null
+        val active = _activeWallet.value ?: return primary
+        mergeWalletUpdate(active.id) { it.copy(cachedPrimaryAddress = primary) }
+        return primary
+    }
+
+    /**
+     * A wallet whose primary address carries a null (all-zero) spend key is a
+     * burn address: anything received there is unspendable. New wallets are
+     * rejected up front by [SeedValidation]; for a pre-existing row, refuse to
+     * advertise the address and say why (fail closed, iOS parity).
+     */
+    private fun failClosedOnNullKey(primary: String?) {
+        if (primary == null || SeedValidation.isPlausiblePrimaryAddress(primary)) return
+        Timber.e("Active wallet has a null-key/malformed primary address; hiding it")
+        _walletState.update {
+            it.copy(
+                receiveAddress = "",
+                error = "This wallet's keys are invalid (null spend key). Do not receive funds with it."
+            )
+        }
+    }
+
+    /**
+     * Kit start failures that are about the WALLET (seed recovery/creation,
+     * unreadable cache), not the node. These must never trigger node
+     * failover, and during an add they mean the add failed.
+     */
+    private fun isWalletLevelStartError(error: Throwable): Boolean {
+        val message = error.message ?: return false
+        return when (error) {
+            is MoneroKit.SyncError.StartError -> message.startsWith("Wallet recovery error")
+            is MoneroKit.SyncError.InvalidNode -> message == "Invalid wallet"
+            else -> false
+        }
+    }
+
+    /** The kit found wallet files but wallet2 could not load them (openWallet returned null). */
+    private fun isUnloadableCacheError(error: Throwable): Boolean =
+        error is MoneroKit.SyncError.InvalidNode && error.message == "Invalid wallet"
 
     fun generateNewSeed(seedType: SeedType): List<String> {
         val mnemonic = Mnemonic()
@@ -365,148 +614,501 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return words
     }
 
-    fun createWallet(seed: List<String>, seedType: SeedType) {
+    fun nextWalletName(): String = WalletStore.nextWalletName(_wallets.value.map { it.name })
+
+    /**
+     * Create a new wallet from a fresh seed. Returns true on success.
+     * Rejects duplicate seeds by derived cache id.
+     */
+    suspend fun createWallet(
+        seed: List<String>,
+        seedType: SeedType,
+        name: String? = null,
+        emoji: String = "💰"
+    ): Boolean = addWalletInternal(
+        seed = seed,
+        seedType = seedType,
+        name = name,
+        emoji = emoji,
+        restoreHeight = MoneroKit.restoreHeightForNewWallet(),
+        restoreDateMillis = System.currentTimeMillis()
+    )
+
+    /**
+     * Restore a wallet from an existing seed. Returns true on success.
+     */
+    suspend fun restoreWallet(
+        seed: List<String>,
+        restoreHeight: String?,
+        restoreDateMillis: Long? = null,
+        name: String? = null,
+        emoji: String = "💰"
+    ): Boolean {
+        // Normalize: the same seed typed with different casing/whitespace must
+        // derive the same cache id (dedupe) and convert cleanly.
+        val normalized = seed.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        val seedType = when (normalized.size) {
+            25 -> SeedType.ELECTRUM_25
+            24 -> SeedType.BIP39_24
+            else -> {
+                _walletState.update {
+                    it.copy(error = "Invalid seed word count: ${normalized.size}. Only 24 (BIP39) or 25 (Monero legacy) words supported.")
+                }
+                return false
+            }
+        }
+        return addWalletInternal(
+            seed = normalized,
+            seedType = seedType,
+            name = name,
+            emoji = emoji,
+            restoreHeight = restoreHeight?.toLongOrNull() ?: 0L,
+            restoreDateMillis = restoreDateMillis ?: 0L
+        )
+    }
+
+    private suspend fun addWalletInternal(
+        seed: List<String>,
+        seedType: SeedType,
+        name: String?,
+        emoji: String,
+        restoreHeight: Long,
+        restoreDateMillis: Long
+    ): Boolean = walletMutationMutex.withLock {
+        val previousActive = _activeWallet.value
+        var persisted: WalletInfo? = null
+        try {
+            _walletState.update { it.copy(isInitializing = true, error = null) }
+
+            // Duplicate-seed rejection against EVERY row's base derivation —
+            // stored id equality alone misses migrated (legacy UUID id) and
+            // reset (sha(seed+N)) wallets.
+            val derived = WalletCacheIds.derivedWalletId(seed, 0)
+            WalletCacheIds.findWalletWithSeed(seed, _wallets.value) { id ->
+                secrets.loadSeed(id)?.first
+            }?.let { throw DuplicateWalletException(it.name) }
+
+            // Validate + convert the seed BEFORE anything is persisted or the
+            // running kit is touched: BIP39 checksum, Electrum wordlist +
+            // checksum word, non-null derived keys and a plausible primary
+            // address. A typo'd or degenerate seed must fail here, not after
+            // the wallet is stored as active (and never as a burn address).
+            val kitSeed = try {
+                withContext(Dispatchers.Default) { SeedValidation.validate(seed, seedType) }.electrum
+            } catch (e: InvalidSeedException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "addWallet: seed validation failed")
+                throw InvalidSeedException()
+            }
+
+            // Snapshot the outgoing wallet's live data before switching away.
+            snapshotActiveWalletCache()
+
+            val info = WalletInfo(
+                id = UUID.randomUUID().toString(),
+                name = name?.trim().takeUnless { it.isNullOrEmpty() } ?: nextWalletName(),
+                emoji = emoji.ifEmpty { "💰" },
+                source = WalletSource.fromSeedType(seedType),
+                createdAt = System.currentTimeMillis(),
+                restoreHeight = restoreHeight,
+                restoreDateMillis = restoreDateMillis,
+                derivedWalletId = derived
+            )
+            Timber.d("addWallet: id=${info.id} cacheId=$derived name=${info.name} height=$restoreHeight")
+
+            // Secrets first, then store (a row without a seed is cleaned at launch).
+            secrets.saveSeed(info.id, seed, seedType)
+            // One app-wide PIN: 2nd+ wallets inherit the existing hash.
+            existingPinHash()?.let { secrets.savePinHash(info.id, it) }
+
+            store.addWallet(info)
+            store.setActiveWalletId(info.id)
+            _wallets.value = store.wallets()
+            _activeWallet.value = info
+            _walletSessionId.value += 1
+            persisted = info
+
+            cancelKitObservers()
+
+            val kit = WalletManager.initialize(
+                context = context,
+                seed = kitSeed,
+                restoreDateOrHeight = restoreHeight.toString(),
+                walletId = derived,
+                node = getSelectedNode(),
+                trustNode = false,
+                networkType = NetworkType.NetworkType_Mainnet
+            )
+
+            setupKitObservers(kit)
+            refreshHasWallet()
+
+            _walletState.update {
+                it.copy(
+                    isInitializing = false,
+                    balance = Balance(0, 0),
+                    transactions = emptyList(),
+                    receiveAddress = kit.receiveAddress,
+                    error = null
+                )
+            }
+
+            _pendingSeed.value = null
+
+            WalletManager.start()
+            // Second line of defense: the kit reports a wallet-level failure
+            // (recovery/creation error) through its sync state, not an
+            // exception. Treat it as a failed add so the row is rolled back
+            // instead of persisting a wallet that can never open.
+            val startState = kit.syncStateFlow.value
+            if (startState is SyncState.NotSynced && isWalletLevelStartError(startState.error)) {
+                throw WalletOpenException(startState.error.message ?: "Wallet could not be created")
+            }
+            persistPrimaryAddress(kit)
+            return true
+        } catch (e: DuplicateWalletException) {
+            Timber.w("addWallet rejected: duplicate of ${e.existingName}")
+            _walletState.update { it.copy(isInitializing = false, error = e.message) }
+            return false
+        } catch (e: InvalidSeedException) {
+            // Expected user error (nothing was persisted): no stack trace.
+            Timber.w("addWallet rejected: invalid seed")
+            _walletState.update { it.copy(isInitializing = false, error = e.message) }
+            return false
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to add wallet")
+            // Roll back cleanly: remove the half-added wallet and put the
+            // previous active wallet back in charge (its kit was already torn
+            // down by WalletManager.initialize, so reopen it).
+            persisted?.let { rollbackFailedAdd(it, previousActive) }
+            _walletState.update {
+                it.copy(isInitializing = false, error = e.message ?: "Failed to create wallet")
+            }
+            return false
+        }
+    }
+
+    /**
+     * Undo a wallet add that failed after persisting: wipe the new row's
+     * secrets + store entry, restore the previous active wallet, and reopen
+     * its kit so the session keeps running (H1: an invalid restore must not
+     * brick the session or steal active).
+     */
+    private suspend fun rollbackFailedAdd(added: WalletInfo, previous: WalletInfo?) {
+        Timber.w("Rolling back failed wallet add ${added.id} (${added.name})")
+        try {
+            // A wallet-level start error may already have scheduled a node
+            // failover; it belongs to the failed row, not the one we restore.
+            failoverJob?.cancel()
+            failoverAttempts = 0
+            cancelKitObservers()
+            WalletManager.stopAndRelease()
+            added.derivedWalletId?.let { id ->
+                // Never touch another row's files (the dup check guarantees uniqueness).
+                if (store.wallets().none { it.id != added.id && it.derivedWalletId == id }) {
+                    withContext(Dispatchers.IO) { deleteWalletFiles(id) }
+                }
+            }
+            secrets.deleteWalletSecrets(added.id)
+            store.removeWallet(added.id)
+            store.setActiveWalletId(previous?.id)
+            val list = store.wallets()
+            _wallets.value = list
+            val prev = previous?.let { p -> list.firstOrNull { it.id == p.id } }
+            _activeWallet.value = prev
+            _walletSessionId.value += 1
+            refreshHasWallet()
+            if (prev != null) {
+                paintCachedState(prev)
+                openActiveWallet()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "rollbackFailedAdd failed")
+        }
+    }
+
+    private fun existingPinHash(): String? {
+        _wallets.value.forEach { w ->
+            secrets.pinHash(w.id)?.let { return it }
+        }
+        return null
+    }
+
+    // =========================================================================
+    // Two-phase instant switch (iOS 2dc6eb7 port)
+    // =========================================================================
+
+    fun switchWallet(id: String) {
+        val outgoing = _activeWallet.value
+        if (outgoing?.id == id) return
+        val target = _wallets.value.firstOrNull { it.id == id } ?: return
+        // Any lifecycle transition in flight (another switch, delete, reset,
+        // node change, add): drop the tap instead of interleaving.
+        if (!walletMutationMutex.tryLock()) return
+
+        // ---- Phase 1: synchronous repaint under the new identity ----
+        val oldKit = WalletManager.kit
+        val outgoingBalance = oldKit?.balance
+
+        // Cancel old collectors BEFORE anything async — the old wallet must
+        // not republish into the new wallet's UI, even for a frame.
+        cancelKitObservers()
+        failoverJob?.cancel()
+        failoverAttempts = 0
+
+        _activeWallet.value = target
+        store.setActiveWalletId(target.id)
+        _walletState.update {
+            it.copy(
+                balance = Balance(target.cachedBalance ?: 0L, target.cachedUnlockedBalance ?: 0L),
+                receiveAddress = target.cachedPrimaryAddress ?: "",
+                transactions = emptyList(),
+                subaddresses = emptyList(),
+                syncState = SyncState.Connecting(waiting = false),
+                error = null
+            )
+        }
+        // No in-memory seed may survive the switch.
+        _pendingSeed.value = null
+        _walletSessionId.value += 1
+
+        // Widget shows the new active wallet's cached data immediately.
+        WidgetDataStore.saveBalance(context, target.cachedBalance ?: 0L, target.cachedUnlockedBalance ?: 0L)
+        WidgetDataStore.saveSyncStatus(context, "connecting")
+        WalletWidget.updateAll(context)
+
+        // ---- Phase 2: async persist outgoing + full teardown + reopen ----
         viewModelScope.launch {
             try {
-                _walletState.update { it.copy(isInitializing = true, error = null) }
-
-                val newWalletId = UUID.randomUUID().toString()
-                val restoreHeight = MoneroKit.restoreHeightForNewWallet().toString()
-                val node = getSelectedNode()
-                val networkType = NetworkType.NetworkType_Mainnet
-                Timber.d("createWallet: walletId=$newWalletId, restoreHeight=$restoreHeight, node=$node, seedType=$seedType, networkType=$networkType")
-
-                val moneroSeed = Seed.Bip39(seed, "")
-
-                val kit = WalletManager.initialize(
-                    context = context,
-                    seed = moneroSeed,
-                    restoreDateOrHeight = restoreHeight,
-                    walletId = newWalletId,
-                    node = node,
-                    trustNode = false,
-                    networkType = networkType
-                )
-
-                walletId = newWalletId
-
-                // Save wallet ID and restore height (both keys)
-                val restoreHeightLong = restoreHeight.toLongOrNull() ?: 0L
-                context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-                    .edit()
-                    .putString("wallet_id", newWalletId)
-                    .putString("restore_height_str", restoreHeight)
-                    .putLong("restore_height", restoreHeightLong)
-                    .putLong("restore_date_millis", System.currentTimeMillis())
-                    .apply()
-
-                // Store seed encrypted for wallet restoration on app restart
-                storeSeedEncrypted(seed, SeedType.BIP39_24)
-
-                setupKitObservers()
-
-                _walletState.update {
-                    it.copy(
-                        isInitializing = false,
-                        receiveAddress = kit.receiveAddress
-                    )
+                if (outgoing != null && oldKit != null && outgoingBalance != null) {
+                    val primary = withContext(Dispatchers.IO) {
+                        runCatching { oldKit.getSubaddresses().firstOrNull()?.address }.getOrNull()
+                    }
+                    // Merge cached fields onto the freshest row — writing the
+                    // captured copy back would revert a concurrent rename etc.
+                    mergeWalletUpdate(outgoing.id) {
+                        it.copy(
+                            cachedBalance = outgoingBalance.all,
+                            cachedUnlockedBalance = outgoingBalance.unlocked,
+                            cachedPrimaryAddress = primary ?: it.cachedPrimaryAddress
+                        )
+                    }
                 }
-
-                Timber.d("createWallet: Wallet created successfully")
-
-                WalletManager.start()
-
+                // KitManager allows exactly one running kit — await teardown
+                // before opening the new wallet.
+                WalletManager.stopAndRelease()
+                openActiveWallet()
             } catch (e: Exception) {
-                Timber.e(e, "Failed to create wallet")
-                _walletState.update {
-                    it.copy(
-                        isInitializing = false,
-                        error = e.message ?: "Failed to create wallet"
-                    )
-                }
+                Timber.e(e, "switchWallet phase 2 failed")
+                _walletState.update { it.copy(error = e.message) }
+            } finally {
+                walletMutationMutex.unlock()
             }
         }
     }
 
-    fun restoreWallet(seed: List<String>, restoreHeight: String?, restoreDateMillis: Long? = null) {
+    /**
+     * Read-modify-write a wallet row against the FRESH store state (M2):
+     * re-reading right before the write means an update that landed while a
+     * caller was suspended (rename, restore height, subaddress indices) is
+     * never reverted by writing back a stale captured copy.
+     * Returns the resulting row, or null when the wallet no longer exists.
+     */
+    private fun mergeWalletUpdate(id: String, transform: (WalletInfo) -> WalletInfo): WalletInfo? {
+        val row = store.wallets().firstOrNull { it.id == id } ?: return null
+        val updated = transform(row)
+        if (updated != row) {
+            store.updateWallet(updated)
+            _wallets.value = store.wallets()
+            if (_activeWallet.value?.id == id) {
+                _activeWallet.value = updated
+            }
+        }
+        return updated
+    }
+
+    /** Persist live balance/address of the active wallet into the store. */
+    private suspend fun snapshotActiveWalletCache() {
+        val active = _activeWallet.value ?: return
+        val kit = WalletManager.kit ?: return
+        if (WalletManager.currentWalletId != active.derivedWalletId) return
+        val balance = kit.balance
+        val primary = withContext(Dispatchers.IO) {
+            runCatching { kit.getSubaddresses().firstOrNull()?.address }.getOrNull()
+        }
+        // Merge ONLY the cached fields onto the freshest row.
+        mergeWalletUpdate(active.id) {
+            it.copy(
+                cachedBalance = balance.all,
+                cachedUnlockedBalance = balance.unlocked,
+                cachedPrimaryAddress = primary ?: it.cachedPrimaryAddress
+            )
+        }
+    }
+
+    // =========================================================================
+    // Rename / delete
+    // =========================================================================
+
+    fun renameWallet(id: String, name: String, emoji: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        mergeWalletUpdate(id) { it.copy(name = trimmed, emoji = emoji.ifEmpty { it.emoji }) }
+    }
+
+    /**
+     * Delete one wallet: per-wallet secret wipe + store removal + cancel all
+     * per-wallet work. The cache files are intentionally LEFT on disk for the
+     * next launch sweep (iOS parity). Auto-switches to the first remaining
+     * wallet, or falls back to Welcome when none remain.
+     */
+    fun deleteWallet(id: String) {
+        val target = _wallets.value.firstOrNull { it.id == id } ?: return
+        val wasActive = _activeWallet.value?.id == id
+        Timber.i("deleteWallet: ${target.id} (${target.name}), active=$wasActive")
+
         viewModelScope.launch {
-            try {
-                _walletState.update { it.copy(isInitializing = true, error = null) }
+            walletMutationMutex.withLock { deleteWalletLocked(id, wasActive) }
+        }
+    }
 
-                val newWalletId = UUID.randomUUID().toString()
-                val height = restoreHeight ?: "0"
-                val node = getSelectedNode()
-                val networkType = NetworkType.NetworkType_Mainnet
-                Timber.d("restoreWallet: walletId=$newWalletId, restoreHeight=$height, node=$node, seedWordCount=${seed.size}, networkType=$networkType")
+    private suspend fun deleteWalletLocked(id: String, wasActive: Boolean) {
+        // Cancel per-wallet work first so nothing fires against the next wallet.
+        if (wasActive) {
+            cancelKitObservers()
+            failoverJob?.cancel()
+            failoverAttempts = 0
+        }
 
-                val moneroSeed = when (seed.size) {
-                    25 -> Seed.Electrum(seed, "")
-                    24 -> Seed.Bip39(seed, "")
-                    else -> throw IllegalArgumentException("Invalid seed word count: ${seed.size}. Only 24 (BIP39) or 25 (Monero legacy) words supported.")
-                }
+        secrets.deleteWalletSecrets(id)
+        store.removeWallet(id)
+        prefs.edit().remove("wallet.$id.selected_address_index").apply()
+        val remaining = store.wallets()
+        _wallets.value = remaining
 
-                val kit = WalletManager.initialize(
-                    context = context,
-                    seed = moneroSeed,
-                    restoreDateOrHeight = height,
-                    walletId = newWalletId,
-                    node = node,
-                    trustNode = false,
-                    networkType = networkType
+        if (!wasActive) {
+            refreshHasWallet()
+            return
+        }
+
+        WalletManager.clear()
+
+        val next = remaining.firstOrNull()
+        if (next != null) {
+            store.setActiveWalletId(next.id)
+            _activeWallet.value = next
+            _walletState.update {
+                it.copy(
+                    balance = Balance(next.cachedBalance ?: 0L, next.cachedUnlockedBalance ?: 0L),
+                    receiveAddress = next.cachedPrimaryAddress ?: "",
+                    transactions = emptyList(),
+                    subaddresses = emptyList(),
+                    syncState = SyncState.Connecting(waiting = false),
+                    error = null
                 )
+            }
+            _walletSessionId.value += 1
+            refreshHasWallet()
+            openActiveWallet()
+        } else {
+            store.setActiveWalletId(null)
+            _activeWallet.value = null
+            _pendingSeed.value = null
+            _pin.value = null
+            _isLocked.value = false
+            _walletSessionId.value += 1
+            _walletState.value = WalletState(hasWallet = false)
+        }
+    }
 
-                walletId = newWalletId
+    /**
+     * Full local wipe of ALL wallets (PIN brute-force protection / "Forgot
+     * PIN"). Wallet caches are deleted immediately. Global app settings
+     * (theme, currency, nodes, auto-lock) are PRESERVED.
+     */
+    fun removeWallet() {
+        // NonCancellable: this runs while the UI navigates away, and a half-done
+        // wipe (kit stopped, seed still on disk) is worse than either outcome.
+        viewModelScope.launch(NonCancellable) {
+            walletMutationMutex.withLock { removeWalletLocked() }
+        }
+    }
 
-                // Save wallet ID and restore height (both keys)
-                val heightLong = height.toLongOrNull() ?: 0L
-                context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+    private suspend fun removeWalletLocked() {
+        run {
+            try {
+                cancelKitObservers()
+                failoverJob?.cancel()
+                WalletManager.clear()
+
+                val all = store.wallets()
+                withContext(Dispatchers.IO) {
+                    all.forEach { w ->
+                        w.derivedWalletId?.let { deleteWalletFiles(it) }
+                    }
+                }
+                all.forEach { secrets.deleteWalletSecrets(it.id) }
+                prefs.edit().apply {
+                    all.forEach { remove("wallet.${it.id}.selected_address_index") }
+                }.apply()
+                store.deleteAll()
+                resetFailedAttempts()
+
+                // Widget cache holds the removed wallets' balance and recent tx hashes.
+                context.getSharedPreferences("monero_widget_data", Context.MODE_PRIVATE)
                     .edit()
-                    .putString("wallet_id", newWalletId)
-                    .putString("restore_height_str", height)
-                    .putLong("restore_height", heightLong)
-                    .putLong("restore_date_millis", restoreDateMillis ?: 0L)
+                    .clear()
                     .apply()
+                WalletWidget.updateAll(context)
 
-                val seedType = when (seed.size) {
-                    25 -> SeedType.ELECTRUM_25
-                    else -> SeedType.BIP39_24
-                }
-                storeSeedEncrypted(seed, seedType)
-
-                setupKitObservers()
-
-                _walletState.update {
-                    it.copy(
-                        isInitializing = false,
-                        receiveAddress = kit.receiveAddress
-                    )
-                }
-
-                Timber.d("restoreWallet: Wallet restored successfully")
-
-                WalletManager.start()
-
+                // Reset state
+                _wallets.value = emptyList()
+                _activeWallet.value = null
+                _pendingSeed.value = null
+                _pin.value = null
+                _isLocked.value = true
+                _walletSessionId.value += 1
+                _walletState.value = WalletState(hasWallet = false)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to restore wallet")
-                _walletState.update {
-                    it.copy(
-                        isInitializing = false,
-                        error = e.message ?: "Failed to restore wallet"
-                    )
-                }
+                Timber.e(e, "Failed to remove wallets")
+                _walletState.update { it.copy(error = e.message) }
             }
         }
     }
+
+    // =========================================================================
+    // Kit observers
+    // =========================================================================
 
     private var kitObserverJobs: List<Job> = emptyList()
 
-    private fun setupKitObservers() {
-        // Cancel any existing collectors to prevent stacking
+    /** The kit instance the current collectors are attached to (null = none). */
+    private var observedKit: MoneroKit? = null
+
+    private fun cancelKitObservers() {
         kitObserverJobs.forEach { it.cancel() }
+        kitObserverJobs = emptyList()
+        observedKit = null
+    }
+
+    /**
+     * Observe the given kit instance DIRECTLY (not the WalletManager mirror
+     * flows) so a replaced kit can never replay stale values into a new
+     * wallet's UI. Collectors are cancelled on every re-init/switch/delete.
+     */
+    private fun setupKitObservers(kit: MoneroKit) {
+        cancelKitObservers()
+        observedKit = kit
 
         kitObserverJobs = listOf(
             viewModelScope.launch {
-                WalletManager.syncStateFlow.collect { syncState ->
+                kit.syncStateFlow.collect { syncState ->
+                    // Skip the constructor default so it can't stomp the
+                    // Connecting state painted by the switch/open path.
+                    if (syncState is SyncState.NotSynced && syncState.error is MoneroKit.SyncError.NotStarted) {
+                        return@collect
+                    }
                     when (syncState) {
                         is SyncState.NotSynced -> {
                             Timber.d("SyncState: NotSynced, error=${syncState.error}")
@@ -522,13 +1124,17 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                         is SyncState.Synced -> {
                             Timber.d("SyncState: Synced")
                             failoverAttempts = 0
+                            // Balance is authoritative once synced (covers the
+                            // drained-wallet edge the drop(1) below can hide).
+                            _walletState.update { it.copy(balance = kit.balance) }
+                            snapshotActiveWalletCache()
                         }
                     }
                     _walletState.update { it.copy(syncState = syncState) }
                     val statusKey = when (syncState) {
-                        is io.horizontalsystems.monerokit.SyncState.Synced -> "synced"
-                        is io.horizontalsystems.monerokit.SyncState.Syncing -> "syncing"
-                        is io.horizontalsystems.monerokit.SyncState.Connecting -> "connecting"
+                        is SyncState.Synced -> "synced"
+                        is SyncState.Syncing -> "syncing"
+                        is SyncState.Connecting -> "connecting"
                         else -> "offline"
                     }
                     WidgetDataStore.saveSyncStatus(context, statusKey)
@@ -536,16 +1142,19 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 }
             },
             viewModelScope.launch {
-                WalletManager.balanceFlow.collect { balance ->
+                // drop(1): the StateFlow's initial Balance(0,0) default must not
+                // overwrite the cached balance painted during a switch.
+                kit.balanceFlow.drop(1).collect { balance ->
                     Timber.d("Balance updated")
                     _walletState.update { it.copy(balance = balance) }
+                    persistCachedBalance(balance)
                     // Update balance widget
                     WidgetDataStore.saveBalance(context, balance.all, balance.unlocked)
                     WalletWidget.updateAll(context)
                 }
             },
             viewModelScope.launch {
-                WalletManager.transactionsFlow.collect { transactions ->
+                kit.allTransactionsFlow.drop(1).collect { transactions ->
                     Timber.d("Transactions updated: count=${transactions.size}")
                     _walletState.update { it.copy(transactions = transactions) }
                     // Update transactions widget (store last 4 for the iOS-style large layout)
@@ -553,7 +1162,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                         .sortedByDescending { it.timestamp }
                         .take(4)
                         .joinToString(";") { tx ->
-                            val dir = if (tx.direction == io.horizontalsystems.monerokit.model.TransactionInfo.Direction.Direction_In) "in" else "out"
+                            val dir = if (tx.direction == TransactionInfo.Direction.Direction_In) "in" else "out"
                             "$dir|${tx.amount}|${tx.timestamp}"
                         }
                     WidgetDataStore.saveTransactions(context, txString)
@@ -561,6 +1170,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         )
+    }
+
+    private fun persistCachedBalance(balance: Balance) {
+        val active = _activeWallet.value ?: return
+        mergeWalletUpdate(active.id) {
+            it.copy(cachedBalance = balance.all, cachedUnlockedBalance = balance.unlocked)
+        }
     }
 
     // --- PBKDF2 PIN hashing ---
@@ -582,7 +1198,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         const val RATE_LIMIT_TIER2_DELAY_MS = 300_000L
     }
 
-    // --- PIN rate limiting ---
+    // --- PIN rate limiting (GLOBAL — lockout is app-wide) ---
 
     private val _pinLockoutSeconds = MutableStateFlow(0L)
     val pinLockoutSeconds: StateFlow<Long> = _pinLockoutSeconds.asStateFlow()
@@ -640,44 +1256,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - getFailedAttempts()).coerceAtLeast(0)
     }
 
-    /**
-     * The PIN hash lives in Keystore-backed encrypted storage, not in the plaintext
-     * prefs file — an imaged device must not yield a hash that can be attacked
-     * offline. Installs predating this read once from the old location and are
-     * migrated in place.
-     */
-    private fun readPinHash(): String? {
-        encryptedPrefs.getString("pin_hash", null)?.let { return it }
-
-        val plainPrefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-        val legacy = plainPrefs.getString("pin_hash", null) ?: return null
-        // Only drop the old copy once the encrypted write is known to have landed.
-        // Deleting it after a failed write would leave no PIN hash at all, which
-        // reads as "no wallet" and locks the user out of their funds.
-        if (runCatching { encryptedPrefs.edit().putString("pin_hash", legacy).commit() }
-                .getOrDefault(false)
-        ) {
-            plainPrefs.edit().remove("pin_hash").apply()
-            Timber.d("Relocated pin_hash into encrypted storage")
-        } else {
-            Timber.w("Could not relocate pin_hash; leaving the existing copy in place")
-        }
-        return legacy
-    }
-
-    private fun writePinHash(hash: String) {
-        val stored = runCatching { encryptedPrefs.edit().putString("pin_hash", hash).commit() }
-            .getOrDefault(false)
-        if (!stored) {
-            // Never leave the wallet with no retrievable PIN hash.
-            throw IllegalStateException("Failed to persist PIN")
-        }
-        // Drop any copy left in the plaintext file by an older install.
-        context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .edit()
-            .remove("pin_hash")
-            .apply()
-    }
 
     private suspend fun hashPin(pin: String): String = withContext(Dispatchers.Default) {
         val salt = ByteArray(PBKDF2_SALT_LENGTH).also { SecureRandom().nextBytes(it) }
@@ -725,6 +1303,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun storedPinHash(): String? {
+        _activeWallet.value?.let { active ->
+            secrets.pinHash(active.id)?.let { return it }
+        }
+        return existingPinHash()
+    }
+
     private suspend fun migratePinIfNeeded(pin: String, storedHash: String) {
         val needsMigration = when (storedHash.split(":").size) {
             1 -> true    // Legacy hashCode
@@ -737,17 +1322,27 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             else -> false
         }
         if (needsMigration) {
-            writePinHash(hashPin(pin))
+            val newHash = hashPin(pin)
+            _wallets.value.forEach { secrets.savePinHash(it.id, newHash) }
             Timber.d("PIN hash migrated to current format ($PBKDF2_ITERATIONS iterations)")
         }
     }
 
+    /**
+     * Set the app-wide PIN. The hash is written to EVERY wallet's per-wallet
+     * entry in encrypted storage (iOS keeps per-wallet pinhash/salt).
+     */
     suspend fun setPin(pin: String) {
-        writePinHash(hashPin(pin))
+        val pinHash = hashPin(pin)
+        // Under the lifecycle mutex so an add in flight cannot inherit a
+        // stale hash and leave one wallet on a different PIN.
+        walletMutationMutex.withLock {
+            store.wallets().forEach { secrets.savePinHash(it.id, pinHash) }
+        }
         _pin.value = pin
         _isLocked.value = false
         // Only mark wallet as having been fully set up after PIN is also saved
-        _walletState.update { it.copy(hasWallet = true) }
+        refreshHasWallet()
         // The generated seed has been persisted encrypted by now; drop the copy
         // held for the confirmation step rather than keeping it for the session.
         _pendingSeed.value = null
@@ -758,7 +1353,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         // Check rate limiting
         if (getRemainingLockoutMs() > 0) return false
 
-        val storedHash = readPinHash() ?: return false
+        val storedHash = storedPinHash() ?: return false
 
         val isValid = verifyPinHash(enteredPin, storedHash)
 
@@ -767,7 +1362,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             migratePinIfNeeded(enteredPin, storedHash)
             _pin.value = enteredPin
             _isLocked.value = false
-            initializeWalletIfNeeded()
+            viewModelScope.launch { walletMutationMutex.withLock { openActiveWallet() } }
         } else {
             recordFailedAttempt()
             refreshLockoutState()
@@ -784,7 +1379,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     suspend fun verifyPinForAction(enteredPin: String): Boolean {
         if (getRemainingLockoutMs() > 0) return false
 
-        val storedHash = readPinHash() ?: return false
+        val storedHash = storedPinHash() ?: return false
         val isValid = verifyPinHash(enteredPin, storedHash)
 
         if (isValid) {
@@ -799,7 +1394,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     suspend fun verifyPinOnly(enteredPin: String): Boolean {
-        val storedHash = readPinHash() ?: return false
+        val storedHash = storedPinHash() ?: return false
 
         val isValid = verifyPinHash(enteredPin, storedHash)
         if (isValid) {
@@ -808,76 +1403,133 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return isValid
     }
 
+    /**
+     * Change the app-wide PIN. Two-pass over all wallets (port of iOS
+     * `reencryptAllWallets`): first verify every wallet's secret is readable,
+     * then write the new hash for every wallet — no partial state on failure.
+     */
     suspend fun changePin(oldPin: String, newPin: String): Boolean {
         if (!verifyPinOnly(oldPin)) return false
 
-        writePinHash(hashPin(newPin))
+        val allWallets = _wallets.value
+        // Pass 1: every wallet's seed must be readable before anything is written.
+        val readable = allWallets.all { it.isViewOnly || secrets.hasSeed(it.id) }
+        if (!readable) {
+            Timber.e("changePin aborted: not all wallet secrets readable")
+            return false
+        }
+
+        // Pass 2: write the new hash everywhere, serialized against adds so
+        // a wallet added mid-change cannot keep the old hash.
+        val pinHash = hashPin(newPin)
+        walletMutationMutex.withLock {
+            store.wallets().forEach { secrets.savePinHash(it.id, pinHash) }
+        }
         _pin.value = newPin
         return true
     }
 
-    fun getSeedPhrase(): List<String>? {
-        // Return the pending seed if available (during wallet creation)
+    // =========================================================================
+    // Secret export (gated on expected wallet id — iOS a31683d)
+    // =========================================================================
+
+    /**
+     * Seed of the ACTIVE wallet. Pass [expectedWalletId] (captured when the
+     * secret-export screen opened) so a mid-view wallet switch can never leak
+     * another wallet's seed; returns null on mismatch.
+     */
+    fun getSeedPhrase(expectedWalletId: String? = null): List<String>? {
+        val active = _activeWallet.value
+        if (expectedWalletId != null) {
+            // Export bound to an EXISTING wallet: the id gate applies before
+            // ANY shortcut. A pending (not-yet-created) seed must never
+            // satisfy an existing wallet's backup — that is exactly how the
+            // wrong seed gets backed up (iOS a31683d class).
+            if (active == null || active.id != expectedWalletId) {
+                Timber.w("getSeedPhrase: wallet mismatch (expected $expectedWalletId, active ${active?.id})")
+                return null
+            }
+            return secrets.loadSeed(active.id)?.first
+        }
+        // Ungated call: only meaningful during wallet creation, where the
+        // pending seed is the wallet being created.
         _pendingSeed.value?.let { return it.words }
-
-        // Otherwise, retrieve from encrypted storage
-        return loadSeedEncrypted()?.first
+        return active?.let { secrets.loadSeed(it.id)?.first }
     }
 
-    fun getSeedType(): SeedType? {
+    fun getSeedType(expectedWalletId: String? = null): SeedType? {
+        val active = _activeWallet.value
+        if (expectedWalletId != null) {
+            if (active == null || active.id != expectedWalletId) return null
+            return secrets.loadSeed(active.id)?.second
+        }
         _pendingSeed.value?.let { return it.type }
-        return loadSeedEncrypted()?.second
+        return active?.let { secrets.loadSeed(it.id)?.second }
     }
 
-    fun getElectrumSeedPhrase(): List<String>? {
-        val (words, type) = loadSeedEncrypted() ?: return null
+    fun getElectrumSeedPhrase(expectedWalletId: String? = null): List<String>? {
+        val active = _activeWallet.value ?: return null
+        if (expectedWalletId != null && active.id != expectedWalletId) return null
+        val (words, type) = secrets.loadSeed(active.id) ?: return null
         if (type != SeedType.BIP39_24) return null
         return CakeWalletStyleConverter.getLegacySeedFromBip39(words, "")
     }
 
+    // =========================================================================
+    // Settings
+    // =========================================================================
+
     fun setBiometricsEnabled(enabled: Boolean) {
-        context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("biometrics_enabled", enabled)
-            .apply()
+        prefs.edit().putBoolean("biometrics_enabled", enabled).apply()
     }
 
     fun setAutoLockTimeout(seconds: Int) {
-        context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .edit()
-            .putInt("auto_lock_timeout", seconds)
-            .apply()
+        prefs.edit().putInt("auto_lock_timeout", seconds).apply()
     }
 
+    /** Per-wallet restore height (persisted on the active WalletInfo). */
     fun setRestoreHeight(height: Long, restoreDateMillis: Long? = null) {
-        val editor = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-            .edit()
-            .putLong("restore_height", height)
-            .putString("restore_height_str", height.toString())
-        if (restoreDateMillis != null) {
-            editor.putLong("restore_date_millis", restoreDateMillis)
+        val active = _activeWallet.value ?: return
+        mergeWalletUpdate(active.id) {
+            it.copy(
+                restoreHeight = height,
+                restoreDateMillis = restoreDateMillis ?: it.restoreDateMillis
+            )
         }
-        editor.apply()
+    }
+
+    /** Per-wallet selected receive-address index. */
+    fun selectedAddressIndex(): Int {
+        val active = _activeWallet.value ?: return 0
+        return prefs.getInt("wallet.${active.id}.selected_address_index", 0)
+    }
+
+    fun setSelectedAddressIndex(index: Int) {
+        val active = _activeWallet.value ?: return
+        prefs.edit().putInt("wallet.${active.id}.selected_address_index", index).apply()
     }
 
     fun changeNode(resetFailover: Boolean = true) {
         if (resetFailover) failoverAttempts = 0
         viewModelScope.launch {
-            try {
-                _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
+            walletMutationMutex.withLock {
+                try {
+                    _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
 
-                // Stop the current kit and release reference (wallet files preserved)
-                WalletManager.stopAndRelease()
+                    cancelKitObservers()
+                    // Stop the current kit and release reference (wallet files preserved)
+                    WalletManager.stopAndRelease()
 
-                // Reinitialize with the new node (wallet files still exist, sync resumes)
-                initializeWalletIfNeeded()
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to change node")
-                _walletState.update {
-                    it.copy(
-                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                        error = "Failed to change node: ${e.message}"
-                    )
+                    // Reinitialize with the new node (wallet files still exist, sync resumes)
+                    openActiveWallet()
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to change node")
+                    _walletState.update {
+                        it.copy(
+                            syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                            error = "Failed to change node: ${e.message}"
+                        )
+                    }
                 }
             }
         }
@@ -892,8 +1544,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     // a successful sync (or a manual node change) resets the budget.
     private fun maybeFailover(state: SyncState.NotSynced) {
         if (state.error is MoneroKit.SyncError.NotStarted) return
-        if (!_walletState.value.hasWallet) return
-        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+        // A seed/cache problem is not a node problem: rotating the global node
+        // setting cannot fix it and silently changes every wallet's node.
+        if (isWalletLevelStartError(state.error)) return
+        if (_wallets.value.isEmpty() || _activeWallet.value == null) return
         if (!prefs.getBoolean("auto_select_node", true)) return
         if (failoverAttempts >= DefaultNodes.URIS.size) return
         if (failoverJob?.isActive == true) return
@@ -912,153 +1566,85 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshSync() {
         failoverAttempts = 0
         viewModelScope.launch {
-            try {
-                _walletState.update {
-                    it.copy(syncState = SyncState.Connecting(waiting = false))
-                }
-                WalletManager.stopAndRelease()
-                initializeWalletIfNeeded()
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to refresh sync")
-                _walletState.update {
-                    it.copy(
-                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                        error = "Failed to refresh: ${e.message}"
-                    )
+            walletMutationMutex.withLock {
+                try {
+                    _walletState.update {
+                        it.copy(syncState = SyncState.Connecting(waiting = false))
+                    }
+                    cancelKitObservers()
+                    WalletManager.stopAndRelease()
+                    openActiveWallet()
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to refresh sync")
+                    _walletState.update {
+                        it.copy(
+                            syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                            error = "Failed to refresh: ${e.message}"
+                        )
+                    }
                 }
             }
         }
     }
 
+    /**
+     * Reset sync data for the ACTIVE wallet: bump syncResetCount, re-derive
+     * the cache id through the single shared function and PERSIST it BEFORE
+     * touching disk or reopening (iOS 6f1053f lockstep rule — getting this
+     * order wrong makes the launch sweep delete a live cache).
+     */
     fun resetSync() {
         failoverAttempts = 0
         viewModelScope.launch {
-            try {
-                val seedData = loadSeedEncrypted() ?: run {
-                    Timber.w("No encrypted seed found, cannot reset sync")
-                    _walletState.update { it.copy(error = "No wallet seed to reset sync") }
-                    return@launch
-                }
-                val savedWalletId = walletId ?: return@launch
-
-                _walletState.update {
-                    it.copy(
-                        balance = Balance(0, 0),
-                        transactions = emptyList(),
-                        syncState = SyncState.Connecting(waiting = false)
-                    )
-                }
-
-                // Stop current kit
-                WalletManager.kit?.stop()
-
-                // Delete cached wallet files to force full resync
-                MoneroKit.deleteWallet(context, savedWalletId)
-
-                val (seedWords, seedType) = seedData
-                val node = getSelectedNode()
-                val networkType = NetworkType.NetworkType_Mainnet
-
-                Timber.d("resetSync: Reinitializing wallet from scratch, node=$node")
-
-                val moneroSeed = when (seedType) {
-                    SeedType.ELECTRUM_25 -> Seed.Electrum(seedWords, "")
-                    SeedType.BIP39_24 -> Seed.Bip39(seedWords, "")
-                }
-
-                val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-                val syncSettingsHeight = prefs.getLong("restore_height", 0L)
-                val creationHeight = prefs.getString("restore_height_str", "0") ?: "0"
-                // Prefer SyncSettings value (user's explicit override from date picker),
-                // fall back to creation-time height
-                val restoreHeight = if (syncSettingsHeight > 0L) {
-                    syncSettingsHeight.toString()
-                } else {
-                    creationHeight
-                }
-
-                val kit = WalletManager.initialize(
-                    context = context,
-                    seed = moneroSeed,
-                    restoreDateOrHeight = restoreHeight,
-                    walletId = savedWalletId,
-                    node = node,
-                    trustNode = false,
-                    networkType = networkType
-                )
-
-                setupKitObservers()
-
-                _walletState.update {
-                    it.copy(receiveAddress = kit.receiveAddress)
-                }
-
-                WalletManager.start()
-
-                Timber.d("resetSync: Wallet resync started successfully")
-
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to reset sync")
-                _walletState.update {
-                    it.copy(
-                        syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                        error = "Failed to reset sync: ${e.message}"
-                    )
-                }
-            }
+            walletMutationMutex.withLock { resetSyncLocked() }
         }
     }
 
-    fun removeWallet() {
-        // NonCancellable: this runs while the UI navigates away, and a half-done
-        // wipe (kit stopped, seed still on disk) is worse than either outcome.
-        viewModelScope.launch(NonCancellable) {
-            try {
-                val removedWalletId = walletId
+    private suspend fun resetSyncLocked() {
+        try {
+            val active = _activeWallet.value ?: return
+            val seedData = secrets.loadSeed(active.id) ?: run {
+                Timber.w("No stored seed, cannot reset sync")
+                _walletState.update { it.copy(error = "No wallet seed to reset sync") }
+                return
+            }
 
-                // Await full shutdown before deleting files: stopping the kit stores
-                // the wallet, which would re-create what we delete below.
-                WalletManager.clearAndAwait()
+            val oldCacheId = active.derivedWalletId
+            val newCount = active.syncResetCount + 1
+            val newCacheId = WalletCacheIds.derivedWalletId(seedData.first, newCount)
 
-                // Delete the wallet2 files (cache, .keys, .address.txt). The keys file
-                // is written with an empty password, so leaving it behind hands the
-                // spend key to whoever holds the device next.
-                removedWalletId?.let { id ->
-                    withContext(Dispatchers.IO) {
-                        runCatching { MoneroKit.deleteWallet(context, id) }
-                            .onFailure { Timber.e(it, "Failed to delete wallet files for $id") }
-                    }
-                }
+            // Persist the new id FIRST — lockstep with what open will use.
+            // Merge onto the freshest stored row (M2).
+            mergeWalletUpdate(active.id) {
+                it.copy(syncResetCount = newCount, derivedWalletId = newCacheId)
+            } ?: return
+            Timber.i("resetSync: count=$newCount cacheId $oldCacheId -> $newCacheId")
 
-                // Clear all wallet data from SharedPreferences
-                context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
-                    .edit()
-                    .clear()
-                    .apply()
+            _walletState.update {
+                it.copy(
+                    balance = Balance(0, 0),
+                    transactions = emptyList(),
+                    syncState = SyncState.Connecting(waiting = false)
+                )
+            }
 
-                // Empty the encrypted seed store before deleting it — deleteSharedPreferences
-                // is unreliable while this process still holds an open reference to it.
-                runCatching { encryptedPrefs.edit().clear().commit() }
-                    .onFailure { Timber.e(it, "Failed to clear encrypted seed store") }
-                context.deleteSharedPreferences("secure_wallet_data")
+            cancelKitObservers()
+            WalletManager.stopAndRelease()
 
-                // Widget cache holds the removed wallet's balance and recent tx hashes.
-                context.getSharedPreferences("monero_widget_data", Context.MODE_PRIVATE)
-                    .edit()
-                    .clear()
-                    .apply()
-                WalletWidget.updateAll(context)
+            // Delete ONLY this wallet's old cache files.
+            oldCacheId?.let {
+                withContext(Dispatchers.IO) { deleteWalletFiles(it) }
+            }
 
-                // Reset state
-                walletId = null
-                _pendingSeed.value = null
-                _pin.value = null
-                _isLocked.value = true
-                _walletState.value = WalletState(hasWallet = false)
-
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to remove wallet")
-                _walletState.update { it.copy(error = e.message) }
+            openActiveWallet()
+            Timber.d("resetSync: Wallet resync started successfully")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to reset sync")
+            _walletState.update {
+                it.copy(
+                    syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                    error = "Failed to reset sync: ${e.message}"
+                )
             }
         }
     }
@@ -1067,7 +1653,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * Get the user's selected node from SharedPreferences, or fall back to default.
      */
     private fun getSelectedNode(): String {
-        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         val savedNode = prefs.getString("selected_node", null)
         val node = savedNode ?: DefaultNodes.initial(context)
         Timber.d("getSelectedNode: savedNode=$savedNode, using node=$node")
@@ -1091,6 +1676,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun lock() {
+        viewModelScope.launch { snapshotActiveWalletCache() }
         _isLocked.value = true
         _pin.value = null
     }
@@ -1131,8 +1717,18 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             _sendState.value = SendState.Sending
             try {
+                // Null kit (switch/reset/node-change teardown window) must be a
+                // LOUD failure — a silent no-op here reported Success for a
+                // payment that was never sent (M3).
+                val kit = WalletManager.kit
+                if (kit == null || WalletManager.currentWalletId != _activeWallet.value?.derivedWalletId) {
+                    _sendState.value = SendState.Error(
+                        "Wallet is not connected yet. Wait for the wallet to reconnect and try again."
+                    )
+                    return@launch
+                }
                 withContext(Dispatchers.IO) {
-                    WalletManager.kit?.send(amount, address, memo, sweepAll = isSweepAll)
+                    kit.send(amount, address, memo, sweepAll = isSweepAll)
                 }
                 // MoneroKit.send() doesn't return txHash, we'll show success without it
                 // The transaction will appear in the transactions list after sync
@@ -1162,7 +1758,23 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun createSubaddress(): String? {
-        return WalletManager.kit?.createSubaddress()
+        val result = WalletManager.kit?.createSubaddress() ?: return null
+        // Track user-created subaddress indices per wallet so they can be
+        // re-created after a sync reset rebuilds the cache.
+        val active = _activeWallet.value ?: return result
+        val count = try {
+            WalletManager.kit?.getSubaddresses()?.size ?: 0
+        } catch (e: Exception) {
+            0
+        }
+        val index = count - 1
+        if (index > 0) {
+            mergeWalletUpdate(active.id) {
+                if (index in it.userCreatedSubaddressIndices) it
+                else it.copy(userCreatedSubaddressIndices = it.userCreatedSubaddressIndices + index)
+            }
+        }
+        return result
     }
 
     fun formatXmr(atomicUnits: Long): String {
@@ -1191,7 +1803,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _pin.value = null
         _pendingSeed.value = null
         // Don't stop kit if background sync is enabled — the service keeps it alive
-        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("background_sync_enabled", false)) {
             WalletManager.stop()
         }

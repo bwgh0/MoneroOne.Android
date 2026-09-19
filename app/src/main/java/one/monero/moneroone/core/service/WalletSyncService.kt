@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import one.monero.moneroone.MainActivity
 import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletManager
+import one.monero.moneroone.core.wallet.WalletStore
 import timber.log.Timber
 
 class WalletSyncService : Service() {
@@ -104,16 +105,21 @@ class WalletSyncService : Service() {
             .setSilent(true)
             .addAction(0, "Stop", stopPending)
 
+        // Identify which wallet is syncing (multi-wallet).
+        val activeWallet = WalletStore.activeWalletInfo(this)
+        val walletLabel = activeWallet?.let { "${it.emoji} ${it.name}" }
+
         when (syncState) {
             is SyncState.Connecting -> {
                 builder.setContentTitle("Connecting...")
-                builder.setContentText("Connecting to Monero network")
+                builder.setContentText(walletLabel?.let { "$it — connecting to Monero network" }
+                    ?: "Connecting to Monero network")
                 builder.setProgress(0, 0, true)
             }
             is SyncState.Syncing -> {
                 val pct = ((syncState.progress ?: 0.0) * 100).toInt()
                 val blocks = syncState.remainingBlocks
-                builder.setContentTitle("Syncing $pct%")
+                builder.setContentTitle(walletLabel?.let { "$it — syncing $pct%" } ?: "Syncing $pct%")
                 builder.setContentText(
                     if (blocks != null && blocks > 0) "$blocks blocks remaining"
                     else "Syncing wallet..."
@@ -122,7 +128,7 @@ class WalletSyncService : Service() {
             }
             is SyncState.Synced -> {
                 builder.setContentTitle("Synced")
-                builder.setContentText("Wallet is up to date")
+                builder.setContentText(walletLabel?.let { "$it is up to date" } ?: "Wallet is up to date")
             }
             is SyncState.NotSynced -> {
                 builder.setContentTitle("Not synced")

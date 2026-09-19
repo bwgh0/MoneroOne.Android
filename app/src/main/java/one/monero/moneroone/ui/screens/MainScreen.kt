@@ -31,6 +31,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +67,17 @@ fun MainScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
     val chartUiState by chartViewModel.uiState.collectAsState()
+    val walletState by walletViewModel.walletState.collectAsState()
+    val activeWallet by walletViewModel.activeWallet.collectAsState()
+
+    // When the last wallet is deleted, fall back to Welcome.
+    LaunchedEffect(walletState.hasWallet) {
+        if (!walletState.hasWallet) {
+            navController.navigate("welcome") {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
 
     val navItems = listOf(
         BottomNavItem("Wallet", Icons.Filled.Wallet, Icons.Outlined.Wallet),
@@ -155,6 +167,9 @@ fun MainScreen(
                         onBalanceClick = {
                             navController.navigate("portfolio_chart")
                         },
+                        onAddWalletClick = {
+                            navController.navigate("add_wallet")
+                        },
                         priceChange24h = chartUiState.priceChange24h
                     )
                     1 -> ChartScreen(
@@ -174,10 +189,10 @@ fun MainScreen(
                             Toast.makeText(context, "Sync reset initiated", Toast.LENGTH_SHORT).show()
                         },
                         onRemoveWalletClick = {
-                            walletViewModel.removeWallet()
-                            navController.navigate("welcome") {
-                                popUpTo(0) { inclusive = true }
-                            }
+                            // Delete only the ACTIVE wallet; auto-switches to
+                            // the next one, or the hasWallet watcher above
+                            // falls back to Welcome when none remain.
+                            activeWallet?.let { walletViewModel.deleteWallet(it.id) }
                         },
                         onDonateClick = { navController.navigate("donation") }
                     )

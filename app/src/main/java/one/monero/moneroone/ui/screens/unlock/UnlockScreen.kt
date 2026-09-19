@@ -95,10 +95,11 @@ fun UnlockScreen(
         walletViewModel.refreshLockoutState()
     }
 
-    // Check if wallet should be wiped due to too many attempts
+    // Check if wallet should be wiped due to too many attempts.
+    // onResetWallet performs the wipe (NavGraph calls removeWallet) — calling
+    // removeWallet here too ran the full wipe twice.
     LaunchedEffect(attemptsRemaining) {
         if (walletViewModel.shouldWipeWallet()) {
-            walletViewModel.removeWallet()
             onResetWallet()
         }
     }

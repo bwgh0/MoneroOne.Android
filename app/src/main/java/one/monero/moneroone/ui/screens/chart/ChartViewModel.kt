@@ -48,7 +48,7 @@ class ChartViewModel(application: Application) : AndroidViewModel(application) {
         _selectedCurrency.value = Currency.entries.find { it.code == savedCode } ?: Currency.USD
         // Defer network fetch until a wallet exists. Avoids leaking IP to
         // monero.one before the user has generated/restored a key.
-        if (prefs.getString("wallet_id", null) != null) {
+        if (one.monero.moneroone.core.wallet.WalletStore.hasAnyWallet(application)) {
             loadData()
             load24hChange()
         }

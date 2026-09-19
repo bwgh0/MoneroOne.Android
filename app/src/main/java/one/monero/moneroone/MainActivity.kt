@@ -22,10 +22,13 @@ class MainActivity : AppCompatActivity() {
 
         // Block screenshots, screen recording and the recents-screen thumbnail.
         // Single-Activity app, so this covers seed backup, PIN entry and balances.
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // Debug builds stay capturable so device test runs can screenshot the UI.
+        if (!BuildConfig.DEBUG) {
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE
+            )
+        }
 
         val prefs = getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
         val themeMode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
