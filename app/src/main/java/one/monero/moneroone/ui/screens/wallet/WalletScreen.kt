@@ -1,6 +1,16 @@
 package one.monero.moneroone.ui.screens.wallet
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +29,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,7 +52,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,6 +74,8 @@ import io.horizontalsystems.monerokit.model.TransactionInfo
 import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
+import one.monero.moneroone.ui.components.Motion
+import one.monero.moneroone.ui.components.RollingText
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroLogo
 import one.monero.moneroone.ui.components.StatusDot
@@ -138,12 +150,15 @@ fun WalletScreen(
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-    // Key the per-wallet subtree on the wallet session epoch so no stale
-    // per-wallet state (scroll, expansion, remembered values) survives a switch.
-    key(walletSessionId) {
+    // The switcher's open/closed flag outlives a wallet switch so the collapse
+    // can animate (iOS batches prepareSwitchToWallet + isExpanded = false in
+    // one withAnimation). Scroll position is the per-wallet state that must
+    // reset: a fresh LazyListState per wallet session epoch.
     var switcherExpanded by remember { mutableStateOf(false) }
+    val listState = remember(walletSessionId) { LazyListState() }
 
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
@@ -183,72 +198,93 @@ fun WalletScreen(
         item {
             GreetingHeader(
                 activeWallet = activeWallet,
-                onToggleSwitcher = { switcherExpanded = !switcherExpanded }
+                expanded = switcherExpanded,
+                balanceText = "${walletViewModel.formatXmr(walletState.balance.all)} XMR",
+                onToggleSwitcher = { switcherExpanded = !switcherExpanded },
+                onRename = { name, emoji ->
+                    activeWallet?.let { walletViewModel.renameWallet(it.id, name, emoji) }
+                }
             )
         }
 
-        if (switcherExpanded) {
-            // Expanded wallet manager replaces the balance/actions/activity
-            // content (iOS collapses them while the switcher is open).
-            item {
-                WalletManagerRows(
-                    wallets = wallets,
-                    activeWallet = activeWallet,
-                    liveBalanceText = "${walletViewModel.formatXmr(walletState.balance.all)} XMR",
-                    formatXmr = walletViewModel::formatXmr,
-                    onSwitch = { wallet ->
-                        switcherExpanded = false
-                        walletViewModel.switchWallet(wallet.id)
-                    },
-                    onDelete = { wallet ->
-                        walletViewModel.deleteWallet(wallet.id)
-                    },
-                    onRename = { wallet, name, emoji ->
-                        walletViewModel.renameWallet(wallet.id, name, emoji)
-                    },
-                    onAddWallet = {
-                        switcherExpanded = false
-                        onAddWalletClick()
+        // Balance card + actions <-> wallet rows (iOS WalletView: rows slide in
+        // from the trailing edge on .snappy(0.4) while the balance block
+        // collapses; reversed on the way back). Recent activity below hides
+        // instantly, as on iOS.
+        item {
+            AnimatedContent(
+                targetState = switcherExpanded,
+                transitionSpec = {
+                    if (targetState) {
+                        (slideInHorizontally(Motion.snappySlow()) { it } + fadeIn(Motion.snappySlow()))
+                            .togetherWith(slideOutHorizontally(Motion.snappySlow()) { -it / 4 } + fadeOut(tween(160)))
+                    } else {
+                        (slideInHorizontally(Motion.snappySlow()) { -it / 4 } + fadeIn(Motion.snappySlow()))
+                            .togetherWith(slideOutHorizontally(Motion.snappySlow()) { it } + fadeOut(tween(160)))
+                    }.using(SizeTransform(clip = true) { _, _ -> Motion.snappySlow() })
+                },
+                contentAlignment = Alignment.TopStart,
+                label = "dashboardHead"
+            ) { expanded ->
+                if (expanded) {
+                    WalletManagerRows(
+                        wallets = wallets,
+                        activeWallet = activeWallet,
+                        formatXmr = walletViewModel::formatXmr,
+                        onSwitch = { wallet ->
+                            // Collapse only when the switch was taken; a refused
+                            // tap keeps the rows open (iOS prepareSwitchToWallet).
+                            if (walletViewModel.switchWallet(wallet.id)) {
+                                switcherExpanded = false
+                            }
+                        },
+                        onDelete = { wallet ->
+                            walletViewModel.deleteWallet(wallet.id)
+                        },
+                        onAddWallet = {
+                            switcherExpanded = false
+                            onAddWalletClick()
+                        }
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        // Balance card - always show real data (iOS behavior)
+                        BalanceCard(
+                            balance = walletViewModel.formatXmr(walletState.balance.all),
+                            unlockedBalance = walletViewModel.formatXmr(walletState.balance.unlocked),
+                            fiatValue = fiatValue,
+                            unlockedFiatValue = unlockedFiatValue,
+                            syncState = walletState.syncState,
+                            priceChange24h = priceChange24h,
+                            onClick = onBalanceClick
+                        )
+
+                        // Action buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            ActionButton(
+                                modifier = Modifier.weight(1f),
+                                icon = Icons.Default.ArrowUpward,
+                                label = "Send",
+                                color = MoneroOrange,
+                                onClick = onSendClick
+                            )
+                            ActionButton(
+                                modifier = Modifier.weight(1f),
+                                icon = Icons.Default.ArrowDownward,
+                                label = "Receive",
+                                color = SuccessGreen,
+                                onClick = onReceiveClick
+                            )
+                        }
                     }
-                )
-            }
-        } else {
-
-        // Balance card - always show real data (iOS behavior)
-        item {
-            BalanceCard(
-                balance = walletViewModel.formatXmr(walletState.balance.all),
-                unlockedBalance = walletViewModel.formatXmr(walletState.balance.unlocked),
-                fiatValue = fiatValue,
-                unlockedFiatValue = unlockedFiatValue,
-                syncState = walletState.syncState,
-                priceChange24h = priceChange24h,
-                onClick = onBalanceClick
-            )
-        }
-
-        // Action buttons
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ActionButton(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Default.ArrowUpward,
-                    label = "Send",
-                    color = MoneroOrange,
-                    onClick = onSendClick
-                )
-                ActionButton(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Default.ArrowDownward,
-                    label = "Receive",
-                    color = SuccessGreen,
-                    onClick = onReceiveClick
-                )
+                }
             }
         }
+
+        if (!switcherExpanded) {
 
         // Recent activity header
         item {
@@ -302,14 +338,16 @@ fun WalletScreen(
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
     }
-    } // key(walletSessionId)
     } // PullToRefreshBox
 }
 
 @Composable
 private fun GreetingHeader(
     activeWallet: one.monero.moneroone.core.wallet.WalletInfo?,
-    onToggleSwitcher: () -> Unit
+    expanded: Boolean,
+    balanceText: String,
+    onToggleSwitcher: () -> Unit,
+    onRename: (name: String, emoji: String) -> Unit
 ) {
     val greeting = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
         in 0..11 -> "Good Morning"
@@ -317,20 +355,38 @@ private fun GreetingHeader(
         else -> "Good Evening"
     }
 
+    // iOS WalletHeaderContent: the greeting slides out to the leading edge
+    // and the pill takes the whole row, both on .snappy(0.35).
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = greeting,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
+        AnimatedVisibility(
+            visible = !expanded,
+            enter = fadeIn(Motion.snappy()) +
+                expandHorizontally(Motion.snappy(), expandFrom = Alignment.Start) +
+                slideInHorizontally(Motion.snappy()) { -it / 2 },
+            exit = fadeOut(tween(160)) +
+                shrinkHorizontally(Motion.snappy(), shrinkTowards = Alignment.Start) +
+                slideOutHorizontally(Motion.snappy()) { -it / 2 }
+        ) {
+            Text(
+                text = greeting,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                modifier = Modifier.padding(end = 12.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
 
         WalletSwitcherButton(
             wallet = activeWallet,
-            onToggle = onToggleSwitcher
+            expanded = expanded,
+            balanceText = balanceText,
+            onToggle = onToggleSwitcher,
+            onRename = onRename
         )
     }
 }
@@ -401,12 +457,12 @@ private fun BalanceCard(
                             balance.length <= 16 -> 22.sp
                             else -> 18.sp
                         }
-                        Text(
+                        // Digits roll on change (iOS .contentTransition(.numericText())).
+                        RollingText(
                             text = balance,
+                            style = MaterialTheme.typography.bodyLarge,
                             fontSize = balanceFontSize,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            softWrap = false
+                            fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -421,7 +477,7 @@ private fun BalanceCard(
 
                     // Fiat value below balance
                     if (fiatValue != null) {
-                        Text(
+                        RollingText(
                             text = fiatValue,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)

@@ -494,6 +494,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 networkType = NetworkType.NetworkType_Mainnet
             )
 
+            // A coalesced switch repainted for another wallet while this kit
+            // was being built: never attach it to the new wallet's UI.
+            if (_activeWallet.value?.id != info.id) {
+                Timber.d("openActiveWallet: active wallet changed during open of ${info.id}; releasing")
+                WalletManager.stopAndRelease()
+                return
+            }
+
             setupKitObservers(kit)
 
             _walletState.update { it.copy(receiveAddress = kit.receiveAddress) }
@@ -839,13 +847,29 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     // Two-phase instant switch (iOS 2dc6eb7 port)
     // =========================================================================
 
-    fun switchWallet(id: String) {
+    /**
+     * Bumped by every phase-1 repaint. Phase 2 of an in-flight switch compares
+     * it before attaching observers so a wallet tapped mid-swap (coalesced
+     * below) never ends up with the previous target's kit under its name.
+     */
+    private var switchGeneration = 0
+    private var switchInFlight = false
+
+    /**
+     * Returns true when the tap was taken (the switcher may collapse), false
+     * when another lifecycle transition (delete, reset, node change, add) owns
+     * the mutex — the caller keeps the rows open, as iOS does.
+     */
+    fun switchWallet(id: String): Boolean {
         val outgoing = _activeWallet.value
-        if (outgoing?.id == id) return
-        val target = _wallets.value.firstOrNull { it.id == id } ?: return
-        // Any lifecycle transition in flight (another switch, delete, reset,
-        // node change, add): drop the tap instead of interleaving.
-        if (!walletMutationMutex.tryLock()) return
+        if (outgoing?.id == id) return false
+        val target = _wallets.value.firstOrNull { it.id == id } ?: return false
+        val locked = walletMutationMutex.tryLock()
+        // A switch is already tearing down / opening: repaint for the new
+        // target now and let that switch's phase 2 open whatever is active
+        // when it gets there (last tap wins). Any other transition: drop.
+        if (!locked && !switchInFlight) return false
+        val coalesced = !locked
 
         // ---- Phase 1: synchronous repaint under the new identity ----
         val oldKit = WalletManager.kit
@@ -872,15 +896,25 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         // No in-memory seed may survive the switch.
         _pendingSeed.value = null
         _walletSessionId.value += 1
+        switchGeneration += 1
 
         // Widget shows the new active wallet's cached data immediately.
         WidgetDataStore.saveBalance(context, target.cachedBalance ?: 0L, target.cachedUnlockedBalance ?: 0L)
         WidgetDataStore.saveSyncStatus(context, "connecting")
-        WalletWidget.updateAll(context)
+
+        if (coalesced) {
+            Timber.d("switchWallet: coalesced onto the in-flight switch -> ${target.id}")
+            viewModelScope.launch(Dispatchers.IO) { WalletWidget.updateAll(context) }
+            return true
+        }
+        switchInFlight = true
 
         // ---- Phase 2: async persist outgoing + full teardown + reopen ----
         viewModelScope.launch {
             try {
+                // RemoteViews + logo bitmap per widget: off the main thread so
+                // the collapse animation above stays smooth.
+                withContext(Dispatchers.IO) { WalletWidget.updateAll(context) }
                 if (outgoing != null && oldKit != null && outgoingBalance != null) {
                     val primary = withContext(Dispatchers.IO) {
                         runCatching { oldKit.getSubaddresses().firstOrNull()?.address }.getOrNull()
@@ -898,14 +932,23 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 // KitManager allows exactly one running kit — await teardown
                 // before opening the new wallet.
                 WalletManager.stopAndRelease()
-                openActiveWallet()
+                // Open whatever is active NOW; if another tap repainted while
+                // we were opening (openActiveWallet bails on a stale
+                // generation), go around again for the newest target.
+                var gen: Int
+                do {
+                    gen = switchGeneration
+                    openActiveWallet()
+                } while (gen != switchGeneration)
             } catch (e: Exception) {
                 Timber.e(e, "switchWallet phase 2 failed")
                 _walletState.update { it.copy(error = e.message) }
             } finally {
+                switchInFlight = false
                 walletMutationMutex.unlock()
             }
         }
+        return true
     }
 
     /**

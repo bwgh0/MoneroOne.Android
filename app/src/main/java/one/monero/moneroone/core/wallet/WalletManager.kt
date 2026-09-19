@@ -73,14 +73,18 @@ object WalletManager {
         // kit exists so nothing stale leaks across.
         stopAndRelease()
 
-        val newKit = MoneroKit.getInstance(
-            context = context,
-            seed = seed,
-            restoreDateOrHeight = restoreDateOrHeight,
-            walletId = walletId,
-            node = node,
-            trustNode = trustNode
-        )
+        // getInstance derives the Electrum seed from BIP39 (PBKDF2 + keccak)
+        // and builds the native service; keep that off the main thread.
+        val newKit = withContext(Dispatchers.IO) {
+            MoneroKit.getInstance(
+                context = context,
+                seed = seed,
+                restoreDateOrHeight = restoreDateOrHeight,
+                walletId = walletId,
+                node = node,
+                trustNode = trustNode
+            )
+        }
 
         kit = newKit
         currentWalletId = walletId
@@ -134,7 +138,9 @@ object WalletManager {
      */
     fun stop() {
         val k = kit ?: return
-        pendingStop = scope.launch {
+        // kit.stop() stores the wallet2 cache and closes the wallet on the
+        // calling thread; never let that run on Main.
+        pendingStop = scope.launch(Dispatchers.IO) {
             try {
                 k.stop()
             } catch (e: Exception) {
@@ -157,8 +163,11 @@ object WalletManager {
         awaitPendingStop()
         observeJobs.forEach { it.cancel() }
         observeJobs = emptyList()
+        val k = kit
         try {
-            kit?.stop()
+            // Native store + close (seconds for a large cache): the wallet
+            // switch used to freeze the UI here because viewModelScope is Main.
+            withContext(Dispatchers.IO) { k?.stop() }
         } catch (e: Exception) {
             Timber.w(e, "WalletManager.stopAndRelease() stop failed")
         }
@@ -167,26 +176,6 @@ object WalletManager {
         Timber.d("WalletManager: stopped and released kit")
     }
 
-    /**
-     * Stop and release the kit, resetting flows, and suspend until the kit has
-     * fully stopped. Callers that delete wallet files afterwards must use this
-     * rather than [clear]: stopping the kit stores the wallet, which would
-     * re-create the very files being deleted.
-     */
-    suspend fun clearAndAwait() {
-        try {
-            // stop() stores and closes the wallet through the native layer, which
-            // blocks; callers run on Main.
-            withContext(Dispatchers.IO) { kit?.stop() }
-        } catch (e: Exception) {
-            Timber.e(e, "WalletManager.clearAndAwait() stop failed")
-        }
-        kit = null
-        _syncStateFlow.value = SyncState.NotSynced(MoneroKit.SyncError.NotStarted)
-        _balanceFlow.value = Balance(0, 0)
-        _transactionsFlow.value = emptyList()
-        Timber.d("WalletManager: cleared (awaited)")
-    }
 
     /**
      * Stop and release the kit. Resets flows to defaults.

@@ -1,6 +1,12 @@
 package one.monero.moneroone.ui.screens.wallet
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -66,6 +72,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletInfo
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
@@ -83,20 +90,69 @@ private val WALLET_EMOJI = listOf(
 )
 
 /**
- * Collapsed switcher chip shown in the WalletScreen header: emoji over name.
+ * Wallet switcher pill in the WalletScreen header (iOS `WalletSwitcherButton`).
+ * Collapsed: emoji over name, 74dp wide. Expanded: it grows to the full
+ * row and becomes the active wallet card (emoji, name, live balance,
+ * address, rename, check). The size change and label swap animate on the
+ * shared `snappy` spring so the pill morphs instead of flipping.
  */
 @Composable
 fun WalletSwitcherButton(
     wallet: WalletInfo?,
-    onToggle: () -> Unit
+    expanded: Boolean,
+    balanceText: String,
+    onToggle: () -> Unit,
+    onRename: (name: String, emoji: String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    var showRename by remember { mutableStateOf(false) }
+
     Box(
-        modifier = Modifier
-            .width(74.dp)
+        modifier = modifier
             .shadow(4.dp, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onToggle)
+    ) {
+        AnimatedContent(
+            targetState = expanded,
+            transitionSpec = {
+                (fadeIn(tween(180, delayMillis = 60)) togetherWith fadeOut(tween(120)))
+                    .using(SizeTransform(clip = false) { _, _ -> Motion.snappy() })
+            },
+            contentAlignment = Alignment.CenterEnd,
+            label = "switcherLabel"
+        ) { isExpanded ->
+            if (isExpanded) {
+                ExpandedSwitcherLabel(
+                    wallet = wallet,
+                    balanceText = balanceText,
+                    onRename = { showRename = true }
+                )
+            } else {
+                CollapsedSwitcherLabel(wallet = wallet)
+            }
+        }
+    }
+
+    val target = wallet
+    if (showRename && target != null) {
+        RenameWalletSheet(
+            wallet = target,
+            onDismiss = { showRename = false },
+            onSave = { name, emoji ->
+                onRename(name, emoji)
+                showRename = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun CollapsedSwitcherLabel(wallet: WalletInfo?) {
+    Box(
+        modifier = Modifier
+            .width(74.dp)
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -119,64 +175,103 @@ fun WalletSwitcherButton(
     }
 }
 
+/** The pill's expanded body: the active wallet card (iOS `expandedLabel`). */
+@Composable
+private fun ExpandedSwitcherLabel(
+    wallet: WalletInfo?,
+    balanceText: String,
+    onRename: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        EmojiCircle(emoji = wallet?.emoji ?: "💰", size = 44.dp)
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = wallet?.name ?: "Wallet",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = balanceText,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MoneroOrange,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            wallet?.cachedPrimaryAddress?.takeIf { it.length > 16 }?.let { address ->
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${address.take(8)}…${address.takeLast(8)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
+
+        IconButton(onClick = onRename) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "Rename wallet",
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = "Active wallet",
+            tint = SuccessGreen,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
 /**
- * Expanded wallet manager: active wallet card + rows for the other wallets
- * (rendered from CACHED data only) + Add Wallet. Inline in WalletScreen,
- * not a sheet (iOS parity).
+ * Expanded wallet manager: rows for the other wallets (rendered from CACHED
+ * data only) + Add Wallet. The active wallet is the expanded header pill
+ * (iOS `WalletManagerRows` under `WalletSwitcherButton`), inline in
+ * WalletScreen, not a sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletManagerRows(
     wallets: List<WalletInfo>,
     activeWallet: WalletInfo?,
-    liveBalanceText: String,
     formatXmr: (Long) -> String,
     onSwitch: (WalletInfo) -> Unit,
     onDelete: (WalletInfo) -> Unit,
-    onRename: (WalletInfo, String, String) -> Unit,
     onAddWallet: () -> Unit
 ) {
-    var renameTarget by remember { mutableStateOf<WalletInfo?>(null) }
     var deleteCandidate by remember { mutableStateOf<WalletInfo?>(null) }
     var isDeleting by remember { mutableStateOf(false) }
-    var isSwitching by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        activeWallet?.let { active ->
-            ActiveWalletCard(
-                wallet = active,
-                balanceText = liveBalanceText,
-                onRename = { renameTarget = active }
-            )
-        }
-
         wallets.filter { it.id != activeWallet?.id }.forEach { wallet ->
             WalletRow(
                 wallet = wallet,
                 formatXmr = formatXmr,
-                onClick = {
-                    if (!isSwitching) {
-                        isSwitching = true
-                        onSwitch(wallet)
-                    }
-                },
+                // No local double-tap guard: switchWallet coalesces a tap that
+                // lands mid-swap and refuses one during another transition,
+                // and the rows stay open in the refused case.
+                onClick = { onSwitch(wallet) },
                 onDeleteRequest = { deleteCandidate = wallet }
             )
         }
 
         AddWalletRow(onClick = onAddWallet)
-    }
-
-    renameTarget?.let { target ->
-        RenameWalletSheet(
-            wallet = target,
-            onDismiss = { renameTarget = null },
-            onSave = { name, emoji ->
-                onRename(target, name, emoji)
-                renameTarget = null
-            }
-        )
     }
 
     deleteCandidate?.let { candidate ->
@@ -212,70 +307,6 @@ fun WalletManagerRows(
                 TextButton(onClick = { deleteCandidate = null }) { Text("Cancel") }
             }
         )
-    }
-}
-
-@Composable
-private fun ActiveWalletCard(
-    wallet: WalletInfo,
-    balanceText: String,
-    onRename: () -> Unit
-) {
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            EmojiCircle(emoji = wallet.emoji, size = 44.dp)
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = wallet.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = balanceText,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MoneroOrange,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                wallet.cachedPrimaryAddress?.takeIf { it.length > 16 }?.let { address ->
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "${address.take(8)}…${address.takeLast(8)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                }
-            }
-
-            IconButton(onClick = onRename) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "Rename wallet",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "Active wallet",
-                tint = SuccessGreen,
-                modifier = Modifier.size(20.dp)
-            )
-        }
     }
 }
 
