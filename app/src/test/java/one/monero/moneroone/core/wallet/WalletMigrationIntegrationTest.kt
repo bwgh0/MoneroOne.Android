@@ -111,15 +111,80 @@ class WalletMigrationIntegrationTest {
     }
 
     @Test
-    fun `incomplete legacy state is cleared not migrated`() {
-        // wallet_id without seed (stale onboarding)
+    fun `incomplete legacy state is left in place and not marked migrated`() {
+        // wallet_id without seed (stale onboarding): its cache may still be
+        // on disk, so nothing is wiped and the sweep stays off (flag unset).
         plain.edit().putString("wallet_id", legacyUuid).apply()
 
         WalletMigration.migrateIfNeeded(plain, secrets, store)
 
         assertTrue(store.wallets().isEmpty())
+        assertFalse(store.migrated)
+        assertEquals(legacyUuid, plain.getString("wallet_id", null))
+        assertEquals(legacyUuid, WalletMigration.legacyCacheId(plain))
+    }
+
+    @Test
+    fun `legacy seed with no PIN hash anywhere is kept, never wiped`() {
+        seedLegacyInstall()
+        plain.edit().remove("pin_hash").apply()
+
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+
+        assertTrue(store.wallets().isEmpty())
+        assertFalse(store.migrated)
+        assertEquals(legacyUuid, plain.getString("wallet_id", null))
+        assertEquals(seedWords.joinToString(" "), encrypted.getString("seed_words", null))
+        assertEquals("BIP39_24", encrypted.getString("seed_type", null))
+    }
+
+    @Test
+    fun `audit build layout with pin_hash in encrypted prefs migrates`() {
+        // 54de740 relocated pin_hash from the plain prefs into the encrypted
+        // store under the same key. This is what the Pixel ran on 2026-09-19.
+        seedLegacyInstall()
+        plain.edit().remove("pin_hash").apply()
+        encrypted.edit().putString("pin_hash", "600000:cc:dd").apply()
+
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+
+        val wallets = store.wallets()
+        assertEquals(1, wallets.size)
+        assertEquals(legacyUuid, wallets[0].derivedWalletId)
+        assertEquals("600000:cc:dd", secrets.pinHash(wallets[0].id))
+        assertEquals(seedWords, secrets.loadSeed(wallets[0].id)?.first)
         assertTrue(store.migrated)
+        // Every legacy copy is gone, including the encrypted pin_hash.
         assertNull(plain.getString("wallet_id", null))
+        assertNull(encrypted.getString("seed_words", null))
+        assertNull(encrypted.getString("pin_hash", null))
+    }
+
+    @Test
+    fun `plain pin_hash wins over an encrypted one when both exist`() {
+        seedLegacyInstall()
+        encrypted.edit().putString("pin_hash", "600000:cc:dd").apply()
+
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+
+        val w = store.wallets().single()
+        assertEquals("80000:aa:bb", secrets.pinHash(w.id))
+        assertNull(encrypted.getString("pin_hash", null))
+    }
+
+    @Test
+    fun `post-migration incomplete fragments are left in place`() {
+        seedLegacyInstall()
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+        val before = store.wallets()
+        // A downgraded build wrote a wallet_id but died before the seed.
+        plain.edit().putString("wallet_id", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee").apply()
+
+        WalletMigration.migrateIfNeeded(plain, secrets, store)
+
+        assertEquals(before, store.wallets())
+        assertTrue(store.migrated)
+        assertEquals("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", plain.getString("wallet_id", null))
     }
 
     // --- Post-migration legacy leftovers (M4) --------------------------------

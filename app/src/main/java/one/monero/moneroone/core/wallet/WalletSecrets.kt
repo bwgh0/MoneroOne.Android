@@ -58,15 +58,25 @@ class WalletSecrets(private val prefs: SharedPreferences) {
         return words.split(" ") to type
     }
 
-    fun wipeLegacySeed() {
+    /**
+     * The single-wallet PIN hash. Builds up to 2858727 kept it in the plain
+     * "monero_wallet" prefs; the audit-remediation build (54de740) relocated
+     * it into this encrypted store under the same key. Migration checks both.
+     */
+    fun legacyPinHash(): String? = prefs.getString(LEGACY_PIN_HASH, null)
+
+    /** Wipe every legacy single-wallet secret (seed, seed type, PIN hash). */
+    fun wipeLegacySecrets() {
         prefs.edit()
             .remove(LEGACY_SEED_WORDS)
             .remove(LEGACY_SEED_TYPE)
+            .remove(LEGACY_PIN_HASH)
             .apply()
     }
 
     companion object {
         const val LEGACY_SEED_WORDS = "seed_words"
         const val LEGACY_SEED_TYPE = "seed_type"
+        const val LEGACY_PIN_HASH = "pin_hash"
     }
 }

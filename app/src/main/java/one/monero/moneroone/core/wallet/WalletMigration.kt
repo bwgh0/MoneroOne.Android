@@ -15,6 +15,15 @@ import java.util.UUID
  *
  * Crash-safety: new data is fully written (secrets, then store + flag) BEFORE
  * any legacy key is wiped, so no crash ordering can lose the wallet.
+ *
+ * Legacy keys are ONLY wiped after a successful import (or a proven
+ * duplicate). Anything this build cannot migrate — a seed with no PIN hash,
+ * a wallet_id with no seed, a layout it does not know — is left in place and
+ * logged; [legacyCacheId] keeps the orphan sweep away from its cache files.
+ * The first hardware upgrade (Pixel, 2026-09-19) hit exactly that: the
+ * audit-remediation build stores pin_hash in the encrypted prefs, the
+ * migration only read the plain prefs, judged the wallet "incomplete", wiped
+ * the seed and swept the cache.
  */
 object WalletMigration {
 
@@ -54,7 +63,8 @@ object WalletMigration {
         val heightStr = plainPrefs.getString("restore_height_str", null)?.toLongOrNull() ?: 0L
         return LegacySnapshot(
             walletId = plainPrefs.getString("wallet_id", null),
-            pinHash = plainPrefs.getString("pin_hash", null),
+            // 2858727 and earlier: plain prefs. 54de740 (audit): encrypted prefs.
+            pinHash = plainPrefs.getString("pin_hash", null) ?: secrets.legacyPinHash(),
             seedWords = seed?.first,
             seedType = seed?.second,
             restoreHeight = if (heightLong > 0L) heightLong else heightStr,
@@ -81,12 +91,20 @@ object WalletMigration {
 
         val legacy = readLegacySnapshot(plainPrefs, secrets)
         if (!legacy.hasCompleteWallet) {
-            // Nothing (or only stale fragments) to migrate. Clear fragments so
-            // onboarding starts clean, then mark done.
             if (legacy.walletId != null || legacy.pinHash != null || legacy.seedWords != null) {
-                Timber.w("WalletMigration: clearing incomplete legacy wallet state")
-                wipeLegacyKeys(plainPrefs, secrets)
+                // Fragments this build cannot turn into a wallet. Never wipe
+                // them (a seed or an on-disk cache may still be the only copy
+                // of someone's keys) and do not mark migrated: a later build
+                // may know how to read them, and the orphan sweep stays off
+                // while the flag is unset.
+                Timber.w(
+                    "WalletMigration: incomplete legacy wallet state left in place " +
+                        "(walletId=${legacy.walletId != null}, pin=${legacy.pinHash != null}, " +
+                        "seed=${!legacy.seedWords.isNullOrEmpty()}, type=${legacy.seedType != null})"
+                )
+                return
             }
+            // Fresh install: nothing to migrate.
             store.migrated = true
             return
         }
@@ -159,14 +177,23 @@ object WalletMigration {
             } else {
                 Timber.i("WalletMigration: post-migration legacy wallet duplicates an existing row; wiping")
             }
+            wipeLegacyKeys(plainPrefs, secrets)
         } else {
-            Timber.w("WalletMigration: clearing incomplete post-migration legacy fragments")
+            // Same rule as first-run: never destroy what we cannot import.
+            Timber.w("WalletMigration: incomplete post-migration legacy fragments left in place")
         }
-        wipeLegacyKeys(plainPrefs, secrets)
     }
 
+    /**
+     * Cache id of a legacy single wallet whose prefs are still present
+     * (migration pending or fragments kept). The orphan sweep must treat it
+     * as known: its `.keys` file may be the only copy of the keys.
+     */
+    fun legacyCacheId(plainPrefs: SharedPreferences): String? =
+        plainPrefs.getString("wallet_id", null)
+
     private fun wipeLegacyKeys(plainPrefs: SharedPreferences, secrets: WalletSecrets) {
-        secrets.wipeLegacySeed()
+        secrets.wipeLegacySecrets()
         plainPrefs.edit()
             .remove("wallet_id")
             .remove("pin_hash")

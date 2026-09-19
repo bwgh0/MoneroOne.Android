@@ -264,8 +264,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
         val list = _wallets.value
+        // A legacy single wallet whose prefs still exist (fragments the
+        // migration refused to wipe) owns its UUID cache; never sweep it.
+        val legacyCacheId = WalletMigration.legacyCacheId(prefs)
         val knownIds = (list.mapNotNull { it.derivedWalletId } +
-            list.mapNotNull { it.deviceWalletId }).toSet()
+            list.mapNotNull { it.deviceWalletId } +
+            listOfNotNull(legacyCacheId)).toSet()
         val allKnown = list.all { it.derivedWalletId != null || it.deviceWalletId != null }
 
         viewModelScope.launch(Dispatchers.IO) {
