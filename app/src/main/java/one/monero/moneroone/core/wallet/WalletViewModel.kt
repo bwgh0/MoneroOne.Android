@@ -419,7 +419,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun unlockWithBiometrics() {
         _isLocked.value = false
-        viewModelScope.launch { walletMutationMutex.withLock { openActiveWallet() } }
+        viewModelScope.launch { walletMutationMutex.withLock { openActiveWalletSettled() } }
     }
 
     /**
@@ -504,7 +504,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
             setupKitObservers(kit)
 
-            _walletState.update { it.copy(receiveAddress = kit.receiveAddress) }
+            // Before the wallet file is open, receiveAddress derives the
+            // address from the seed (BIP39 -> Electrum PBKDF2 + native keys):
+            // ~0.9 s on the Pixel 10, so never on Main.
+            val address = withContext(Dispatchers.IO) { kit.receiveAddress }
+            _walletState.update { it.copy(receiveAddress = address) }
 
             WalletManager.start()
 
@@ -856,6 +860,25 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private var switchInFlight = false
 
     /**
+     * Open whatever wallet is active and keep going until no tap repainted
+     * for another one meanwhile (openActiveWallet bails on a stale
+     * generation). Every mutex-held open goes through here so a wallet tapped
+     * during the post-unlock open, a node change or a switch is honoured.
+     */
+    private suspend fun openActiveWalletSettled() {
+        switchInFlight = true
+        try {
+            var gen: Int
+            do {
+                gen = switchGeneration
+                openActiveWallet()
+            } while (gen != switchGeneration)
+        } finally {
+            switchInFlight = false
+        }
+    }
+
+    /**
      * Returns true when the tap was taken (the switcher may collapse), false
      * when another lifecycle transition (delete, reset, node change, add) owns
      * the mutex — the caller keeps the rows open, as iOS does.
@@ -912,6 +935,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         // ---- Phase 2: async persist outgoing + full teardown + reopen ----
         viewModelScope.launch {
             try {
+                // (switchInFlight stays true until openActiveWalletSettled
+                // clears it, so taps during the persist/teardown coalesce too.)
                 // RemoteViews + logo bitmap per widget: off the main thread so
                 // the collapse animation above stays smooth.
                 withContext(Dispatchers.IO) { WalletWidget.updateAll(context) }
@@ -932,19 +957,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 // KitManager allows exactly one running kit — await teardown
                 // before opening the new wallet.
                 WalletManager.stopAndRelease()
-                // Open whatever is active NOW; if another tap repainted while
-                // we were opening (openActiveWallet bails on a stale
-                // generation), go around again for the newest target.
-                var gen: Int
-                do {
-                    gen = switchGeneration
-                    openActiveWallet()
-                } while (gen != switchGeneration)
+                openActiveWalletSettled()
             } catch (e: Exception) {
                 Timber.e(e, "switchWallet phase 2 failed")
                 _walletState.update { it.copy(error = e.message) }
             } finally {
-                switchInFlight = false
                 walletMutationMutex.unlock()
             }
         }
@@ -1398,14 +1415,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
         val storedHash = storedPinHash() ?: return false
 
+        val t0 = android.os.SystemClock.elapsedRealtime()
         val isValid = verifyPinHash(enteredPin, storedHash)
+        Timber.d("verifyPin: PBKDF2 check took ${android.os.SystemClock.elapsedRealtime() - t0} ms")
 
         if (isValid) {
             resetFailedAttempts()
             migratePinIfNeeded(enteredPin, storedHash)
             _pin.value = enteredPin
             _isLocked.value = false
-            viewModelScope.launch { walletMutationMutex.withLock { openActiveWallet() } }
+            viewModelScope.launch { walletMutationMutex.withLock { openActiveWalletSettled() } }
         } else {
             recordFailedAttempt()
             refreshLockoutState()

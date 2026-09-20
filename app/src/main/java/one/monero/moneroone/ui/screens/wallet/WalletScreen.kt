@@ -2,6 +2,7 @@ package one.monero.moneroone.ui.screens.wallet
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -58,6 +59,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -226,6 +229,22 @@ fun WalletScreen(
                 contentAlignment = Alignment.TopStart,
                 label = "dashboardHead"
             ) { expanded ->
+                // The outgoing content stays laid out under the incoming one
+                // for the length of the spring. Without this a wallet tapped
+                // while the rows are still sliding in hits the balance card
+                // underneath and opens the chart (iOS: allowsHitTesting(false)).
+                val exiting = transition.targetState == EnterExitState.PostExit
+                Box(
+                    modifier = Modifier.pointerInput(exiting) {
+                        if (exiting) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                                }
+                            }
+                        }
+                    }
+                ) {
                 if (expanded) {
                     WalletManagerRows(
                         wallets = wallets,
@@ -281,6 +300,7 @@ fun WalletScreen(
                         }
                     }
                 }
+                } // hit-test guard
             }
         }
 

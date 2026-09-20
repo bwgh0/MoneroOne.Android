@@ -9,9 +9,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +59,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +77,7 @@ import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** Curated emoji set for wallet icons (grid picker, iOS parity in spirit). */
@@ -352,19 +354,51 @@ private fun WalletRow(
             }
         }
 
+        // Swipe-to-delete only engages on a clear LEFTWARD swipe past 24dp
+        // (or a drag back while revealed). The stock draggable claimed the
+        // gesture at the 8dp touch slop in either direction, so a thumb tap
+        // with a little sideways wobble — common when switching quickly —
+        // was swallowed and the row never switched.
+        val dragStartPx = with(density) { 24.dp.toPx() }
         GlassCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(animatedOffset.roundToInt(), 0) }
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta ->
-                        offsetX = (offsetX + delta).coerceIn(-revealPx, 0f)
-                    },
-                    onDragStopped = {
-                        offsetX = if (offsetX < -revealPx * 0.5f) -revealPx else 0f
+                .pointerInput(revealPx, dragStartPx) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val startOffset = offsetX
+                        var dragging = false
+                        var acc = 0f
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            if (change.isConsumed) break   // the list took it (vertical scroll)
+                            val dx = change.positionChange().x
+                            if (!dragging) {
+                                acc += dx
+                                val dy = abs(change.position.y - down.position.y)
+                                if (abs(acc) > dragStartPx) {
+                                    val towardsReveal = acc < 0f || startOffset < 0f
+                                    if (towardsReveal && abs(acc) > dy) {
+                                        dragging = true
+                                        offsetX = (startOffset + acc).coerceIn(-revealPx, 0f)
+                                        change.consume()
+                                    } else {
+                                        break   // rightward or mostly vertical: leave it to click / scroll
+                                    }
+                                }
+                            } else {
+                                offsetX = (offsetX + dx).coerceIn(-revealPx, 0f)
+                                change.consume()
+                            }
+                        }
+                        if (dragging) {
+                            offsetX = if (offsetX < -revealPx * 0.5f) -revealPx else 0f
+                        }
                     }
-                ),
+                },
             onClick = {
                 if (offsetX != 0f) {
                     offsetX = 0f
