@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import android.widget.Toast
 import androidx.compose.ui.Modifier
@@ -64,7 +65,10 @@ fun MainScreen(
     onNavigateToSend: () -> Unit = {},
     onNavigateToReceive: () -> Unit = {}
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    // Saveable: Main leaves composition while a settings sub-page is up, so
+    // plain remember reset the tab to Wallet and Back from Security/Sync/etc.
+    // landed on the wallet home instead of Settings (GitHub issue #4).
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
     val chartUiState by chartViewModel.uiState.collectAsState()
     val walletState by walletViewModel.walletState.collectAsState()
