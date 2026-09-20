@@ -1,12 +1,6 @@
 package one.monero.moneroone.ui.screens.wallet
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -53,9 +47,20 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.key
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.border
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -92,69 +97,31 @@ private val WALLET_EMOJI = listOf(
 )
 
 /**
- * Wallet switcher pill in the WalletScreen header (iOS `WalletSwitcherButton`).
- * Collapsed: emoji over name, 74dp wide. Expanded: it grows to the full
- * row and becomes the active wallet card (emoji, name, live balance,
- * address, rename, check). The size change and label swap animate on the
- * shared `snappy` spring so the pill morphs instead of flipping.
+ * Wallet switcher chip in the WalletScreen header: emoji over name. It stays
+ * a chip while the list is open (an orange ring marks the open state); the
+ * active wallet keeps its own slot in the list below instead of being pulled
+ * up into the chip, so the list never reshuffles on a switch.
  */
 @Composable
 fun WalletSwitcherButton(
     wallet: WalletInfo?,
     expanded: Boolean,
-    balanceText: String,
     onToggle: () -> Unit,
-    onRename: (name: String, emoji: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showRename by remember { mutableStateOf(false) }
-
+    val ring by animateColorAsState(
+        targetValue = if (expanded) MoneroOrange.copy(alpha = 0.7f) else Color.Transparent,
+        animationSpec = Motion.snappy(),
+        label = "switcherRing"
+    )
     Box(
         modifier = modifier
+            .width(74.dp)
             .shadow(4.dp, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.5.dp, ring, RoundedCornerShape(12.dp))
             .clickable(onClick = onToggle)
-    ) {
-        AnimatedContent(
-            targetState = expanded,
-            transitionSpec = {
-                (fadeIn(tween(180, delayMillis = 60)) togetherWith fadeOut(tween(120)))
-                    .using(SizeTransform(clip = false) { _, _ -> Motion.snappy() })
-            },
-            contentAlignment = Alignment.CenterEnd,
-            label = "switcherLabel"
-        ) { isExpanded ->
-            if (isExpanded) {
-                ExpandedSwitcherLabel(
-                    wallet = wallet,
-                    balanceText = balanceText,
-                    onRename = { showRename = true }
-                )
-            } else {
-                CollapsedSwitcherLabel(wallet = wallet)
-            }
-        }
-    }
-
-    val target = wallet
-    if (showRename && target != null) {
-        RenameWalletSheet(
-            wallet = target,
-            onDismiss = { showRename = false },
-            onSave = { name, emoji ->
-                onRename(name, emoji)
-                showRename = false
-            }
-        )
-    }
-}
-
-@Composable
-private fun CollapsedSwitcherLabel(wallet: WalletInfo?) {
-    Box(
-        modifier = Modifier
-            .width(74.dp)
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -177,103 +144,134 @@ private fun CollapsedSwitcherLabel(wallet: WalletInfo?) {
     }
 }
 
-/** The pill's expanded body: the active wallet card (iOS `expandedLabel`). */
-@Composable
-private fun ExpandedSwitcherLabel(
-    wallet: WalletInfo?,
-    balanceText: String,
-    onRename: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        EmojiCircle(emoji = wallet?.emoji ?: "💰", size = 44.dp)
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = wallet?.name ?: "Wallet",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = balanceText,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MoneroOrange,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            wallet?.cachedPrimaryAddress?.takeIf { it.length > 16 }?.let { address ->
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${address.take(8)}…${address.takeLast(8)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
-        }
-
-        IconButton(onClick = onRename) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "Rename wallet",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                modifier = Modifier.size(18.dp)
-            )
-        }
-
-        Icon(
-            imageVector = Icons.Default.Check,
-            contentDescription = "Active wallet",
-            tint = SuccessGreen,
-            modifier = Modifier.size(20.dp)
-        )
-    }
-}
-
 /**
- * Expanded wallet manager: rows for the other wallets (rendered from CACHED
- * data only) + Add Wallet. The active wallet is the expanded header pill
- * (iOS `WalletManagerRows` under `WalletSwitcherButton`), inline in
- * WalletScreen, not a sheet.
+ * Expanded wallet manager: EVERY wallet in store order (insertion order until
+ * the user drags), the active one marked in place with a check and an orange
+ * ring, then Add Wallet. Inline in WalletScreen, not a sheet.
+ *
+ * Gestures per row: tap = switch (or close when it is the active one),
+ * pencil = rename, swipe left = delete (inactive rows), long-press + drag =
+ * reorder, persisted through [onMove].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletManagerRows(
     wallets: List<WalletInfo>,
     activeWallet: WalletInfo?,
+    liveBalanceText: String,
     formatXmr: (Long) -> String,
     onSwitch: (WalletInfo) -> Unit,
     onDelete: (WalletInfo) -> Unit,
+    onRename: (WalletInfo, String, String) -> Unit,
+    onMove: (movedId: String, beforeId: String?) -> Unit,
     onAddWallet: () -> Unit
 ) {
+    var renameTarget by remember { mutableStateOf<WalletInfo?>(null) }
     var deleteCandidate by remember { mutableStateOf<WalletInfo?>(null) }
     var isDeleting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    val gapPx = with(LocalDensity.current) { 10.dp.toPx() }
+
+    // Reorder state: the lifted row follows the finger, the rows it passes
+    // slide out of the way by one step, the drop commits the new order.
+    var dragIndex by remember { mutableStateOf<Int?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var rowHeightPx by remember { mutableFloatStateOf(0f) }
+    var suppressClick by remember { mutableStateOf(false) }
+    // pointerInput lambdas outlive recompositions: read the list and the
+    // drop target through state, never through captured locals.
+    val latestWallets by rememberUpdatedState(wallets)
+    fun dropTarget(from: Int): Int {
+        val stepNow = rowHeightPx + gapPx
+        return if (stepNow <= 0f) from
+        else (from + (dragOffset / stepNow).roundToInt()).coerceIn(0, latestWallets.lastIndex)
+    }
+    val step = rowHeightPx + gapPx
+    val targetIndex = dragIndex?.let { dropTarget(it) }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        wallets.filter { it.id != activeWallet?.id }.forEach { wallet ->
-            WalletRow(
-                wallet = wallet,
-                formatXmr = formatXmr,
-                // No local double-tap guard: switchWallet coalesces a tap that
-                // lands mid-swap and refuses one during another transition,
-                // and the rows stay open in the refused case.
-                onClick = { onSwitch(wallet) },
-                onDeleteRequest = { deleteCandidate = wallet }
-            )
+        wallets.forEachIndexed { index, wallet ->
+            val isActive = wallet.id == activeWallet?.id
+            val isDragging = dragIndex == index
+            val from = dragIndex
+            val shift = when {
+                from == null || targetIndex == null || isDragging -> 0f
+                index > from && index <= targetIndex -> -step
+                index < from && index >= targetIndex -> step
+                else -> 0f
+            }
+            val animatedShift by animateFloatAsState(shift, Motion.snappy(), label = "shift$index")
+            val lift by animateFloatAsState(if (isDragging) 1f else 0f, Motion.snappy(), label = "lift$index")
+
+            key(wallet.id) {
+                WalletRow(
+                    wallet = wallet,
+                    isActive = isActive,
+                    balanceText = if (isActive) liveBalanceText else "${formatXmr(wallet.cachedBalance ?: 0L)} XMR",
+                    modifier = Modifier
+                        .onSizeChanged { if (rowHeightPx == 0f) rowHeightPx = it.height.toFloat() }
+                        .zIndex(if (isDragging) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = if (isDragging) dragOffset else animatedShift
+                            val s = 1f + 0.02f * lift
+                            scaleX = s
+                            scaleY = s
+                            shadowElevation = 14.dp.toPx() * lift
+                            shape = RoundedCornerShape(16.dp)
+                        }
+                        .pointerInput(index, wallets.size) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    dragIndex = index
+                                    dragOffset = 0f
+                                    suppressClick = true
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDrag = { change, delta ->
+                                    change.consume()
+                                    dragOffset += delta.y
+                                },
+                                onDragEnd = {
+                                    val from = dragIndex
+                                    val to = from?.let { dropTarget(it) }
+                                    dragIndex = null
+                                    dragOffset = 0f
+                                    val list = latestWallets
+                                    if (from != null && to != null && to != from && from in list.indices) {
+                                        val remaining = list.filterIndexed { i, _ -> i != from }
+                                        timber.log.Timber.d("reorder: ${list[from].name} -> position $to")
+                                        onMove(list[from].id, remaining.getOrNull(to)?.id)
+                                    }
+                                    scope.launch { delay(300); suppressClick = false }
+                                },
+                                onDragCancel = {
+                                    dragIndex = null
+                                    dragOffset = 0f
+                                    scope.launch { delay(300); suppressClick = false }
+                                }
+                            )
+                        },
+                    onClick = { if (!suppressClick) onSwitch(wallet) },
+                    onRenameRequest = { renameTarget = wallet },
+                    // The active wallet is deleted from Settings, not by a swipe.
+                    onDeleteRequest = if (isActive) null else ({ deleteCandidate = wallet })
+                )
+            }
         }
 
         AddWalletRow(onClick = onAddWallet)
+    }
+
+    renameTarget?.let { target ->
+        RenameWalletSheet(
+            wallet = target,
+            onDismiss = { renameTarget = null },
+            onSave = { name, emoji ->
+                onRename(target, name, emoji)
+                renameTarget = null
+            }
+        )
     }
 
     deleteCandidate?.let { candidate ->
@@ -313,58 +311,66 @@ fun WalletManagerRows(
 }
 
 /**
- * Inactive wallet row rendered from CACHED balance/address only.
- * Swipe-to-delete reveals a trash button in an overlay — only offset/alpha
- * animate, the row never re-lays-out (iOS aa8e835 lesson).
+ * One wallet row (iOS WalletRow): emoji, name, orange balance, address under
+ * it, rename pencil, and a check when it is the active wallet. Swipe-to-delete
+ * reveals a trash button in an overlay — only offset/alpha animate, the row
+ * never re-lays-out (iOS aa8e835 lesson). The drag only engages on a clear
+ * leftward swipe past 24dp so wobbly taps still click.
  */
 @Composable
 private fun WalletRow(
     wallet: WalletInfo,
-    formatXmr: (Long) -> String,
+    isActive: Boolean,
+    balanceText: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    onDeleteRequest: () -> Unit
+    onRenameRequest: () -> Unit,
+    onDeleteRequest: (() -> Unit)?
 ) {
     val density = LocalDensity.current
     val revealPx = with(density) { 72.dp.toPx() }
+    val dragStartPx = with(density) { 24.dp.toPx() }
     var offsetX by remember { mutableFloatStateOf(0f) }
     val animatedOffset by animateFloatAsState(targetValue = offsetX, label = "swipe")
     val revealFraction = (-animatedOffset / revealPx).coerceIn(0f, 1f)
+    val swipeEnabled = onDeleteRequest != null
 
-    Box(modifier = Modifier.fillMaxWidth()) {
-        // Trash overlay behind the row — no layout participation.
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 12.dp)
-                .alpha(revealFraction),
-            contentAlignment = Alignment.Center
-        ) {
-            IconButton(
-                onClick = {
-                    offsetX = 0f
-                    onDeleteRequest()
-                },
-                enabled = revealFraction > 0.9f
+    Box(modifier = modifier.fillMaxWidth()) {
+        if (swipeEnabled) {
+            // Trash overlay behind the row — no layout participation.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 12.dp)
+                    .alpha(revealFraction),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete wallet",
-                    tint = ErrorRed
-                )
+                IconButton(
+                    onClick = {
+                        offsetX = 0f
+                        onDeleteRequest?.invoke()
+                    },
+                    enabled = revealFraction > 0.9f
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete wallet",
+                        tint = ErrorRed
+                    )
+                }
             }
         }
 
-        // Swipe-to-delete only engages on a clear LEFTWARD swipe past 24dp
-        // (or a drag back while revealed). The stock draggable claimed the
-        // gesture at the 8dp touch slop in either direction, so a thumb tap
-        // with a little sideways wobble — common when switching quickly —
-        // was swallowed and the row never switched.
-        val dragStartPx = with(density) { 24.dp.toPx() }
         GlassCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(animatedOffset.roundToInt(), 0) }
-                .pointerInput(revealPx, dragStartPx) {
+                .then(
+                    if (isActive) Modifier.border(1.5.dp, MoneroOrange.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                    else Modifier
+                )
+                .pointerInput(swipeEnabled, revealPx, dragStartPx) {
+                    if (!swipeEnabled) return@pointerInput
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val startOffset = offsetX
@@ -374,7 +380,7 @@ private fun WalletRow(
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (!change.pressed) break
-                            if (change.isConsumed) break   // the list took it (vertical scroll)
+                            if (change.isConsumed) break   // the list or the reorder drag took it
                             val dx = change.positionChange().x
                             if (!dragging) {
                                 acc += dx
@@ -410,10 +416,11 @@ private fun WalletRow(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
+                    .then(if (isActive) Modifier.background(MoneroOrange.copy(alpha = 0.06f)) else Modifier)
+                    .padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                EmojiCircle(emoji = wallet.emoji, size = 40.dp)
+                EmojiCircle(emoji = wallet.emoji, size = 44.dp)
 
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -421,27 +428,51 @@ private fun WalletRow(
                     Text(
                         text = wallet.name,
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = balanceText,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MoneroOrange,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    wallet.cachedPrimaryAddress?.takeIf { it.length > 16 }?.let { address ->
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "${formatXmr(wallet.cachedBalance ?: 0L)} XMR",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            text = "${address.take(8)}…${address.takeLast(8)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            maxLines = 1
                         )
-                        wallet.cachedPrimaryAddress?.takeIf { it.length > 16 }?.let { address ->
-                            Text(
-                                text = "  ${address.take(8)}…",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                maxLines = 1
-                            )
-                        }
                     }
+                }
+
+                IconButton(onClick = onRenameRequest) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Rename wallet",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                if (isActive) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Active wallet",
+                        tint = SuccessGreen,
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .size(20.dp)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.width(28.dp))
                 }
             }
         }

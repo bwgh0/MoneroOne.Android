@@ -5,10 +5,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -202,11 +200,7 @@ fun WalletScreen(
             GreetingHeader(
                 activeWallet = activeWallet,
                 expanded = switcherExpanded,
-                balanceText = "${walletViewModel.formatXmr(walletState.balance.all)} XMR",
-                onToggleSwitcher = { switcherExpanded = !switcherExpanded },
-                onRename = { name, emoji ->
-                    activeWallet?.let { walletViewModel.renameWallet(it.id, name, emoji) }
-                }
+                onToggleSwitcher = { switcherExpanded = !switcherExpanded }
             )
         }
 
@@ -249,17 +243,23 @@ fun WalletScreen(
                     WalletManagerRows(
                         wallets = wallets,
                         activeWallet = activeWallet,
+                        liveBalanceText = "${walletViewModel.formatXmr(walletState.balance.all)} XMR",
                         formatXmr = walletViewModel::formatXmr,
                         onSwitch = { wallet ->
-                            // Collapse only when the switch was taken; a refused
-                            // tap keeps the rows open (iOS prepareSwitchToWallet).
-                            if (walletViewModel.switchWallet(wallet.id)) {
+                            // Tapping the active row just closes the list. Otherwise
+                            // collapse only when the switch was taken; a refused tap
+                            // keeps the rows open (iOS prepareSwitchToWallet).
+                            if (wallet.id == activeWallet?.id || walletViewModel.switchWallet(wallet.id)) {
                                 switcherExpanded = false
                             }
                         },
                         onDelete = { wallet ->
                             walletViewModel.deleteWallet(wallet.id)
                         },
+                        onRename = { wallet, name, emoji ->
+                            walletViewModel.renameWallet(wallet.id, name, emoji)
+                        },
+                        onMove = walletViewModel::reorderWallets,
                         onAddWallet = {
                             switcherExpanded = false
                             onAddWalletClick()
@@ -365,9 +365,7 @@ fun WalletScreen(
 private fun GreetingHeader(
     activeWallet: one.monero.moneroone.core.wallet.WalletInfo?,
     expanded: Boolean,
-    balanceText: String,
-    onToggleSwitcher: () -> Unit,
-    onRename: (name: String, emoji: String) -> Unit
+    onToggleSwitcher: () -> Unit
 ) {
     val greeting = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
         in 0..11 -> "Good Morning"
@@ -375,38 +373,25 @@ private fun GreetingHeader(
         else -> "Good Evening"
     }
 
-    // iOS WalletHeaderContent: the greeting slides out to the leading edge
-    // and the pill takes the whole row, both on .snappy(0.35).
+    // The greeting and the chip stay put whether the list is open or not;
+    // only the content below swaps. The chip's ring shows the open state.
     Row(
         modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AnimatedVisibility(
-            visible = !expanded,
-            enter = fadeIn(Motion.snappy()) +
-                expandHorizontally(Motion.snappy(), expandFrom = Alignment.Start) +
-                slideInHorizontally(Motion.snappy()) { -it / 2 },
-            exit = fadeOut(tween(160)) +
-                shrinkHorizontally(Motion.snappy(), shrinkTowards = Alignment.Start) +
-                slideOutHorizontally(Motion.snappy()) { -it / 2 }
-        ) {
-            Text(
-                text = greeting,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                modifier = Modifier.padding(end = 12.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = greeting,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = Modifier.padding(end = 12.dp)
+        )
 
         WalletSwitcherButton(
             wallet = activeWallet,
             expanded = expanded,
-            balanceText = balanceText,
-            onToggle = onToggleSwitcher,
-            onRename = onRename
+            onToggle = onToggleSwitcher
         )
     }
 }

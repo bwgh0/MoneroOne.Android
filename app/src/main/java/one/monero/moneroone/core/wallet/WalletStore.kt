@@ -146,6 +146,20 @@ class WalletStore(private val prefs: SharedPreferences) {
             return "Wallet $n"
         }
 
+        /**
+         * The list with [movedId] placed right before [beforeId] (or last when
+         * null). Unknown ids leave the list untouched. Order in the store is
+         * the order the user sees: insertion order until they drag.
+         */
+        fun reordered(list: List<WalletInfo>, movedId: String, beforeId: String?): List<WalletInfo> {
+            val moved = list.firstOrNull { it.id == movedId } ?: return list
+            if (beforeId == movedId) return list
+            val remaining = list.filterNot { it.id == movedId }
+            val at = if (beforeId == null) remaining.size
+                else remaining.indexOfFirst { it.id == beforeId }.takeIf { it >= 0 } ?: return list
+            return remaining.toMutableList().apply { add(at, moved) }
+        }
+
         /** True when any wallet exists (new store or legacy single-wallet key). */
         fun hasAnyWallet(context: Context): Boolean {
             val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)

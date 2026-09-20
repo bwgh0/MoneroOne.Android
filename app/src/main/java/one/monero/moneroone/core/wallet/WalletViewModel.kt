@@ -1011,6 +1011,19 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     // Rename / delete
     // =========================================================================
 
+    /**
+     * Persist a drag reorder: [movedId] lands right before [beforeId] (or
+     * last). Store order is what the switcher shows; the active wallet keeps
+     * its slot like any other row.
+     */
+    fun reorderWallets(movedId: String, beforeId: String?) {
+        val fresh = store.wallets()
+        val reordered = WalletStore.reordered(fresh, movedId, beforeId)
+        if (reordered == fresh) return
+        store.saveWallets(reordered)
+        _wallets.value = reordered
+    }
+
     fun renameWallet(id: String, name: String, emoji: String) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return

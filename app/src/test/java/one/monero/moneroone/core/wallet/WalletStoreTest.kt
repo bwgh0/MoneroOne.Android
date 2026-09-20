@@ -70,4 +70,25 @@ class WalletStoreTest {
         // "Wallet 3" taken -> bump
         assertEquals("Wallet 4", WalletStore.nextWalletName(listOf("A", "B", "Wallet 3")))
     }
+
+    @Test
+    fun `reordered moves a wallet before another and to the end`() {
+        val a = WalletInfo(id = "a", name = "A")
+        val b = WalletInfo(id = "b", name = "B")
+        val c = WalletInfo(id = "c", name = "C")
+        val list = listOf(a, b, c)
+        assertEquals(listOf(c, a, b), WalletStore.reordered(list, "c", "a"))
+        assertEquals(listOf(b, c, a), WalletStore.reordered(list, "a", null))
+        assertEquals(listOf(a, c, b), WalletStore.reordered(list, "c", "b"))
+    }
+
+    @Test
+    fun `reordered ignores unknown ids and a self-target`() {
+        val a = WalletInfo(id = "a", name = "A")
+        val b = WalletInfo(id = "b", name = "B")
+        val list = listOf(a, b)
+        assertEquals(list, WalletStore.reordered(list, "zzz", "a"))
+        assertEquals(list, WalletStore.reordered(list, "a", "zzz"))
+        assertEquals(list, WalletStore.reordered(list, "a", "a"))
+    }
 }
