@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import io.horizontalsystems.hdwalletkit.Mnemonic
 import io.horizontalsystems.monerokit.Balance
 import io.horizontalsystems.monerokit.CakeWalletStyleConverter
@@ -37,6 +35,7 @@ import one.monero.moneroone.data.repository.PriceRepository
 import one.monero.moneroone.widget.PriceWidget
 import one.monero.moneroone.widget.WalletWidget
 import one.monero.moneroone.widget.WidgetDataStore
+import one.monero.moneroone.core.node.NodeCredentialStore
 import timber.log.Timber
 import java.io.File
 import java.math.BigDecimal
@@ -150,23 +149,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val _sendState = MutableStateFlow<SendState>(SendState.Idle)
     val sendState: StateFlow<SendState> = _sendState.asStateFlow()
 
-    // Encrypted storage for seeds + per-wallet PIN hashes
-    private val encryptedPrefs: SharedPreferences by lazy {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-
-        EncryptedSharedPreferences.create(
-            context,
-            "secure_wallet_data",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    }
+    // Encrypted storage for seeds, per-wallet PIN hashes and node RPC credentials
+    private val encryptedPrefs: SharedPreferences by lazy { SecurePrefs.open(context) }
 
     private val store by lazy { WalletStore(prefs) }
     private val secrets by lazy { WalletSecrets(encryptedPrefs) }
+    private val nodeCredentials by lazy { NodeCredentialStore(encryptedPrefs) }
 
     init {
         loadSelectedCurrency()
@@ -481,15 +469,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
 
             val (seedWords, seedType) = seedData
-            val node = getSelectedNode()
-            Timber.d("openActiveWallet: wallet=${info.id} cacheId=$cacheId node=$node seedType=$seedType")
+            val nodeUri = getSelectedNode()
+            Timber.d("openActiveWallet: wallet=${info.id} cacheId=$cacheId node=$nodeUri seedType=$seedType")
 
             val kit = WalletManager.initialize(
                 context = context,
                 seed = moneroSeed(seedWords, seedType),
                 restoreDateOrHeight = info.restoreHeight.toString(),
                 walletId = cacheId,
-                node = node,
+                node = nodeCredentials.kitNodeString(nodeUri),
                 trustNode = false,
                 networkType = NetworkType.NetworkType_Mainnet
             )
@@ -748,7 +736,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 seed = kitSeed,
                 restoreDateOrHeight = restoreHeight.toString(),
                 walletId = derived,
-                node = getSelectedNode(),
+                node = nodeCredentials.kitNodeString(getSelectedNode()),
                 trustNode = false,
                 networkType = NetworkType.NetworkType_Mainnet
             )
@@ -1725,9 +1713,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
-     * Get the user's selected node from SharedPreferences, or fall back to default.
+     * The user's selected node as a bare host:port (fallback: the install's
+     * default), safe to log and compare. Any RPC login lives in
+     * [nodeCredentials]; only the kit start composes the two.
      */
     private fun getSelectedNode(): String {
+        nodeCredentials.migrateInline(prefs)
         val savedNode = prefs.getString("selected_node", null)
         val node = savedNode ?: DefaultNodes.initial(context)
         Timber.d("getSelectedNode: savedNode=$savedNode, using node=$node")
