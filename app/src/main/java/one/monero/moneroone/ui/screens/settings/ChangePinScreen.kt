@@ -47,6 +47,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
+import one.monero.moneroone.ui.components.KeypadKey
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 
@@ -93,15 +94,23 @@ fun ChangePinScreen(
     }
 
     fun onDigitPress(digit: String) {
-        if (currentValue.length < PIN_LENGTH) {
+        // Read the state, not this composition's snapshot: keys act on touch-down,
+        // so two digits can land within one frame.
+        val entered = when (step) {
+            ChangePinStep.ENTER_CURRENT -> currentPin
+            ChangePinStep.ENTER_NEW -> newPin
+            ChangePinStep.CONFIRM_NEW -> confirmPin
+        }
+        if (entered.length < PIN_LENGTH) {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             error = null
             when (step) {
                 ChangePinStep.ENTER_CURRENT -> {
                     currentPin += digit
                     if (currentPin.length == PIN_LENGTH) {
+                        val oldPin = currentPin
                         scope.launch {
-                            if (!walletViewModel.verifyPinOnly(currentPin)) {
+                            if (!walletViewModel.verifyPinOnly(oldPin)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 error = "Incorrect PIN"
                                 shakeAnimation = true
@@ -128,8 +137,10 @@ fun ChangePinScreen(
                             confirmPin = ""
                         } else {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val oldPin = currentPin
+                            val chosen = newPin
                             scope.launch {
-                                walletViewModel.changePin(currentPin, newPin)
+                                walletViewModel.changePin(oldPin, chosen)
                                 onSuccess()
                             }
                         }
@@ -285,34 +296,38 @@ private fun NumberPad(
                     when (button) {
                         "" -> Spacer(modifier = Modifier.size(80.dp))
                         "back" -> {
-                            IconButton(
-                                onClick = onBackspace,
-                                modifier = Modifier.size(80.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Backspace,
-                                    contentDescription = "Backspace",
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onBackground
-                                )
+                            KeypadKey(onPress = onBackspace) { onClick ->
+                                IconButton(
+                                    onClick = onClick,
+                                    modifier = Modifier.size(80.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Backspace,
+                                        contentDescription = "Backspace",
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
                             }
                         }
                         else -> {
-                            GlassButton(
-                                onClick = { onDigitPress(button) },
-                                modifier = Modifier.size(80.dp),
-                                cornerRadius = 40.dp
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
+                            KeypadKey(onPress = { onDigitPress(button) }) { onClick ->
+                                GlassButton(
+                                    onClick = onClick,
+                                    modifier = Modifier.size(80.dp),
+                                    cornerRadius = 40.dp
                                 ) {
-                                    Text(
-                                        text = button,
-                                        fontSize = 28.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = button,
+                                            fontSize = 28.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
                                 }
                             }
                         }

@@ -14,10 +14,12 @@ import one.monero.moneroone.core.alert.PriceAlertManager
 import one.monero.moneroone.core.alert.PriceAlertWorker
 import one.monero.moneroone.core.service.WalletSyncService
 import one.monero.moneroone.core.util.NetworkMonitor
+import one.monero.moneroone.core.wallet.PinHash
 import one.monero.moneroone.core.wallet.WalletManager
 import one.monero.moneroone.widget.PriceWidget
 import one.monero.moneroone.widget.WalletWidget
 import timber.log.Timber
+import kotlin.concurrent.thread
 
 class MoneroOneApp : Application() {
 
@@ -68,6 +70,10 @@ class MoneroOneApp : Application() {
         }
 
         createNotificationChannels()
+
+        // The PIN check runs natively in the kit's library; load it now, off
+        // Main, so the first unlock after a cold start does not wait for it.
+        thread(name = "pin-hash-preload", isDaemon = true) { PinHash.preload() }
 
         // Initialize network monitor
         NetworkMonitor.init(this)

@@ -70,6 +70,7 @@ import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.SeedType
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
+import one.monero.moneroone.ui.components.KeypadKey
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
@@ -141,8 +142,9 @@ fun BackupSeedScreen(
             pinError = null
             pin += digit
             if (pin.length == PIN_LENGTH) {
+                val entered = pin
                 scope.launch {
-                    val verified = walletViewModel.verifyPinOnly(pin)
+                    val verified = walletViewModel.verifyPinOnly(entered)
                     if (verified) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         isUnlocked = true
@@ -568,34 +570,38 @@ private fun NumberPadBackup(
                     when (button) {
                         "" -> Spacer(modifier = Modifier.size(80.dp))
                         "back" -> {
-                            IconButton(
-                                onClick = onBackspace,
-                                modifier = Modifier.size(80.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Backspace,
-                                    contentDescription = "Backspace",
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onBackground
-                                )
+                            KeypadKey(onPress = onBackspace) { onClick ->
+                                IconButton(
+                                    onClick = onClick,
+                                    modifier = Modifier.size(80.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Backspace,
+                                        contentDescription = "Backspace",
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
                             }
                         }
                         else -> {
-                            GlassButton(
-                                onClick = { onDigitPress(button) },
-                                modifier = Modifier.size(80.dp),
-                                cornerRadius = 40.dp
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
+                            KeypadKey(onPress = { onDigitPress(button) }) { onClick ->
+                                GlassButton(
+                                    onClick = onClick,
+                                    modifier = Modifier.size(80.dp),
+                                    cornerRadius = 40.dp
                                 ) {
-                                    Text(
-                                        text = button,
-                                        fontSize = 28.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = button,
+                                            fontSize = 28.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
                                 }
                             }
                         }

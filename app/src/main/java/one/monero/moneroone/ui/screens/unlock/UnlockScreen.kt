@@ -58,6 +58,7 @@ import kotlinx.coroutines.launch
 import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
+import one.monero.moneroone.ui.components.KeypadKey
 import one.monero.moneroone.ui.components.MoneroLogo
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
@@ -120,8 +121,9 @@ fun UnlockScreen(
         errorMessage = null
 
         if (pin.length == PIN_LENGTH) {
+            val entered = pin // a backspace landing before the launch runs must not change it
             scope.launch {
-                if (walletViewModel.verifyPin(pin)) {
+                if (walletViewModel.verifyPin(entered)) {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onUnlocked()
                 } else {
@@ -385,23 +387,27 @@ private fun NumberPad(
                             }
                         }
                         "back" -> {
-                            IconButton(
-                                onClick = onBackspace,
-                                modifier = Modifier.size(80.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Backspace,
-                                    contentDescription = "Backspace",
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onBackground
-                                )
+                            KeypadKey(onPress = onBackspace) { onClick ->
+                                IconButton(
+                                    onClick = onClick,
+                                    modifier = Modifier.size(80.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Backspace,
+                                        contentDescription = "Backspace",
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
                             }
                         }
                         else -> {
-                            NumberButton(
-                                digit = button,
-                                onClick = { onDigitPress(button) }
-                            )
+                            KeypadKey(onPress = { onDigitPress(button) }) { onClick ->
+                                NumberButton(
+                                    digit = button,
+                                    onClick = onClick
+                                )
+                            }
                         }
                     }
                 }

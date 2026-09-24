@@ -39,11 +39,7 @@ import one.monero.moneroone.core.node.NodeCredentialStore
 import timber.log.Timber
 import java.io.File
 import java.math.BigDecimal
-import java.security.MessageDigest
-import java.security.SecureRandom
 import java.util.UUID
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.PBEKeySpec
 
 data class WalletState(
     val hasWallet: Boolean = false,
@@ -1244,12 +1240,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     private companion object {
         const val FAILOVER_RETRY_DELAY_MS = 5_000L
-        // OWASP's floor for PBKDF2-HMAC-SHA256. Existing hashes are rewritten at
-        // this count on the next successful unlock (see migratePinIfNeeded).
-        const val PBKDF2_ITERATIONS = 600_000
-        const val PBKDF2_KEY_LENGTH = 256
-        const val PBKDF2_SALT_LENGTH = 16
-        const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
 
         // PIN rate limiting thresholds
         const val RATE_LIMIT_TIER1_ATTEMPTS = 5   // 30s lockout
@@ -1285,19 +1275,26 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun resetFailedAttempts() {
-        encryptedPrefs.edit()
-            .putInt("pin_fail_count", 0)
-            .putLong("pin_fail_timestamp", 0L)
-            .apply()
+        // Nothing to reset on almost every unlock: skip the encrypted write.
+        if (getFailedAttempts() != 0 || getLastFailTimestamp() != 0L) {
+            encryptedPrefs.edit()
+                .putInt("pin_fail_count", 0)
+                .putLong("pin_fail_timestamp", 0L)
+                .apply()
+        }
         _pinAttemptsRemaining.value = RATE_LIMIT_WIPE_ATTEMPTS
         _pinLockoutSeconds.value = 0L
     }
 
-    fun shouldWipeWallet(): Boolean {
-        return getFailedAttempts() >= RATE_LIMIT_WIPE_ATTEMPTS
+    // The counters live in EncryptedSharedPreferences (Keystore-backed
+    // decrypts): read them off Main so the keypad never waits on them.
+    suspend fun shouldWipeWallet(): Boolean = withContext(Dispatchers.IO) {
+        getFailedAttempts() >= RATE_LIMIT_WIPE_ATTEMPTS
     }
 
-    fun getRemainingLockoutMs(): Long {
+    suspend fun getRemainingLockoutMs(): Long = withContext(Dispatchers.IO) { remainingLockoutMs() }
+
+    private fun remainingLockoutMs(): Long {
         val attempts = getFailedAttempts()
         val lastFail = getLastFailTimestamp()
         if (attempts < RATE_LIMIT_TIER1_ATTEMPTS || lastFail == 0L) return 0L
@@ -1311,59 +1308,22 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return (delayMs - elapsed).coerceAtLeast(0L)
     }
 
-    fun refreshLockoutState() {
-        val remaining = getRemainingLockoutMs()
+    suspend fun refreshLockoutState() = withContext(Dispatchers.IO) {
+        val remaining = remainingLockoutMs()
         _pinLockoutSeconds.value = (remaining + 999) / 1000 // ceil to seconds
         _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - getFailedAttempts()).coerceAtLeast(0)
     }
 
-
+    // PBKDF2 itself lives in PinHash (native rounds through the kit).
     private suspend fun hashPin(pin: String): String = withContext(Dispatchers.Default) {
-        val salt = ByteArray(PBKDF2_SALT_LENGTH).also { SecureRandom().nextBytes(it) }
-        val spec = PBEKeySpec(pin.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
-        val hash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).encoded
-        val saltHex = salt.joinToString("") { "%02x".format(it) }
-        val hashHex = hash.joinToString("") { "%02x".format(it) }
-        // Format: iterations:salt:hash
-        "$PBKDF2_ITERATIONS:$saltHex:$hashHex"
+        PinHash.create(pin)
     }
 
     private suspend fun verifyPinHash(pin: String, stored: String): Boolean = withContext(Dispatchers.Default) {
-        val parts = stored.split(":")
-        when (parts.size) {
-            1 -> {
-                // Legacy format: String.hashCode()
-                pin.hashCode().toString() == stored
-            }
-            2 -> {
-                // Old PBKDF2 format (salt:hash) — used 600k iterations
-                val salt = parts[0].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                val expectedHash = parts[1]
-                val spec = PBEKeySpec(pin.toCharArray(), salt, 600_000, PBKDF2_KEY_LENGTH)
-                val actualHash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).encoded
-                    .joinToString("") { "%02x".format(it) }
-                MessageDigest.isEqual(
-                    expectedHash.toByteArray(Charsets.UTF_8),
-                    actualHash.toByteArray(Charsets.UTF_8)
-                )
-            }
-            3 -> {
-                // Current format: iterations:salt:hash
-                val iterations = parts[0].toIntOrNull() ?: return@withContext false
-                val salt = parts[1].chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                val expectedHash = parts[2]
-                val spec = PBEKeySpec(pin.toCharArray(), salt, iterations, PBKDF2_KEY_LENGTH)
-                val actualHash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).encoded
-                    .joinToString("") { "%02x".format(it) }
-                MessageDigest.isEqual(
-                    expectedHash.toByteArray(Charsets.UTF_8),
-                    actualHash.toByteArray(Charsets.UTF_8)
-                )
-            }
-            else -> false
-        }
+        PinHash.verify(pin, stored)
     }
 
+    /** Reads encrypted storage: call from a background dispatcher. */
     private fun storedPinHash(): String? {
         _activeWallet.value?.let { active ->
             secrets.pinHash(active.id)?.let { return it }
@@ -1372,20 +1332,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun migratePinIfNeeded(pin: String, storedHash: String) {
-        val needsMigration = when (storedHash.split(":").size) {
-            1 -> true    // Legacy hashCode
-            2 -> true    // Old 600k format without iteration count
-            3 -> {
-                // Current format — migrate if iteration count changed
-                val iterations = storedHash.split(":")[0].toIntOrNull()
-                iterations != PBKDF2_ITERATIONS
-            }
-            else -> false
-        }
-        if (needsMigration) {
+        if (PinHash.needsRehash(storedHash)) {
             val newHash = hashPin(pin)
-            _wallets.value.forEach { secrets.savePinHash(it.id, newHash) }
-            Timber.d("PIN hash migrated to current format ($PBKDF2_ITERATIONS iterations)")
+            withContext(Dispatchers.IO) {
+                _wallets.value.forEach { secrets.savePinHash(it.id, newHash) }
+            }
+            Timber.d("PIN hash migrated to current format (${PinHash.ITERATIONS} iterations)")
         }
     }
 
@@ -1398,7 +1350,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         // Under the lifecycle mutex so an add in flight cannot inherit a
         // stale hash and leave one wallet on a different PIN.
         walletMutationMutex.withLock {
-            store.wallets().forEach { secrets.savePinHash(it.id, pinHash) }
+            withContext(Dispatchers.IO) {
+                store.wallets().forEach { secrets.savePinHash(it.id, pinHash) }
+            }
         }
         _pin.value = pin
         _isLocked.value = false
@@ -1411,23 +1365,23 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     suspend fun verifyPin(enteredPin: String): Boolean {
-        // Check rate limiting
-        if (getRemainingLockoutMs() > 0) return false
-
-        val storedHash = storedPinHash() ?: return false
+        // Rate limiting + stored hash: encrypted reads, off Main.
+        val storedHash = withContext(Dispatchers.IO) {
+            if (remainingLockoutMs() > 0) null else storedPinHash()
+        } ?: return false
 
         val t0 = android.os.SystemClock.elapsedRealtime()
         val isValid = verifyPinHash(enteredPin, storedHash)
         Timber.d("verifyPin: PBKDF2 check took ${android.os.SystemClock.elapsedRealtime() - t0} ms")
 
         if (isValid) {
-            resetFailedAttempts()
+            withContext(Dispatchers.IO) { resetFailedAttempts() }
             migratePinIfNeeded(enteredPin, storedHash)
             _pin.value = enteredPin
             _isLocked.value = false
             viewModelScope.launch { walletMutationMutex.withLock { openActiveWalletSettled() } }
         } else {
-            recordFailedAttempt()
+            withContext(Dispatchers.IO) { recordFailedAttempt() }
             refreshLockoutState()
         }
 
@@ -1440,16 +1394,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * limiter so this cannot be used as an unthrottled PIN oracle.
      */
     suspend fun verifyPinForAction(enteredPin: String): Boolean {
-        if (getRemainingLockoutMs() > 0) return false
-
-        val storedHash = storedPinHash() ?: return false
+        val storedHash = withContext(Dispatchers.IO) {
+            if (remainingLockoutMs() > 0) null else storedPinHash()
+        } ?: return false
         val isValid = verifyPinHash(enteredPin, storedHash)
 
         if (isValid) {
-            resetFailedAttempts()
+            withContext(Dispatchers.IO) { resetFailedAttempts() }
             migratePinIfNeeded(enteredPin, storedHash)
         } else {
-            recordFailedAttempt()
+            withContext(Dispatchers.IO) { recordFailedAttempt() }
             refreshLockoutState()
         }
 
@@ -1457,7 +1411,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     suspend fun verifyPinOnly(enteredPin: String): Boolean {
-        val storedHash = storedPinHash() ?: return false
+        val storedHash = withContext(Dispatchers.IO) { storedPinHash() } ?: return false
 
         val isValid = verifyPinHash(enteredPin, storedHash)
         if (isValid) {
@@ -1476,7 +1430,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
         val allWallets = _wallets.value
         // Pass 1: every wallet's seed must be readable before anything is written.
-        val readable = allWallets.all { it.isViewOnly || secrets.hasSeed(it.id) }
+        val readable = withContext(Dispatchers.IO) {
+            allWallets.all { it.isViewOnly || secrets.hasSeed(it.id) }
+        }
         if (!readable) {
             Timber.e("changePin aborted: not all wallet secrets readable")
             return false
@@ -1486,7 +1442,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         // a wallet added mid-change cannot keep the old hash.
         val pinHash = hashPin(newPin)
         walletMutationMutex.withLock {
-            store.wallets().forEach { secrets.savePinHash(it.id, pinHash) }
+            withContext(Dispatchers.IO) {
+                store.wallets().forEach { secrets.savePinHash(it.id, pinHash) }
+            }
         }
         _pin.value = newPin
         return true
