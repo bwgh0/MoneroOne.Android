@@ -305,6 +305,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         // Clear timestamp so we don't re-check
         prefs.edit().remove("background_timestamp").apply()
 
+        // A connection idle this long may have died silently (NAT timeout, network change); a request
+        // sent on it hangs for wallet2's 3.5 min RPC timeout, so start the node connection fresh.
+        if (elapsedSeconds >= WalletManager.RECYCLE_AFTER_BACKGROUND_S) {
+            WalletManager.recycleConnection("back after ${elapsedSeconds}s in the background")
+        }
+
         // Suppress auto-lock while the add-wallet flow is open (iOS parity).
         if (_addWalletFlowDepth.value > 0) return
 
@@ -499,6 +505,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             _walletState.update { it.copy(receiveAddress = address) }
 
             WalletManager.start()
+
+            // Neither started nor failed: the start was abandoned for a newer tap or a node change (see
+            // WalletManager.abandonStart), whose transition opens the right wallet next.
+            if (!kit.isStarted && kit.syncStateFlow.value is SyncState.Connecting) {
+                Timber.d("openActiveWallet: start of ${info.id} abandoned")
+                return
+            }
 
             // An unloadable cache (process killed mid-store, downgrade to an
             // older wallet2, disk damage) used to leave the wallet on
@@ -915,6 +928,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
         if (coalesced) {
             Timber.d("switchWallet: coalesced onto the in-flight switch -> ${target.id}")
+            // The kit being started is for the wallet just left: don't wait out its first node contact.
+            WalletManager.abandonStart()
             viewModelScope.launch(Dispatchers.IO) { WalletWidget.updateAll(context) }
             return true
         }
@@ -1573,28 +1588,40 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun changeNode(resetFailover: Boolean = true) {
-        if (resetFailover) failoverAttempts = 0
+        if (resetFailover) {
+            failoverAttempts = 0
+            failoverJob?.cancel()
+        }
+        // An open in flight is for the old node: don't queue behind its first node contact.
+        if (switchInFlight) WalletManager.abandonStart()
         viewModelScope.launch {
-            walletMutationMutex.withLock {
-                try {
-                    _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
+            walletMutationMutex.withLock { reopenActiveWallet(errorPrefix = "Failed to change node") }
+        }
+    }
 
-                    cancelKitObservers()
-                    // Stop the current kit and release reference (wallet files preserved)
-                    WalletManager.stopAndRelease()
-
-                    // Reinitialize with the new node (wallet files still exist, sync resumes)
-                    openActiveWallet()
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to change node")
-                    _walletState.update {
-                        it.copy(
-                            syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                            error = "Failed to change node: ${e.message}"
-                        )
-                    }
-                }
+    /**
+     * Stop the kit and open the active wallet again (node change, failover, refresh); wallet files are
+     * kept, so sync resumes. Runs as a switch does: a wallet tapped meanwhile coalesces onto it (last tap
+     * wins) instead of being refused, which left the switcher dead while a node change or failover was
+     * in flight.
+     */
+    private suspend fun reopenActiveWallet(errorPrefix: String) {
+        switchInFlight = true
+        try {
+            _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
+            cancelKitObservers()
+            WalletManager.stopAndRelease()
+            openActiveWalletSettled()
+        } catch (e: Exception) {
+            Timber.e(e, errorPrefix)
+            _walletState.update {
+                it.copy(
+                    syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
+                    error = "$errorPrefix: ${e.message}"
+                )
             }
+        } finally {
+            switchInFlight = false
         }
     }
 
@@ -1628,25 +1655,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun refreshSync() {
         failoverAttempts = 0
+        if (switchInFlight) WalletManager.abandonStart()
         viewModelScope.launch {
-            walletMutationMutex.withLock {
-                try {
-                    _walletState.update {
-                        it.copy(syncState = SyncState.Connecting(waiting = false))
-                    }
-                    cancelKitObservers()
-                    WalletManager.stopAndRelease()
-                    openActiveWallet()
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to refresh sync")
-                    _walletState.update {
-                        it.copy(
-                            syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
-                            error = "Failed to refresh: ${e.message}"
-                        )
-                    }
-                }
-            }
+            walletMutationMutex.withLock { reopenActiveWallet(errorPrefix = "Failed to refresh") }
         }
     }
 

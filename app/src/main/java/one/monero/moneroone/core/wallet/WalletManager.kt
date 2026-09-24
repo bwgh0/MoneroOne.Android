@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import one.monero.moneroone.core.util.NetworkMonitor
 import timber.log.Timber
 
 /**
@@ -32,8 +33,18 @@ import timber.log.Timber
  */
 object WalletManager {
 
+    /** Back from the background at least this long: the node connection is started fresh. */
+    const val RECYCLE_AFTER_BACKGROUND_S = 30L
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var observeJobs: List<Job> = emptyList()
+
+    init {
+        // A connection opened on the previous network is dead after a switch (Wi-Fi <-> cellular).
+        scope.launch {
+            NetworkMonitor.networkChanges.collect { recycleConnection("default network changed") }
+        }
+    }
 
     /** In-flight fire-and-forget stop (see [stop]); joined before any start/reopen. */
     private var pendingStop: Job? = null
@@ -176,6 +187,27 @@ object WalletManager {
         Timber.d("WalletManager: stopped and released kit")
     }
 
+
+    /**
+     * The kit's start in flight is for a wallet or node the user has already left: make it give up now
+     * instead of holding every later transition until wallet2's connection check times out (MoneroKit.abandonStart).
+     */
+    fun abandonStart() {
+        val k = kit ?: return
+        scope.launch(Dispatchers.IO) { k.abandonStart() }
+    }
+
+    /**
+     * Drop the running kit's node connection so the next RPC dials a fresh one (MoneroKit.recycleConnection):
+     * a request sent on a connection that died silently otherwise stalls sync for wallet2's 3.5 min timeout.
+     */
+    fun recycleConnection(reason: String) {
+        val k = kit ?: return
+        scope.launch(Dispatchers.IO) {
+            Timber.d("WalletManager: recycling the node connection ($reason)")
+            k.recycleConnection()
+        }
+    }
 
     /**
      * Stop and release the kit. Resets flows to defaults.
