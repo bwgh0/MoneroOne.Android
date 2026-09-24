@@ -1,6 +1,7 @@
 package one.monero.moneroone.core.wallet
 
 import io.horizontalsystems.monerokit.util.NativeCrypto
+import timber.log.Timber
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
@@ -51,7 +52,14 @@ object PinHash {
         if (iterations < 1) return false
         val salt = hexToBytes(saltHex)?.takeIf { it.isNotEmpty() } ?: return false
         val expected = hexToBytes(hashHex)?.takeIf { it.isNotEmpty() } ?: return false
-        return constantTimeEquals(derive(pin, salt, iterations), expected)
+        if (constantTimeEquals(derive(pin, salt, iterations), expected)) return true
+        if (!usesNative(pin)) return false
+        // Stored hashes were written by the JCA. Should the native rounds ever disagree with it on some
+        // device, a right PIN would count toward the wipe limit: let the JCA settle a mismatch before the
+        // PIN is called wrong. Costs a wrong PIN the JCA's second or so.
+        val matched = constantTimeEquals(deriveJca(pin, salt, iterations), expected)
+        if (matched) Timber.e("PinHash: native PBKDF2 disagreed with the JCA; verified through the JCA")
+        return matched
     }
 
     /** True for a verified hash in an older format or at another round count. */
@@ -65,11 +73,13 @@ object PinHash {
     }
 
     fun derive(pin: String, salt: ByteArray, iterations: Int): ByteArray =
-        if (NativeCrypto.isAvailable && pin.all { it.code < 0x80 }) {
+        if (usesNative(pin)) {
             deriveNative(pin, salt, iterations)
         } else {
             deriveJca(pin, salt, iterations)
         }
+
+    private fun usesNative(pin: String): Boolean = NativeCrypto.isAvailable && pin.all { it.code < 0x80 }
 
     internal fun deriveNative(pin: String, salt: ByteArray, iterations: Int): ByteArray {
         val password = ByteArray(pin.length) { pin[it].code.toByte() }
