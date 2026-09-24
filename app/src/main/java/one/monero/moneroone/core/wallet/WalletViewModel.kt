@@ -19,6 +19,7 @@ import io.horizontalsystems.monerokit.util.Helper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1158,6 +1159,25 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     /** The kit instance the current collectors are attached to (null = none). */
     private var observedKit: MoneroKit? = null
 
+    /** Sync status last written for the widget by the current collectors (null = none yet). */
+    private var widgetSyncStatus: String? = null
+
+    /**
+     * Widget redraws (RemoteViews, a logo bitmap and binder calls per widget) run on one IO worker,
+     * coalesced: sync reports land every couple of seconds and used to redraw on Main, stalling taps.
+     */
+    private val widgetRedraws: Channel<Unit> by lazy {
+        Channel<Unit>(Channel.CONFLATED).also { redraws ->
+            viewModelScope.launch(Dispatchers.IO) {
+                for (ignored in redraws) WalletWidget.updateAll(context)
+            }
+        }
+    }
+
+    private fun redrawWidgets() {
+        widgetRedraws.trySend(Unit)
+    }
+
     private fun cancelKitObservers() {
         kitObserverJobs.forEach { it.cancel() }
         kitObserverJobs = emptyList()
@@ -1172,6 +1192,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private fun setupKitObservers(kit: MoneroKit) {
         cancelKitObservers()
         observedKit = kit
+        widgetSyncStatus = null
 
         kitObserverJobs = listOf(
             viewModelScope.launch {
@@ -1209,8 +1230,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                         is SyncState.Connecting -> "connecting"
                         else -> "offline"
                     }
-                    WidgetDataStore.saveSyncStatus(context, statusKey)
-                    WalletWidget.updateAll(context)
+                    // Syncing reports every couple of seconds; the widget shows only the status.
+                    if (statusKey != widgetSyncStatus) {
+                        widgetSyncStatus = statusKey
+                        WidgetDataStore.saveSyncStatus(context, statusKey)
+                        redrawWidgets()
+                    }
                 }
             },
             viewModelScope.launch {
@@ -1222,7 +1247,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     persistCachedBalance(balance)
                     // Update balance widget
                     WidgetDataStore.saveBalance(context, balance.all, balance.unlocked)
-                    WalletWidget.updateAll(context)
+                    redrawWidgets()
                 }
             },
             viewModelScope.launch {
@@ -1238,7 +1263,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                             "$dir|${tx.amount}|${tx.timestamp}"
                         }
                     WidgetDataStore.saveTransactions(context, txString)
-                    WalletWidget.updateAll(context)
+                    redrawWidgets()
                 }
             }
         )
