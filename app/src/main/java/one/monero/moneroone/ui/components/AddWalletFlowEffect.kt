@@ -1,9 +1,8 @@
 package one.monero.moneroone.ui.components
 
 import android.app.Activity
-import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import one.monero.moneroone.core.wallet.WalletViewModel
 import java.util.UUID
@@ -18,19 +17,14 @@ fun Activity?.isRecreatingForConfigChange(): Boolean = this?.isChangingConfigura
 
 /**
  * Keeps auto-lock off while this add-wallet-flow screen is open (iOS parity).
- * The screen key lives in saved state: the screen that the Activity recreates
- * takes the same place again, so the flow never looks closed in between.
+ * The screen registers its key each time it composes (a recreated screen keeps
+ * its key in saved state) and drops it only when its back stack entry leaves
+ * for good: a recreation during a navigation transition disposes a screen that
+ * never composes again, and a disposal-based drop then never ran.
  */
 @Composable
 fun AddWalletFlowEffect(walletViewModel: WalletViewModel) {
     val screenKey = rememberSaveable { UUID.randomUUID().toString() }
-    val activity = LocalActivity.current
-    DisposableEffect(screenKey) {
-        walletViewModel.setAddWalletFlowActive(true, screenKey)
-        onDispose {
-            if (!activity.isRecreatingForConfigChange()) {
-                walletViewModel.setAddWalletFlowActive(false, screenKey)
-            }
-        }
-    }
+    LaunchedEffect(screenKey) { walletViewModel.setAddWalletFlowActive(true, screenKey) }
+    OnNavEntryEnd("add-wallet-flow") { walletViewModel.setAddWalletFlowActive(false, screenKey) }
 }

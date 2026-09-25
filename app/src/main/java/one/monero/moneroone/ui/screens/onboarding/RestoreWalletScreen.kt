@@ -1,8 +1,8 @@
 package one.monero.moneroone.ui.screens.onboarding
 
+import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
-import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -34,7 +34,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,7 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.AddWalletFlowEffect
-import one.monero.moneroone.ui.components.isRecreatingForConfigChange
+import one.monero.moneroone.ui.components.OnNavEntryEnd
 import one.monero.moneroone.ui.theme.MoneroOrange
 import io.horizontalsystems.monerokit.util.RestoreHeight
 import java.text.SimpleDateFormat
@@ -89,12 +88,8 @@ fun RestoreWalletScreen(
     LaunchedEffect(walletRestored) {
         if (walletRestored) onWalletRestored()
     }
-    val activity = LocalActivity.current
-    DisposableEffect(flowId) {
-        onDispose {
-            if (!activity.isRecreatingForConfigChange()) walletViewModel.clearAddOutcome(flowId)
-        }
-    }
+    OnNavEntryEnd("restore-flow") { walletViewModel.clearAddOutcome(flowId) }
+    val addsInFlight by walletViewModel.addsInFlight.collectAsState()
 
     // Suppress auto-lock while the add-wallet flow is open (iOS parity).
     if (isAddingWallet) AddWalletFlowEffect(walletViewModel)
@@ -133,11 +128,12 @@ fun RestoreWalletScreen(
                 NameWalletStep(
                     defaultName = walletViewModel.nextWalletName(),
                     buttonLabel = "Restore Wallet",
-                    isBusy = walletState.isInitializing,
+                    // Also covers an add that a screen before an Activity recreation started.
+                    isBusy = walletState.isInitializing || flowId in addsInFlight,
                     onDone = { name, emoji ->
                         val words = seedPhrase.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
                         val restoreHeightValue = selectedDate?.let { dateToRestoreHeight(it) }?.toString()
-                        if (walletState.isInitializing || walletRestored) return@NameWalletStep
+                        if (walletState.isInitializing || walletRestored || flowId in addsInFlight) return@NameWalletStep
                         scope.launch {
                             walletViewModel.restoreWallet(
                                 seed = words,
@@ -343,7 +339,10 @@ fun RestoreWalletScreen(
 
 /**
  * Asks the keyboard not to learn from text typed inside [content]
- * (IME_FLAG_NO_PERSONALIZED_LEARNING, the flag behind incognito typing).
+ * (IME_FLAG_NO_PERSONALIZED_LEARNING, the flag behind incognito typing) and
+ * not to suggest or autocorrect (TYPE_TEXT_FLAG_NO_SUGGESTIONS). Turning
+ * autocorrect off alone is not enough in a multi-line field: AOSP LatinIME
+ * still autocorrects one.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -355,6 +354,8 @@ private fun NoPersonalizedLearning(content: @Composable () -> Unit) {
                     val connection = request.createInputConnection(outAttributes)
                     outAttributes.imeOptions =
                         outAttributes.imeOptions or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+                    outAttributes.inputType =
+                        outAttributes.inputType or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
                     return connection
                 }
             }

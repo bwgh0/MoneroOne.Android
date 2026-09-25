@@ -17,6 +17,8 @@ import io.horizontalsystems.monerokit.model.TransactionInfo
 import io.horizontalsystems.monerokit.toElectrum
 import io.horizontalsystems.monerokit.util.Helper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.NonCancellable
@@ -176,13 +178,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private val pendingDeleteIds = mutableSetOf<String>()
 
     /**
-     * Cache id of a wallet file that failed the key check: its primary address
-     * is not the one the stored seed derives. The wallet's addresses stay
-     * hidden while that cache is in use. Reset Sync rebuilds the cache from the
-     * seed under a new id. Read off Main by [seedMatchesWalletFile].
+     * Cache ids of wallet files that failed the key check: the primary address
+     * is not the one the stored seed derives. Such a wallet's addresses stay
+     * hidden while that cache is in use, until a read of the open file shows
+     * the match again (a heal rebuilds the cache from the seed; Reset Sync
+     * rebuilds it under a new id). Replaced whole on each change (Main); read
+     * off Main by [seedMatchesWalletFile].
      */
     @Volatile
-    private var keyMismatchCacheId: String? = null
+    private var keyMismatchCacheIds: Set<String> = emptySet()
 
     /** Orders address reads (Main only): a read that started before a newer one never overwrites it. */
     private var addressReadSeq = 0L
@@ -220,6 +224,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             // retried next launch.
             Timber.e(e, "Wallet migration failed; continuing with existing state")
         }
+        dropUncheckedCachedAddresses()
         loadWalletsFromStore()
         cleanOrphanedWalletCaches()
         // Defer price fetch until a wallet exists. Avoids leaking IP to
@@ -271,6 +276,24 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
         refreshHasWallet()
         active?.let { paintCachedState(it) }
+    }
+
+    /**
+     * Builds before the address fixes could cache one wallet's primary address
+     * on another wallet's row (a tap during a start). Drop every cached primary
+     * address once; each wallet caches its own checked one when it next opens.
+     */
+    private fun dropUncheckedCachedAddresses() {
+        if (prefs.getBoolean(CACHED_ADDRESSES_CHECKED_KEY, false)) return
+        try {
+            val rows = store.wallets()
+            if (rows.any { it.cachedPrimaryAddress != null }) {
+                store.saveWallets(rows.map { it.copy(cachedPrimaryAddress = null) })
+            }
+            prefs.edit().putBoolean(CACHED_ADDRESSES_CHECKED_KEY, true).apply()
+        } catch (e: Exception) {
+            Timber.e(e, "Dropping cached primary addresses failed; retrying next launch")
+        }
     }
 
     private fun refreshHasWallet() {
@@ -657,11 +680,20 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
         if (seq < appliedAddressReadSeq) return
         appliedAddressReadSeq = seq
-        if (read.keyMismatch) keyMismatchCacheId = cacheId
+        if (read.keyMismatch) {
+            keyMismatchCacheIds = keyMismatchCacheIds + cacheId
+        } else if (read.complete) {
+            // The open file derives from the seed again (a heal rebuilt it).
+            keyMismatchCacheIds = keyMismatchCacheIds - cacheId
+        }
         val primary = read.list.firstOrNull { it.addressIndex == 0 }?.address
-        val blocked = keyMismatchCacheId == cacheId || !SeedValidation.isPlausiblePrimaryAddress(primary)
+        val blocked = cacheId in keyMismatchCacheIds || !SeedValidation.isPlausiblePrimaryAddress(primary)
         if (blocked) {
             Timber.e("Receive addresses of wallet ${info.id} blocked: its keys failed a check")
+            // Whatever the row cached before is not a checked address of this wallet.
+            mergeWalletUpdate(info.id) {
+                if (it.cachedPrimaryAddress == null) it else it.copy(cachedPrimaryAddress = null)
+            }
         }
         _walletState.update {
             it.copy(
@@ -683,23 +715,21 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     /**
      * Before the wallet file is open the kit derives addresses from the seed,
      * index 0 only: add the selected index the same way so Receive shows it at
-     * once. Once the file is open, check that its primary address is the one
-     * the stored seed derives. Runs JNI; call off Main.
+     * once. Every read checks the list's own primary address against the one
+     * the stored seed derives, so a file that opened during the read is
+     * checked too. Returns null when the file opened or closed during the
+     * read. Runs JNI; call off Main.
      */
-    private fun readAddresses(kit: MoneroKit, selected: Int): AddressRead {
+    private fun readAddresses(kit: MoneroKit, selected: Int): AddressRead? {
         val open = kit.isWalletOpen
         var list = kit.getSubaddresses()
         if (!open && selected > 0 && list.none { it.addressIndex == selected }) {
             kit.getSubaddress(0, selected)?.let { list = list + it }
         }
-        var mismatch = false
-        if (open) {
-            val fromFile = kit.openWalletPrimaryAddress()
-            if (fromFile != null && fromFile != kit.seedPrimaryAddress()) {
-                Timber.e("Wallet file primary address differs from the stored seed's")
-                mismatch = true
-            }
-        }
+        if (kit.isWalletOpen != open) return null
+        val primary = list.firstOrNull { it.addressIndex == 0 }?.address
+        val mismatch = primary != null && primary != kit.seedPrimaryAddress()
+        if (mismatch) Timber.e("Wallet file primary address differs from the stored seed's")
         return AddressRead(list, open, mismatch)
     }
 
@@ -799,10 +829,33 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     /** The screen [flowId] has left for good: forget how its add ended. */
     fun clearAddOutcome(flowId: String) = _addOutcomes.update { it - flowId }
 
-    private suspend fun addForScreen(flowId: String, add: suspend () -> Boolean): Boolean =
-        viewModelScope.async {
-            add().also { added -> _addOutcomes.update { it + (flowId to added) } }
-        }.await()
+    /**
+     * Screens (NavBackStackEntry ids) whose add is still running. A screen that
+     * the Activity recreated keeps its button busy with it: the old screen's
+     * own busy flag is gone, and a second tap would start a second add.
+     */
+    private val _addsInFlight = MutableStateFlow<Set<String>>(emptySet())
+    val addsInFlight: StateFlow<Set<String>> = _addsInFlight.asStateFlow()
+
+    /** Main only. */
+    private val addJobs = mutableMapOf<String, Deferred<Boolean>>()
+
+    /** Runs [add] for the screen [flowId], or waits for the add it already runs. */
+    private suspend fun addForScreen(flowId: String, add: suspend () -> Boolean): Boolean {
+        val job = addJobs[flowId] ?: viewModelScope.async(start = CoroutineStart.LAZY) {
+            try {
+                add().also { added -> _addOutcomes.update { it + (flowId to added) } }
+            } finally {
+                addJobs -= flowId
+                _addsInFlight.update { it - flowId }
+            }
+        }.also { job ->
+            addJobs[flowId] = job
+            _addsInFlight.update { it + flowId }
+            job.start()
+        }
+        return job.await()
+    }
 
     /**
      * Restore a wallet from an existing seed, for the screen [flowId] (see
@@ -1267,7 +1320,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
         WalletManager.clear()
 
-        val next = remaining.firstOrNull()
+        // A wallet with its own delete queued must not become active.
+        val next = remaining.firstOrNull { it.id !in pendingDeleteIds }
         if (next != null) {
             store.setActiveWalletId(next.id)
             _activeWallet.value = next
@@ -1337,7 +1391,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 // Reset state
                 _wallets.value = emptyList()
                 _activeWallet.value = null
-                keyMismatchCacheId = null
+                keyMismatchCacheIds = emptySet()
                 _pendingSeed.value = null
                 _pin.value = null
                 _isLocked.value = true
@@ -1491,6 +1545,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         const val RATE_LIMIT_WIPE_ATTEMPTS = 20   // wallet wipe
         const val RATE_LIMIT_TIER1_DELAY_MS = 30_000L
         const val RATE_LIMIT_TIER2_DELAY_MS = 300_000L
+
+        // Failed attempts on the unlock screen only (see getUnlockFailedAttempts).
+        const val UNLOCK_FAIL_COUNT_KEY = "pin_unlock_fail_count"
+
+        // Set once the cached primary addresses of older builds were dropped.
+        const val CACHED_ADDRESSES_CHECKED_KEY = "wallet_store.cached_addresses_checked"
     }
 
     // --- PIN rate limiting (GLOBAL — lockout is app-wide) ---
@@ -1509,20 +1569,35 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return encryptedPrefs.getLong("pin_fail_timestamp", 0L)
     }
 
-    private fun recordFailedAttempt() {
+    /**
+     * Failed attempts on the unlock screen only: the count the wipe reads. A PIN
+     * gate inside the unlocked app (Backup Seed, Change PIN, send) shares the
+     * lockout of [getFailedAttempts] but never moves this count, so a user who
+     * forgot the PIN and retries at Backup Seed is never wiped for it. Builds
+     * before this key counted every failure; they start from that count.
+     */
+    private fun getUnlockFailedAttempts(): Int =
+        if (encryptedPrefs.contains(UNLOCK_FAIL_COUNT_KEY)) encryptedPrefs.getInt(UNLOCK_FAIL_COUNT_KEY, 0)
+        else getFailedAttempts()
+
+    /** [atUnlock]: the failure was on the unlock screen, so it counts toward the wipe too. */
+    private fun recordFailedAttempt(atUnlock: Boolean) {
         val count = getFailedAttempts() + 1
+        val unlockCount = getUnlockFailedAttempts() + if (atUnlock) 1 else 0
         encryptedPrefs.edit()
             .putInt("pin_fail_count", count)
+            .putInt(UNLOCK_FAIL_COUNT_KEY, unlockCount)
             .putLong("pin_fail_timestamp", System.currentTimeMillis())
             .apply()
-        _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - count).coerceAtLeast(0)
+        _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - unlockCount).coerceAtLeast(0)
     }
 
     private fun resetFailedAttempts() {
         // Nothing to reset on almost every unlock: skip the encrypted write.
-        if (getFailedAttempts() != 0 || getLastFailTimestamp() != 0L) {
+        if (getFailedAttempts() != 0 || getLastFailTimestamp() != 0L || getUnlockFailedAttempts() != 0) {
             encryptedPrefs.edit()
                 .putInt("pin_fail_count", 0)
+                .putInt(UNLOCK_FAIL_COUNT_KEY, 0)
                 .putLong("pin_fail_timestamp", 0L)
                 .apply()
         }
@@ -1533,7 +1608,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     // The counters live in EncryptedSharedPreferences (Keystore-backed
     // decrypts): read them off Main so the keypad never waits on them.
     suspend fun shouldWipeWallet(): Boolean = withContext(Dispatchers.IO) {
-        getFailedAttempts() >= RATE_LIMIT_WIPE_ATTEMPTS
+        getUnlockFailedAttempts() >= RATE_LIMIT_WIPE_ATTEMPTS
     }
 
     suspend fun getRemainingLockoutMs(): Long = withContext(Dispatchers.IO) { remainingLockoutMs() }
@@ -1555,7 +1630,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     suspend fun refreshLockoutState() = withContext(Dispatchers.IO) {
         val remaining = remainingLockoutMs()
         _pinLockoutSeconds.value = (remaining + 999) / 1000 // ceil to seconds
-        _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - getFailedAttempts()).coerceAtLeast(0)
+        _pinAttemptsRemaining.value = (RATE_LIMIT_WIPE_ATTEMPTS - getUnlockFailedAttempts()).coerceAtLeast(0)
     }
 
     // PBKDF2 itself lives in PinHash (native rounds through the kit).
@@ -1608,28 +1683,37 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         fetchPrice()
     }
 
+    /**
+     * One PIN check at a time: two checks in flight (a fast backspace and retype
+     * during a check) could both pass the lockout check, and one failure could
+     * be lost in the counter's read and write.
+     */
+    private val pinCheckMutex = Mutex()
+
     suspend fun verifyPin(enteredPin: String): Boolean {
-        // Rate limiting + stored hash: encrypted reads, off Main.
-        val storedHash = withContext(Dispatchers.IO) {
-            if (remainingLockoutMs() > 0) null else storedPinHash()
-        } ?: return false
+        return pinCheckMutex.withLock {
+            // Rate limiting + stored hash: encrypted reads, off Main.
+            val storedHash = withContext(Dispatchers.IO) {
+                if (remainingLockoutMs() > 0) null else storedPinHash()
+            } ?: return false
 
-        val t0 = android.os.SystemClock.elapsedRealtime()
-        val isValid = verifyPinHash(enteredPin, storedHash)
-        Timber.d("verifyPin: PBKDF2 check took ${android.os.SystemClock.elapsedRealtime() - t0} ms")
+            val t0 = android.os.SystemClock.elapsedRealtime()
+            val isValid = verifyPinHash(enteredPin, storedHash)
+            Timber.d("verifyPin: PBKDF2 check took ${android.os.SystemClock.elapsedRealtime() - t0} ms")
 
-        if (isValid) {
-            withContext(Dispatchers.IO) { resetFailedAttempts() }
-            migratePinIfNeeded(enteredPin, storedHash)
-            _pin.value = enteredPin
-            _isLocked.value = false
-            viewModelScope.launch { walletMutationMutex.withLock { openActiveWalletSettled() } }
-        } else {
-            withContext(Dispatchers.IO) { recordFailedAttempt() }
-            refreshLockoutState()
+            if (isValid) {
+                withContext(Dispatchers.IO) { resetFailedAttempts() }
+                migratePinIfNeeded(enteredPin, storedHash)
+                _pin.value = enteredPin
+                _isLocked.value = false
+                viewModelScope.launch { walletMutationMutex.withLock { openActiveWalletSettled() } }
+            } else {
+                withContext(Dispatchers.IO) { recordFailedAttempt(atUnlock = true) }
+                refreshLockoutState()
+            }
+
+            isValid
         }
-
-        return isValid
     }
 
     /**
@@ -1640,20 +1724,22 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * check while a lockout runs.
      */
     suspend fun verifyPinForAction(enteredPin: String): Boolean {
-        val storedHash = withContext(Dispatchers.IO) {
-            if (remainingLockoutMs() > 0) null else storedPinHash()
-        } ?: return false
-        val isValid = verifyPinHash(enteredPin, storedHash)
+        return pinCheckMutex.withLock {
+            val storedHash = withContext(Dispatchers.IO) {
+                if (remainingLockoutMs() > 0) null else storedPinHash()
+            } ?: return false
+            val isValid = verifyPinHash(enteredPin, storedHash)
 
-        if (isValid) {
-            withContext(Dispatchers.IO) { resetFailedAttempts() }
-            migratePinIfNeeded(enteredPin, storedHash)
-        } else {
-            withContext(Dispatchers.IO) { recordFailedAttempt() }
-            refreshLockoutState()
+            if (isValid) {
+                withContext(Dispatchers.IO) { resetFailedAttempts() }
+                migratePinIfNeeded(enteredPin, storedHash)
+            } else {
+                withContext(Dispatchers.IO) { recordFailedAttempt(atUnlock = false) }
+                refreshLockoutState()
+            }
+
+            isValid
         }
-
-        return isValid
     }
 
     /**
@@ -2016,8 +2102,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * once in this session; true then.
      */
     fun seedMatchesWalletFile(walletId: String): Boolean {
-        val mismatched = keyMismatchCacheId ?: return true
-        return _wallets.value.firstOrNull { it.id == walletId }?.derivedWalletId != mismatched
+        val cacheId = _wallets.value.firstOrNull { it.id == walletId }?.derivedWalletId ?: return true
+        return cacheId !in keyMismatchCacheIds
     }
 
     /** Read the active wallet's addresses again (Receive or the picker came back to the front). */

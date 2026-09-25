@@ -65,6 +65,7 @@ import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.AddWalletFlowEffect
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroLogo
+import one.monero.moneroone.ui.components.OnNavEntryEnd
 import one.monero.moneroone.ui.components.isRecreatingForConfigChange
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.WarningYellow
@@ -117,21 +118,25 @@ fun CreateWalletScreen(
     // started it, finishes the flow, so a screen that the Activity recreates
     // during the add still moves on once the wallet exists.
     val addOutcomes by walletViewModel.addOutcomes.collectAsState()
+    val addsInFlight by walletViewModel.addsInFlight.collectAsState()
     val walletAdded = addOutcomes[flowId] == true
     LaunchedEffect(walletAdded) {
         if (walletAdded) onWalletCreated()
     }
 
-    // Back, cancel, completion and the lock screen end the flow and drop its
-    // phrase; the disposal that recreates the Activity keeps it.
+    // The lock screen and leaving the screen drop the phrase; the disposal
+    // that recreates the Activity keeps it.
     val activity = LocalActivity.current
     DisposableEffect(flowId) {
         onDispose {
-            if (!activity.isRecreatingForConfigChange()) {
-                walletViewModel.discardPendingSeed(flowId)
-                walletViewModel.clearAddOutcome(flowId)
-            }
+            if (!activity.isRecreatingForConfigChange()) walletViewModel.discardPendingSeed(flowId)
         }
+    }
+    // The flow's entry left the back stack for good: nothing of it may stay,
+    // also when a recreation during a transition skipped the disposal above.
+    OnNavEntryEnd("create-flow") {
+        walletViewModel.discardPendingSeed(flowId)
+        walletViewModel.clearAddOutcome(flowId)
     }
 
     // Suppress auto-lock while the add-wallet flow is open (iOS parity).
@@ -211,11 +216,13 @@ fun CreateWalletScreen(
                     NameWalletStep(
                         defaultName = walletViewModel.nextWalletName(),
                         buttonLabel = "Create Wallet",
-                        // isInitializing also covers an add that a screen before an
-                        // Activity recreation started.
-                        isBusy = isCreating || walletState.isInitializing,
+                        // addsInFlight also covers an add that the screen started
+                        // before an Activity recreation.
+                        isBusy = isCreating || walletState.isInitializing || flowId in addsInFlight,
                         onDone = { name, emoji ->
-                            if (isCreating || walletState.isInitializing || walletAdded) return@NameWalletStep
+                            if (isCreating || walletState.isInitializing || walletAdded || flowId in addsInFlight) {
+                                return@NameWalletStep
+                            }
                             // The ViewModel keeps the phrase until the add succeeds; it is
                             // gone only when something else ended the flow: start over.
                             if (seed.isEmpty()) {
