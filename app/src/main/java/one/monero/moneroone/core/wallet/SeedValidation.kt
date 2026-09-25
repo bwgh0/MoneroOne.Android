@@ -22,8 +22,12 @@ import java.util.zip.CRC32
  *    as an active wallet that can never open.
  *  - Any seed: derived keys must not be null (all-zero) and the primary
  *    address must be a well-formed mainnet address without a null-key run.
- *    A null spend key (one word repeated 25 times, the all-"abandon" BIP39
- *    vector, ...) yields a burn address: funds received there are lost.
+ *    This rejects only seeds whose private spend key reduces to zero:
+ *    `abbey` x25 and the 15 encodings of k*l (k = 1..15, l the group order).
+ *    Such a seed yields a burn address: funds received there are lost.
+ *    Weak seeds with a real key still pass: `zoom` x25, and the all-"abandon
+ *    ... art" BIP39 vector (spend key 4fe2e8fa...). iOS accepts them too, and
+ *    blocking a restore would stop a user sweeping funds out of that wallet.
  *
  * [validate] runs native key derivation; call it off the main thread.
  */
@@ -42,8 +46,32 @@ object SeedValidation {
 
     private val englishWords: Set<String> by lazy { CakeWalletStyleConverter.MONERO_WORDLIST.toHashSet() }
 
+    /** English wordlist words by 3-letter prefix, only where exactly one word has that prefix. */
+    private val englishWordByPrefix: Map<String, String> by lazy {
+        CakeWalletStyleConverter.MONERO_WORDLIST
+            .groupBy { it.take(PREFIX_LENGTH) }
+            .filterValues { it.size == 1 }
+            .mapValues { it.value.single() }
+    }
+
     /** True when every word is in the English Electrum wordlist. */
     fun isEnglishElectrum(words: List<String>): Boolean = words.isNotEmpty() && words.all { it in englishWords }
+
+    /**
+     * wallet2 reads an English Electrum word by its unique 3-letter prefix, so
+     * "abbxy" restores as "abbey". Returns [words] with each word replaced by
+     * the list word wallet2 reads, when all of these are true: 25 words, each
+     * word in the list or sharing its first 3 letters with exactly one list
+     * word, and the result passes the checksum. Otherwise returns [words] as
+     * they are. Pure (no native code).
+     */
+    fun canonicalElectrumWords(words: List<String>): List<String> {
+        if (words.size != 25) return words
+        val canonical = words.map { word ->
+            if (word in englishWords) word else englishWordByPrefix[word.take(PREFIX_LENGTH)] ?: return words
+        }
+        return if (electrumSeedProblem(canonical) == null) canonical else words
+    }
 
     /**
      * Pure wallet2 checksum rule for an English 25-word seed (no native code).

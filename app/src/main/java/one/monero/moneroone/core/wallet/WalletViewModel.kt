@@ -655,8 +655,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         emoji: String = "💰"
     ): Boolean {
         // Normalize: the same seed typed with different casing/whitespace must
-        // derive the same cache id (dedupe) and convert cleanly.
-        val normalized = seed.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        // derive the same cache id (dedupe) and convert cleanly. wallet2 reads
+        // an English word by its 3-letter prefix, so a prefix typo is saved as
+        // the word wallet2 reads (new wallets only; stored rows never change).
+        val normalized = SeedValidation.canonicalElectrumWords(
+            seed.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        )
         val seedType = when (normalized.size) {
             25 -> SeedType.ELECTRUM_25
             24 -> SeedType.BIP39_24
