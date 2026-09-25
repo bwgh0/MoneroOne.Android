@@ -21,13 +21,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.AddWalletFlowEffect
 import one.monero.moneroone.ui.components.MoneroLogo
 import one.monero.moneroone.ui.theme.MoneroOrange
 
@@ -43,10 +43,7 @@ fun AddWalletScreen(
     onRestoreWallet: () -> Unit,
     onBack: () -> Unit
 ) {
-    DisposableEffect(Unit) {
-        walletViewModel.setAddWalletFlowActive(true)
-        onDispose { walletViewModel.setAddWalletFlowActive(false) }
-    }
+    AddWalletFlowEffect(walletViewModel)
 
     Scaffold(
         topBar = {

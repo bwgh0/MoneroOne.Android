@@ -116,8 +116,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * Depth counter of open add-wallet-flow screens; suppresses auto-lock
      * while > 0. A counter (not a boolean) because during navigation
      * transitions the incoming screen composes before the outgoing one
-     * disposes — a boolean would be reset to false by the outgoing screen.
+     * disposes, and a boolean would be reset to false by the outgoing screen.
+     * It counts screen keys, not calls: each screen keeps its key in saved
+     * state, so a screen that the Activity recreates for a configuration
+     * change registers again under the same key and the count stays balanced.
      */
+    private val addWalletFlowScreens = mutableSetOf<String>()
     private val _addWalletFlowDepth = MutableStateFlow(0)
     val addWalletFlowActive: StateFlow<Boolean>
         get() = _addWalletFlowActiveView
@@ -323,15 +327,19 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setAddWalletFlowActive(active: Boolean) {
-        _addWalletFlowDepth.update { (it + if (active) 1 else -1).coerceAtLeast(0) }
-        val open = _addWalletFlowDepth.value > 0
+    /**
+     * Register ([active]) or drop the add-wallet-flow screen [screenKey].
+     * Registering a key twice counts it once.
+     */
+    fun setAddWalletFlowActive(active: Boolean, screenKey: String) {
+        if (active) addWalletFlowScreens += screenKey else addWalletFlowScreens -= screenKey
+        _addWalletFlowDepth.value = addWalletFlowScreens.size
+        val open = addWalletFlowScreens.isNotEmpty()
         _addWalletFlowActiveView.value = open
         if (!open) {
             // Add-wallet flow fully closed (completed OR abandoned). A seed
-            // generated for a wallet that was never created must not survive —
-            // a stale pendingSeed would otherwise be served by getSeedPhrase()
-            // and end up "backed up" as an existing wallet's seed.
+            // generated for a wallet that was never created must not stay
+            // in memory.
             _pendingSeed.value = null
         }
     }
@@ -604,7 +612,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private fun isUnloadableCacheError(error: Throwable): Boolean =
         error is MoneroKit.SyncError.InvalidNode && error.message == "Invalid wallet"
 
-    fun generateNewSeed(seedType: SeedType): List<String> {
+    /** The phrase of the create flow in progress, held for the life of that flow. */
+    private val createFlowSeed = CreateFlowSeed(_pendingSeed)
+
+    /**
+     * Issue the recovery phrase for the create flow [flowId] (its
+     * NavBackStackEntry id) and hold it in [pendingSeed]. A flow gets one
+     * phrase: asking again returns the words it was shown, or null once they
+     * are gone. It never gets a second phrase.
+     */
+    fun generateNewSeed(seedType: SeedType, flowId: String): List<String>? = createFlowSeed.issue(flowId) {
         val mnemonic = Mnemonic()
 
         val words = when (seedType) {
@@ -620,9 +637,18 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         Timber.d("Generated ${words.size}-word seed for type $seedType")
-        _pendingSeed.value = PendingSeed(words, seedType)
-        return words
+        PendingSeed(words, seedType)
     }
+
+    /** How the create screen of [flowId] starts; [savedIssued] is its saved record of a shown phrase. */
+    fun createFlowStart(flowId: String, savedIssued: Boolean): CreateFlowStart =
+        createFlowSeed.start(flowId, savedIssued)
+
+    /** True while [pendingSeed] holds the phrase issued to the create flow [flowId]. */
+    fun holdsPendingSeed(flowId: String): Boolean = createFlowSeed.holds(flowId)
+
+    /** The create flow [flowId] ended for real (back, cancel, completion, lock): drop its phrase. */
+    fun discardPendingSeed(flowId: String) = createFlowSeed.discard(flowId)
 
     fun nextWalletName(): String = WalletStore.nextWalletName(_wallets.value.map { it.name })
 

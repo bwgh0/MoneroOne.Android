@@ -33,7 +33,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +53,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.AddWalletFlowEffect
 import one.monero.moneroone.ui.theme.MoneroOrange
 import io.horizontalsystems.monerokit.util.RestoreHeight
 import java.text.SimpleDateFormat
@@ -78,12 +78,7 @@ fun RestoreWalletScreen(
     val scope = rememberCoroutineScope()
 
     // Suppress auto-lock while the add-wallet flow is open (iOS parity).
-    if (isAddingWallet) {
-        DisposableEffect(Unit) {
-            walletViewModel.setAddWalletFlowActive(true)
-            onDispose { walletViewModel.setAddWalletFlowActive(false) }
-        }
-    }
+    if (isAddingWallet) AddWalletFlowEffect(walletViewModel)
 
     val dateFormatter = remember {
         SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).apply {

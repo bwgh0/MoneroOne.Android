@@ -245,6 +245,8 @@ fun MoneroOneNavHost(
                 val adding = backStackEntry.arguments?.getBoolean("adding") ?: false
                 CreateWalletScreen(
                     walletViewModel = walletViewModel,
+                    // The entry id outlives Activity recreation, the lock screen and process death.
+                    flowId = backStackEntry.id,
                     isAddingWallet = adding,
                     onWalletCreated = {
                         if (adding) {
