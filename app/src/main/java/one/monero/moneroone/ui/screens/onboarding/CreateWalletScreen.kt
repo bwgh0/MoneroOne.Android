@@ -52,12 +52,11 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import one.monero.moneroone.core.util.SeedClipboard
 import one.monero.moneroone.core.wallet.SeedType
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
@@ -269,11 +268,11 @@ private fun SeedDisplay(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Copy seed button
-        val clipboardManager = LocalClipboardManager.current
+        val context = LocalContext.current
         var copied by remember { mutableStateOf(false) }
         OutlinedButton(
             onClick = {
-                clipboardManager.setText(AnnotatedString(seed.joinToString(" ")))
+                SeedClipboard.copy(context, seed.joinToString(" "))
                 copied = true
             },
             modifier = Modifier.fillMaxWidth().height(48.dp),

@@ -1,7 +1,5 @@
 package one.monero.moneroone.ui.screens.settings
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
@@ -44,7 +42,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -67,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import one.monero.moneroone.core.util.SeedClipboard
 import one.monero.moneroone.core.wallet.SeedType
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
@@ -76,7 +74,6 @@ import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 
 private const val PIN_LENGTH = 6
-private const val CLIPBOARD_CLEAR_DELAY_MS = 5 * 60 * 1000L // 5 minutes
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -114,20 +111,6 @@ fun BackupSeedScreen(
         accessibilityManager.isTouchExplorationEnabled
     }
     var screenReaderWarningAccepted by remember { mutableStateOf(false) }
-
-    // Clear clipboard after delay if seed was copied
-    DisposableEffect(copiedToClipboard) {
-        if (copiedToClipboard) {
-            val job = scope.launch {
-                delay(CLIPBOARD_CLEAR_DELAY_MS)
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-            }
-            onDispose { job.cancel() }
-        } else {
-            onDispose { }
-        }
-    }
 
     LaunchedEffect(shakeAnimation) {
         if (shakeAnimation) {
@@ -475,11 +458,13 @@ fun BackupSeedScreen(
             // Copy button
             Button(
                 onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clip = ClipData.newPlainText("Seed Phrase", displayWords.joinToString(" "))
-                    clipboard.setPrimaryClip(clip)
+                    SeedClipboard.copy(context, displayWords.joinToString(" "))
                     copiedToClipboard = true
-                    Toast.makeText(context, "Copied! Will clear in 5 minutes", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        context,
+                        "Copied! Will clear in ${SeedClipboard.LIFETIME_SECONDS} seconds",
+                        Toast.LENGTH_LONG
+                    ).show()
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MoneroOrange,
@@ -502,7 +487,7 @@ fun BackupSeedScreen(
             if (copiedToClipboard) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Clipboard will auto-clear in 5 minutes",
+                    text = "Clipboard will auto-clear in ${SeedClipboard.LIFETIME_SECONDS} seconds",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.fillMaxWidth(),

@@ -1,5 +1,7 @@
 package one.monero.moneroone.ui.screens.onboarding
 
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -40,10 +42,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.InterceptPlatformTextInput
+import androidx.compose.ui.platform.PlatformTextInputMethodRequest
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -158,33 +164,39 @@ fun RestoreWalletScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Seed phrase input
-            OutlinedTextField(
-                value = seedPhrase,
-                onValueChange = {
-                    seedPhrase = it.lowercase()
-                    errorMessage = null
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                label = { Text("Seed Phrase") },
-                placeholder = { Text("Separate words with spaces") },
-                supportingText = {
-                    val wordCount = seedPhrase.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
-                    Text("$wordCount words")
-                },
-                isError = errorMessage != null,
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MoneroOrange,
-                    cursorColor = MoneroOrange
-                ),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Next
+            // Seed phrase input. The keyboard must not correct, capitalize or
+            // learn the words: a learned word can come back as a suggestion.
+            // No KeyboardType.Password, which turns off glide typing.
+            NoPersonalizedLearning {
+                OutlinedTextField(
+                    value = seedPhrase,
+                    onValueChange = {
+                        seedPhrase = it.lowercase()
+                        errorMessage = null
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    label = { Text("Seed Phrase") },
+                    placeholder = { Text("Separate words with spaces") },
+                    supportingText = {
+                        val wordCount = seedPhrase.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+                        Text("$wordCount words")
+                    },
+                    isError = errorMessage != null,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MoneroOrange,
+                        cursorColor = MoneroOrange
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next
+                    )
                 )
-            )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -312,6 +324,29 @@ fun RestoreWalletScreen(
             DatePicker(state = datePickerState)
         }
     }
+}
+
+/**
+ * Asks the keyboard not to learn from text typed inside [content]
+ * (IME_FLAG_NO_PERSONALIZED_LEARNING, the flag behind incognito typing).
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun NoPersonalizedLearning(content: @Composable () -> Unit) {
+    InterceptPlatformTextInput(
+        interceptor = { request, nextHandler ->
+            val noLearning = object : PlatformTextInputMethodRequest {
+                override fun createInputConnection(outAttributes: EditorInfo): InputConnection {
+                    val connection = request.createInputConnection(outAttributes)
+                    outAttributes.imeOptions =
+                        outAttributes.imeOptions or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+                    return connection
+                }
+            }
+            nextHandler.startInputMethod(noLearning)
+        },
+        content = content
+    )
 }
 
 private fun dateToRestoreHeight(dateMillis: Long): Long {
