@@ -1,5 +1,6 @@
 package one.monero.moneroone.core.wallet
 
+import io.horizontalsystems.monerokit.CakeWalletStyleConverter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -85,6 +86,59 @@ class WalletCacheIdsTest {
     fun `row with unreadable seed and non-derived id is not claimed as duplicate`() {
         val opaque = row("x", "Opaque", "123e4567-e89b-12d3-a456-426614174000")
         assertEquals(null, WalletCacheIds.findWalletWithSeed(seed, listOf(opaque)) { null })
+    }
+
+    // --- Prefix typos (wallet2 reads an English word by its 3-letter prefix) --
+
+    private val electrum: List<String> = CakeWalletStyleConverter.getLegacySeedFromBip39(
+        ("blind ginger glare shrimp copper farm useless pluck task disease this laugh " +
+            "build frog prison inner heavy delay scissors order eager treat youth genre").split(" "),
+        ""
+    )!!
+
+    /** The same seed with word [index] typed past its prefix. */
+    private fun typo(index: Int, tail: String = "zz") =
+        electrum.toMutableList().apply { this[index] = this[index].take(3) + tail }
+
+    @Test
+    fun `typo'd input is a duplicate of a canonical row`() {
+        val canonical = row("c", "Canonical", WalletCacheIds.derivedWalletId(electrum, 0))
+        val dup = WalletCacheIds.findWalletWithSeed(typo(2), listOf(canonical)) { id ->
+            if (id == "c") electrum else null
+        }
+        assertEquals(canonical, dup)
+    }
+
+    @Test
+    fun `canonical input is a duplicate of a row saved with a typo`() {
+        val typed = typo(2)
+        val typoRowId = WalletCacheIds.derivedWalletId(typed, 0)
+        val typoRow = row("t", "Typo", typoRowId)
+        val dup = WalletCacheIds.findWalletWithSeed(electrum, listOf(typoRow)) { id ->
+            if (id == "t") typed else null
+        }
+        assertEquals(typoRow, dup)
+        // The row keeps the id derived from the words it stored.
+        assertEquals(typoRowId, dup!!.derivedWalletId)
+    }
+
+    @Test
+    fun `another typo of the same seed is a duplicate of a typo'd row`() {
+        val typed = typo(2)
+        val typoRow = row("t", "Typo", WalletCacheIds.derivedWalletId(typed, 0))
+        val dup = WalletCacheIds.findWalletWithSeed(typo(7, tail = "qq"), listOf(typoRow)) { id ->
+            if (id == "t") typed else null
+        }
+        assertEquals(typoRow, dup)
+    }
+
+    @Test
+    fun `a typo'd row is not a duplicate of a different seed`() {
+        val typoRow = row("t", "Typo", WalletCacheIds.derivedWalletId(typo(2), 0))
+        val dup = WalletCacheIds.findWalletWithSeed(seed, listOf(typoRow)) { id ->
+            if (id == "t") typo(2) else null
+        }
+        assertEquals(null, dup)
     }
 
     // --- Cache base names ----------------------------------------------------

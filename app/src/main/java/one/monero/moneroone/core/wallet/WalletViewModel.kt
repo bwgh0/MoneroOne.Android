@@ -152,8 +152,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * Depth counter of open add-wallet-flow screens; suppresses auto-lock
      * while > 0. A counter (not a boolean) because during navigation
      * transitions the incoming screen composes before the outgoing one
-     * disposes — a boolean would be reset to false by the outgoing screen.
+     * disposes, and a boolean would be reset to false by the outgoing screen.
+     * It counts screen keys, not calls: each screen keeps its key in saved
+     * state, so a screen that the Activity recreates for a configuration
+     * change registers again under the same key and the count stays balanced.
      */
+    private val addWalletFlowScreens = mutableSetOf<String>()
     private val _addWalletFlowDepth = MutableStateFlow(0)
     val addWalletFlowActive: StateFlow<Boolean>
         get() = _addWalletFlowActiveView
@@ -378,15 +382,19 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun setAddWalletFlowActive(active: Boolean) {
-        _addWalletFlowDepth.update { (it + if (active) 1 else -1).coerceAtLeast(0) }
-        val open = _addWalletFlowDepth.value > 0
+    /**
+     * Register ([active]) or drop the add-wallet-flow screen [screenKey].
+     * Registering a key twice counts it once.
+     */
+    fun setAddWalletFlowActive(active: Boolean, screenKey: String) {
+        if (active) addWalletFlowScreens += screenKey else addWalletFlowScreens -= screenKey
+        _addWalletFlowDepth.value = addWalletFlowScreens.size
+        val open = addWalletFlowScreens.isNotEmpty()
         _addWalletFlowActiveView.value = open
         if (!open) {
             // Add-wallet flow fully closed (completed OR abandoned). A seed
-            // generated for a wallet that was never created must not survive —
-            // a stale pendingSeed would otherwise be served by getSeedPhrase()
-            // and end up "backed up" as an existing wallet's seed.
+            // generated for a wallet that was never created must not stay
+            // in memory.
             _pendingSeed.value = null
         }
     }
@@ -711,7 +719,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private fun isUnloadableCacheError(error: Throwable): Boolean =
         error is MoneroKit.SyncError.InvalidNode && error.message == "Invalid wallet"
 
-    fun generateNewSeed(seedType: SeedType): List<String> {
+    /** The phrase of the create flow in progress, held for the life of that flow. */
+    private val createFlowSeed = CreateFlowSeed(_pendingSeed)
+
+    /**
+     * Issue the recovery phrase for the create flow [flowId] (its
+     * NavBackStackEntry id) and hold it in [pendingSeed]. A flow gets one
+     * phrase: asking again returns the words it was shown, or null once they
+     * are gone. It never gets a second phrase.
+     */
+    fun generateNewSeed(seedType: SeedType, flowId: String): List<String>? = createFlowSeed.issue(flowId) {
         val mnemonic = Mnemonic()
 
         val words = when (seedType) {
@@ -727,9 +744,18 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         Timber.d("Generated ${words.size}-word seed for type $seedType")
-        _pendingSeed.value = PendingSeed(words, seedType)
-        return words
+        PendingSeed(words, seedType)
     }
+
+    /** How the create screen of [flowId] starts; [savedIssued] is its saved record of a shown phrase. */
+    fun createFlowStart(flowId: String, savedIssued: Boolean): CreateFlowStart =
+        createFlowSeed.start(flowId, savedIssued)
+
+    /** True while [pendingSeed] holds the phrase issued to the create flow [flowId]. */
+    fun holdsPendingSeed(flowId: String): Boolean = createFlowSeed.holds(flowId)
+
+    /** The create flow [flowId] ended for real (back, cancel, completion, lock): drop its phrase. */
+    fun discardPendingSeed(flowId: String) = createFlowSeed.discard(flowId)
 
     fun nextWalletName(): String = WalletStore.nextWalletName(_wallets.value.map { it.name })
 
@@ -762,8 +788,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         emoji: String = "💰"
     ): Boolean {
         // Normalize: the same seed typed with different casing/whitespace must
-        // derive the same cache id (dedupe) and convert cleanly.
-        val normalized = seed.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        // derive the same cache id (dedupe) and convert cleanly. wallet2 reads
+        // an English word by its 3-letter prefix, so a prefix typo is saved as
+        // the word wallet2 reads (new wallets only; stored rows never change).
+        val normalized = SeedValidation.canonicalElectrumWords(
+            seed.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        )
         val seedType = when (normalized.size) {
             25 -> SeedType.ELECTRUM_25
             24 -> SeedType.BIP39_24
@@ -1566,9 +1596,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
-     * PIN check for re-authorising a sensitive action (broadcasting a transaction)
-     * without unlocking or re-initialising the wallet. Shares the unlock rate
-     * limiter so this cannot be used as an unthrottled PIN oracle.
+     * PIN check for re-authorising a sensitive action (broadcasting a
+     * transaction, showing the seed, changing the PIN) without unlocking or
+     * re-initialising the wallet. Shares the unlock rate limiter so this
+     * cannot be used as an unthrottled PIN oracle. Returns false without a
+     * check while a lockout runs.
      */
     suspend fun verifyPinForAction(enteredPin: String): Boolean {
         val storedHash = withContext(Dispatchers.IO) {
@@ -1587,23 +1619,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return isValid
     }
 
-    suspend fun verifyPinOnly(enteredPin: String): Boolean {
-        val storedHash = withContext(Dispatchers.IO) { storedPinHash() } ?: return false
-
-        val isValid = verifyPinHash(enteredPin, storedHash)
-        if (isValid) {
-            migratePinIfNeeded(enteredPin, storedHash)
-        }
-        return isValid
-    }
-
     /**
      * Change the app-wide PIN. Two-pass over all wallets (port of iOS
      * `reencryptAllWallets`): first verify every wallet's secret is readable,
      * then write the new hash for every wallet — no partial state on failure.
      */
     suspend fun changePin(oldPin: String, newPin: String): Boolean {
-        if (!verifyPinOnly(oldPin)) return false
+        if (!verifyPinForAction(oldPin)) return false
 
         val allWallets = _wallets.value
         // Pass 1: every wallet's seed must be readable before anything is written.
@@ -1632,42 +1654,30 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     // =========================================================================
 
     /**
-     * Seed of the ACTIVE wallet. Pass [expectedWalletId] (captured when the
-     * secret-export screen opened) so a mid-view wallet switch can never leak
-     * another wallet's seed; returns null on mismatch.
+     * Seed of the ACTIVE wallet. [expectedWalletId] (captured when the
+     * secret-export screen opened) is required, so a mid-view wallet switch can
+     * never leak another wallet's seed; returns null on mismatch or when no seed
+     * is stored. The create flow's phrase is never served here: that flow reads
+     * [pendingSeed] (iOS a31683d class).
      */
-    fun getSeedPhrase(expectedWalletId: String? = null): List<String>? {
+    fun getSeedPhrase(expectedWalletId: String): List<String>? {
         val active = _activeWallet.value
-        if (expectedWalletId != null) {
-            // Export bound to an EXISTING wallet: the id gate applies before
-            // ANY shortcut. A pending (not-yet-created) seed must never
-            // satisfy an existing wallet's backup — that is exactly how the
-            // wrong seed gets backed up (iOS a31683d class).
-            if (active == null || active.id != expectedWalletId) {
-                Timber.w("getSeedPhrase: wallet mismatch (expected $expectedWalletId, active ${active?.id})")
-                return null
-            }
-            return secrets.loadSeed(active.id)?.first
+        if (active == null || active.id != expectedWalletId) {
+            Timber.w("getSeedPhrase: wallet mismatch (expected $expectedWalletId, active ${active?.id})")
+            return null
         }
-        // Ungated call: only meaningful during wallet creation, where the
-        // pending seed is the wallet being created.
-        _pendingSeed.value?.let { return it.words }
-        return active?.let { secrets.loadSeed(it.id)?.first }
+        return secrets.loadSeed(active.id)?.first
     }
 
-    fun getSeedType(expectedWalletId: String? = null): SeedType? {
+    fun getSeedType(expectedWalletId: String): SeedType? {
         val active = _activeWallet.value
-        if (expectedWalletId != null) {
-            if (active == null || active.id != expectedWalletId) return null
-            return secrets.loadSeed(active.id)?.second
-        }
-        _pendingSeed.value?.let { return it.type }
-        return active?.let { secrets.loadSeed(it.id)?.second }
+        if (active == null || active.id != expectedWalletId) return null
+        return secrets.loadSeed(active.id)?.second
     }
 
-    fun getElectrumSeedPhrase(expectedWalletId: String? = null): List<String>? {
+    fun getElectrumSeedPhrase(expectedWalletId: String): List<String>? {
         val active = _activeWallet.value ?: return null
-        if (expectedWalletId != null && active.id != expectedWalletId) return null
+        if (active.id != expectedWalletId) return null
         val (words, type) = secrets.loadSeed(active.id) ?: return null
         if (type != SeedType.BIP39_24) return null
         return CakeWalletStyleConverter.getLegacySeedFromBip39(words, "")

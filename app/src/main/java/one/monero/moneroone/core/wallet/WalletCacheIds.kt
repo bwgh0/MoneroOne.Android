@@ -42,6 +42,9 @@ object WalletCacheIds {
      *    row's stored seed;
      *  - migrated rows: stored id is the legacy random UUID (not seed-derived
      *    at all) — recompute base from the row's stored seed.
+     *  - rows saved with a prefix typo ("abbxy" for "abbey") before restores
+     *    were canonicalized: wallet2 reads both as the same wallet, so the
+     *    canonical forms are compared too. The row's own id stays as it is.
      * Rows whose seed cannot be read and whose stored id doesn't match are
      * skipped (they cannot be proven duplicates).
      */
@@ -51,9 +54,13 @@ object WalletCacheIds {
         storedSeedOf: (walletId: String) -> List<String>?
     ): WalletInfo? {
         val base = derivedWalletId(seedWords, 0)
+        val canonical = SeedValidation.canonicalElectrumWords(seedWords)
         return wallets.firstOrNull { row ->
             row.derivedWalletId == base ||
-                storedSeedOf(row.id)?.let { derivedWalletId(it, 0) == base } == true
+                storedSeedOf(row.id)?.let { stored ->
+                    derivedWalletId(stored, 0) == base ||
+                        SeedValidation.canonicalElectrumWords(stored) == canonical
+                } == true
         }
     }
 

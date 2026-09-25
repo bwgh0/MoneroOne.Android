@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.KeypadKey
+import one.monero.moneroone.ui.components.pinLockoutMessage
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 
@@ -110,9 +111,11 @@ fun ChangePinScreen(
                     if (currentPin.length == PIN_LENGTH) {
                         val oldPin = currentPin
                         scope.launch {
-                            if (!walletViewModel.verifyPinOnly(oldPin)) {
+                            // Rate-limited with the unlock screen (one shared lockout).
+                            if (!walletViewModel.verifyPinForAction(oldPin)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                error = "Incorrect PIN"
+                                val lockedFor = walletViewModel.getRemainingLockoutMs()
+                                error = if (lockedFor > 0) pinLockoutMessage(lockedFor) else "Incorrect PIN"
                                 shakeAnimation = true
                                 currentPin = ""
                             } else {

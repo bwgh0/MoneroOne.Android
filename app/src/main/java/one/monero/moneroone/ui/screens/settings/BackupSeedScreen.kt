@@ -1,7 +1,5 @@
 package one.monero.moneroone.ui.screens.settings
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
@@ -44,7 +42,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -65,18 +62,47 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import one.monero.moneroone.core.util.SeedClipboard
 import one.monero.moneroone.core.wallet.SeedType
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.KeypadKey
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.pinLockoutMessage
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 
 private const val PIN_LENGTH = 6
-private const val CLIPBOARD_CLEAR_DELAY_MS = 5 * 60 * 1000L // 5 minutes
+
+/** iOS WalletError.walletMismatch wording. */
+private const val WALLET_CHANGED_MESSAGE = "Active wallet changed — please retry"
+private const val NO_SEED_MESSAGE = "No seed phrase found for this wallet"
+
+/** What the screen may show once the PIN is verified. */
+private sealed interface SeedReveal {
+    class Show(val words: List<String>, val type: SeedType, val electrumWords: List<String>?) : SeedReveal
+    class Refuse(val message: String) : SeedReveal
+}
+
+/**
+ * The one place that decides what this screen reveals: only the phrase of the
+ * wallet it was opened for. Put any further reveal check here. Reads encrypted
+ * storage and converts BIP39 to the legacy words: call it off Main.
+ */
+private fun seedRevealFor(walletViewModel: WalletViewModel, boundWalletId: String?): SeedReveal {
+    val walletId = boundWalletId ?: return SeedReveal.Refuse(NO_SEED_MESSAGE)
+    val words = walletViewModel.getSeedPhrase(walletId)
+    val type = walletViewModel.getSeedType(walletId)
+    val electrumWords = if (type == SeedType.BIP39_24) walletViewModel.getElectrumSeedPhrase(walletId) else null
+    // Checked after the reads, so a switch while they ran is reported as one.
+    if (walletViewModel.activeWallet.value?.id != walletId) return SeedReveal.Refuse(WALLET_CHANGED_MESSAGE)
+    if (words.isNullOrEmpty() || type == null) return SeedReveal.Refuse(NO_SEED_MESSAGE)
+    return SeedReveal.Show(words, type, electrumWords)
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -103,9 +129,16 @@ fun BackupSeedScreen(
     // can never show another wallet's seed (iOS a31683d).
     val activeWallet by walletViewModel.activeWallet.collectAsState()
     val boundWalletId = remember { activeWallet?.id }
+    // Two paths can close the screen at once (the switch above, a refused reveal): pop once.
+    var closed by remember { mutableStateOf(false) }
+    fun close() {
+        if (closed) return
+        closed = true
+        onBack()
+    }
     LaunchedEffect(activeWallet?.id) {
         if (activeWallet?.id != boundWalletId) {
-            onBack()
+            close()
         }
     }
 
@@ -114,20 +147,6 @@ fun BackupSeedScreen(
         accessibilityManager.isTouchExplorationEnabled
     }
     var screenReaderWarningAccepted by remember { mutableStateOf(false) }
-
-    // Clear clipboard after delay if seed was copied
-    DisposableEffect(copiedToClipboard) {
-        if (copiedToClipboard) {
-            val job = scope.launch {
-                delay(CLIPBOARD_CLEAR_DELAY_MS)
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-            }
-            onDispose { job.cancel() }
-        } else {
-            onDispose { }
-        }
-    }
 
     LaunchedEffect(shakeAnimation) {
         if (shakeAnimation) {
@@ -144,18 +163,30 @@ fun BackupSeedScreen(
             if (pin.length == PIN_LENGTH) {
                 val entered = pin
                 scope.launch {
-                    val verified = walletViewModel.verifyPinOnly(entered)
+                    // Rate-limited with the unlock screen: on Android this PIN
+                    // is the only barrier in front of the seed.
+                    val verified = walletViewModel.verifyPinForAction(entered)
                     if (verified) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        isUnlocked = true
-                        seedWords = walletViewModel.getSeedPhrase(boundWalletId) ?: emptyList()
-                        seedType = walletViewModel.getSeedType(boundWalletId)
-                        if (seedType == SeedType.BIP39_24) {
-                            electrumSeedWords = walletViewModel.getElectrumSeedPhrase(boundWalletId)
+                        val reveal = withContext(Dispatchers.Default) {
+                            seedRevealFor(walletViewModel, boundWalletId)
+                        }
+                        when (reveal) {
+                            is SeedReveal.Show -> {
+                                seedWords = reveal.words
+                                seedType = reveal.type
+                                electrumSeedWords = reveal.electrumWords
+                                isUnlocked = true
+                            }
+                            is SeedReveal.Refuse -> {
+                                Toast.makeText(context, reveal.message, Toast.LENGTH_LONG).show()
+                                close()
+                            }
                         }
                     } else {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        pinError = "Invalid PIN"
+                        val lockedFor = walletViewModel.getRemainingLockoutMs()
+                        pinError = if (lockedFor > 0) pinLockoutMessage(lockedFor) else "Invalid PIN"
                         shakeAnimation = true
                         pin = ""
                     }
@@ -475,11 +506,13 @@ fun BackupSeedScreen(
             // Copy button
             Button(
                 onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clip = ClipData.newPlainText("Seed Phrase", displayWords.joinToString(" "))
-                    clipboard.setPrimaryClip(clip)
+                    SeedClipboard.copy(context, displayWords.joinToString(" "))
                     copiedToClipboard = true
-                    Toast.makeText(context, "Copied! Will clear in 5 minutes", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        context,
+                        "Copied! Will clear in ${SeedClipboard.LIFETIME_SECONDS} seconds",
+                        Toast.LENGTH_LONG
+                    ).show()
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MoneroOrange,
@@ -502,7 +535,7 @@ fun BackupSeedScreen(
             if (copiedToClipboard) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Clipboard will auto-clear in 5 minutes",
+                    text = "Clipboard will auto-clear in ${SeedClipboard.LIFETIME_SECONDS} seconds",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.fillMaxWidth(),

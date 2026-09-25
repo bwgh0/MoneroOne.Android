@@ -2,6 +2,7 @@ package one.monero.moneroone.ui.screens.onboarding
 
 import android.content.Context
 import android.view.accessibility.AccessibilityManager
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,21 +48,24 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import one.monero.moneroone.core.util.SeedClipboard
+import one.monero.moneroone.core.wallet.CreateFlowStart
 import one.monero.moneroone.core.wallet.SeedType
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.AddWalletFlowEffect
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroLogo
+import one.monero.moneroone.ui.components.isRecreatingForConfigChange
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.WarningYellow
 
@@ -69,14 +73,18 @@ import one.monero.moneroone.ui.theme.WarningYellow
 @Composable
 fun CreateWalletScreen(
     walletViewModel: WalletViewModel,
+    flowId: String,
     onWalletCreated: () -> Unit,
     onBack: () -> Unit,
     isAddingWallet: Boolean = false
 ) {
-    var currentStep by remember { mutableIntStateOf(0) }
-    var generatedSeed by remember { mutableStateOf<List<String>>(emptyList()) }
-    var seedConfirmed by remember { mutableStateOf(false) }
+    // Step and flags survive an Activity recreation; the words never enter
+    // saved state. The ViewModel holds them for the life of the flow.
+    var currentStep by rememberSaveable { mutableIntStateOf(0) }
+    var seedIssued by rememberSaveable { mutableStateOf(false) }
+    var seedConfirmed by rememberSaveable { mutableStateOf(false) }
     var isCreating by remember { mutableStateOf(false) }
+    val pendingSeed by walletViewModel.pendingSeed.collectAsState()
     val walletState by walletViewModel.walletState.collectAsState()
     val scope = rememberCoroutineScope()
 
@@ -85,22 +93,40 @@ fun CreateWalletScreen(
         val accessibilityManager = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
         accessibilityManager.isTouchExplorationEnabled
     }
-    var screenReaderWarningAccepted by remember { mutableStateOf(false) }
+    var screenReaderWarningAccepted by rememberSaveable { mutableStateOf(false) }
 
-    // Generate seed immediately on screen entry
-    LaunchedEffect(Unit) {
-        if (generatedSeed.isEmpty()) {
-            generatedSeed = walletViewModel.generateNewSeed(SeedType.BIP39_24)
+    // Decided once per composition. A recreated screen finds its phrase in the
+    // ViewModel and shows the same words. A flow whose phrase is gone (process
+    // death) must never show a new phrase in its place: it leaves and starts
+    // over where it began, as iOS does after a kill.
+    val start = remember { walletViewModel.createFlowStart(flowId, savedIssued = seedIssued) }
+    LaunchedEffect(flowId) {
+        when (start) {
+            CreateFlowStart.ISSUE -> {
+                walletViewModel.generateNewSeed(SeedType.BIP39_24, flowId)
+                seedIssued = true
+            }
+            CreateFlowStart.RESUME -> seedIssued = true
+            CreateFlowStart.RESTART -> onBack()
+        }
+    }
+
+    // Back, cancel, completion and the lock screen end the flow and drop its
+    // phrase; the disposal that recreates the Activity keeps it.
+    val activity = LocalActivity.current
+    DisposableEffect(flowId) {
+        onDispose {
+            if (!activity.isRecreatingForConfigChange()) walletViewModel.discardPendingSeed(flowId)
         }
     }
 
     // Suppress auto-lock while the add-wallet flow is open (iOS parity).
-    if (isAddingWallet) {
-        DisposableEffect(Unit) {
-            walletViewModel.setAddWalletFlowActive(true)
-            onDispose { walletViewModel.setAddWalletFlowActive(false) }
-        }
-    }
+    if (isAddingWallet) AddWalletFlowEffect(walletViewModel)
+
+    if (start == CreateFlowStart.RESTART) return
+
+    // This flow's phrase only.
+    val seed = pendingSeed?.words?.takeIf { walletViewModel.holdsPendingSeed(flowId) }.orEmpty()
 
     Scaffold(
         topBar = {
@@ -155,12 +181,12 @@ fun CreateWalletScreen(
                     )
                 } else {
                     SeedDisplay(
-                        seed = generatedSeed,
+                        seed = seed,
                         onContinue = { currentStep = 1 }
                     )
                 }
                 1 -> SeedConfirmation(
-                    seed = generatedSeed,
+                    seed = seed,
                     onConfirmed = {
                         seedConfirmed = true
                         currentStep = 2
@@ -174,10 +200,16 @@ fun CreateWalletScreen(
                         isBusy = isCreating,
                         onDone = { name, emoji ->
                             if (isCreating) return@NameWalletStep
+                            // The phrase is gone only after an add that failed late
+                            // (the ViewModel drops it once the kit is built): start over.
+                            if (seed.isEmpty()) {
+                                onBack()
+                                return@NameWalletStep
+                            }
                             isCreating = true
                             scope.launch {
                                 val ok = walletViewModel.createWallet(
-                                    generatedSeed, SeedType.BIP39_24, name, emoji
+                                    seed, SeedType.BIP39_24, name, emoji
                                 )
                                 isCreating = false
                                 if (ok) onWalletCreated()
@@ -269,11 +301,11 @@ private fun SeedDisplay(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Copy seed button
-        val clipboardManager = LocalClipboardManager.current
-        var copied by remember { mutableStateOf(false) }
+        val context = LocalContext.current
+        var copied by rememberSaveable { mutableStateOf(false) }
         OutlinedButton(
             onClick = {
-                clipboardManager.setText(AnnotatedString(seed.joinToString(" ")))
+                SeedClipboard.copy(context, seed.joinToString(" "))
                 copied = true
             },
             modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -413,7 +445,7 @@ private fun SeedConfirmation(
     seed: List<String>,
     onConfirmed: () -> Unit
 ) {
-    var confirmChecked by remember { mutableStateOf(false) }
+    var confirmChecked by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),

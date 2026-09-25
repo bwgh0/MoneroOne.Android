@@ -31,6 +31,10 @@ import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.theme.ErrorRed
 
+/** The lockout line of every PIN re-authentication gate (seconds rounded up). */
+fun pinLockoutMessage(lockedForMs: Long): String =
+    "Too many attempts. Try again in ${(lockedForMs + 999) / 1000}s"
+
 /**
  * Re-authentication gate for irreversible actions (currently: broadcasting a
  * transaction). Prefers a strong biometric when the user has enabled it, and
@@ -123,7 +127,7 @@ fun AuthGateDialog(
                             } else {
                                 val lockedFor = walletViewModel.getRemainingLockoutMs()
                                 error = if (lockedFor > 0) {
-                                    "Too many attempts. Try again in ${(lockedFor + 999) / 1000}s"
+                                    pinLockoutMessage(lockedFor)
                                 } else {
                                     "Incorrect PIN"
                                 }

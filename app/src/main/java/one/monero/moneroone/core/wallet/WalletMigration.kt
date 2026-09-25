@@ -1,6 +1,7 @@
 package one.monero.moneroone.core.wallet
 
 import android.content.SharedPreferences
+import io.horizontalsystems.hdwalletkit.Mnemonic
 import timber.log.Timber
 import java.util.UUID
 
@@ -112,6 +113,7 @@ object WalletMigration {
         val newId = UUID.randomUUID().toString()
         val info = buildMigratedWallet(legacy, newId, System.currentTimeMillis()) ?: return
         Timber.i("WalletMigration: migrating single wallet -> ${info.id} (cache ${info.derivedWalletId})")
+        warnIfSeedFailsValidation(legacy.seedWords!!, legacy.seedType!!)
 
         // 1. Write new secrets (copy, don't move).
         secrets.saveSeed(newId, legacy.seedWords!!, legacy.seedType!!)
@@ -165,6 +167,7 @@ object WalletMigration {
                 val info = buildMigratedWallet(legacy, newId, System.currentTimeMillis())!!
                     .let { it.copy(name = WalletStore.nextWalletName(existing.map { w -> w.name })) }
                 Timber.i("WalletMigration: importing post-migration legacy wallet -> $newId (cache ${info.derivedWalletId})")
+                warnIfSeedFailsValidation(legacy.seedWords!!, legacy.seedType!!)
                 secrets.saveSeed(newId, legacy.seedWords!!, legacy.seedType!!)
                 // Keep the one-app-wide-PIN invariant: prefer the existing
                 // wallets' hash; fall back to the legacy build's hash.
@@ -181,6 +184,30 @@ object WalletMigration {
         } else {
             // Same rule as first-run: never destroy what we cannot import.
             Timber.w("WalletMigration: incomplete post-migration legacy fragments left in place")
+        }
+    }
+
+    /**
+     * The single-wallet restore checked only the word count, so a legacy seed
+     * can fail the rules a new wallet must pass. It is imported anyway (it can
+     * be the only copy of someone's keys); this only logs why. Pure checks,
+     * no native code: migration runs in the ViewModel constructor on Main.
+     * The reason never contains seed words.
+     */
+    private fun warnIfSeedFailsValidation(words: List<String>, type: SeedType) {
+        val problem = when (type) {
+            SeedType.ELECTRUM_25 -> SeedValidation.electrumSeedProblem(words)
+            SeedType.BIP39_24 -> try {
+                Mnemonic().validate(words)
+                null
+            } catch (e: Throwable) {
+                // Nothing here may stop the import. The exception message can
+                // quote a word: log the type only.
+                "BIP39 validation failed (${e.javaClass.simpleName})"
+            }
+        }
+        if (problem != null) {
+            Timber.w("WalletMigration: importing a legacy seed that fails validation: $problem")
         }
     }
 

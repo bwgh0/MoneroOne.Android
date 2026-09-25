@@ -3,6 +3,7 @@ package one.monero.moneroone.core.wallet
 import io.horizontalsystems.monerokit.CakeWalletStyleConverter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -85,6 +86,67 @@ class SeedValidationTest {
         assertFalse(SeedValidation.isPlausiblePrimaryAddress(real.drop(1)))          // 94 chars
         assertFalse(SeedValidation.isPlausiblePrimaryAddress("8" + real.drop(1)))    // subaddress prefix
         assertFalse(SeedValidation.isPlausiblePrimaryAddress(real.replace('4', '0'))) // non-base58
+    }
+
+    // --- Prefix typos: wallet2 reads an English word by its 3-letter prefix ----
+
+    /** Keeps the 3-letter prefix and changes the rest, as a typo past the prefix does. */
+    private fun typo(word: String): String =
+        (word.take(3) + "zz").also { assertFalse(it in CakeWalletStyleConverter.MONERO_WORDLIST) }
+
+    @Test
+    fun `prefix typos are canonicalized to the words wallet2 reads`() {
+        val words = validElectrum()
+        val typed = words.toMutableList().apply {
+            this[0] = typo(this[0])
+            this[24] = typo(this[24]) // the checksum word too
+        }
+        assertNotEquals(words, typed)
+        assertEquals(words, SeedValidation.canonicalElectrumWords(typed))
+    }
+
+    @Test
+    fun `abbxy restores as abbey`() {
+        val typed = List(25) { if (it == 3) "abbxy" else "abbey" }
+        assertEquals(List(25) { "abbey" }, SeedValidation.canonicalElectrumWords(typed))
+    }
+
+    @Test
+    fun `a canonical seed comes back unchanged`() {
+        val words = validElectrum()
+        assertEquals(words, SeedValidation.canonicalElectrumWords(words))
+    }
+
+    @Test
+    fun `a word with no prefix match keeps the seed as typed`() {
+        val typed = validElectrum().toMutableList().apply {
+            this[0] = typo(this[0])
+            this[5] = "qqqqq"
+        }
+        assertEquals(typed, SeedValidation.canonicalElectrumWords(typed))
+    }
+
+    @Test
+    fun `a word shorter than the prefix is not matched`() {
+        val typed = validElectrum().toMutableList().apply { this[0] = this[0].take(2) }
+        assertEquals(typed, SeedValidation.canonicalElectrumWords(typed))
+    }
+
+    @Test
+    fun `a canonical form that fails the checksum keeps the seed as typed`() {
+        val words = validElectrum().toMutableList()
+        words[4] = CakeWalletStyleConverter.MONERO_WORDLIST.first { it != words[4] && it != words[24] }
+        assertNotNull(SeedValidation.electrumSeedProblem(words))
+        val typed = words.toMutableList().apply { this[0] = typo(this[0]) }
+        assertEquals(typed, SeedValidation.canonicalElectrumWords(typed))
+    }
+
+    @Test
+    fun `only 25-word seeds are canonicalized`() {
+        val bip39Typo = bip39.toMutableList().apply { this[0] = "blinx" }
+        assertEquals(bip39Typo, SeedValidation.canonicalElectrumWords(bip39Typo))
+        val short = validElectrum().take(24).toMutableList().apply { this[0] = typo(this[0]) }
+        assertEquals(short, SeedValidation.canonicalElectrumWords(short))
     }
 
     @Test
