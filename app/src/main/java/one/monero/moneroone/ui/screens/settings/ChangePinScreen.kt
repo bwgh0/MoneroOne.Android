@@ -143,8 +143,17 @@ fun ChangePinScreen(
                             val oldPin = currentPin
                             val chosen = newPin
                             scope.launch {
-                                walletViewModel.changePin(oldPin, chosen)
-                                onSuccess()
+                                if (walletViewModel.changePin(oldPin, chosen)) {
+                                    onSuccess()
+                                } else {
+                                    // Nothing was written (iOS SecurityView wording): start over.
+                                    error = "Failed to change PIN"
+                                    shakeAnimation = true
+                                    currentPin = ""
+                                    newPin = ""
+                                    confirmPin = ""
+                                    step = ChangePinStep.ENTER_CURRENT
+                                }
                             }
                         }
                     }

@@ -108,7 +108,18 @@ fun CreateWalletScreen(
             }
             CreateFlowStart.RESUME -> seedIssued = true
             CreateFlowStart.RESTART -> onBack()
+            // The add below finishes the flow.
+            CreateFlowStart.COMPLETED -> Unit
         }
+    }
+
+    // The add runs in the ViewModel. Its outcome, not the coroutine that
+    // started it, finishes the flow, so a screen that the Activity recreates
+    // during the add still moves on once the wallet exists.
+    val addOutcomes by walletViewModel.addOutcomes.collectAsState()
+    val walletAdded = addOutcomes[flowId] == true
+    LaunchedEffect(walletAdded) {
+        if (walletAdded) onWalletCreated()
     }
 
     // Back, cancel, completion and the lock screen end the flow and drop its
@@ -116,14 +127,17 @@ fun CreateWalletScreen(
     val activity = LocalActivity.current
     DisposableEffect(flowId) {
         onDispose {
-            if (!activity.isRecreatingForConfigChange()) walletViewModel.discardPendingSeed(flowId)
+            if (!activity.isRecreatingForConfigChange()) {
+                walletViewModel.discardPendingSeed(flowId)
+                walletViewModel.clearAddOutcome(flowId)
+            }
         }
     }
 
     // Suppress auto-lock while the add-wallet flow is open (iOS parity).
     if (isAddingWallet) AddWalletFlowEffect(walletViewModel)
 
-    if (start == CreateFlowStart.RESTART) return
+    if (start == CreateFlowStart.RESTART || start == CreateFlowStart.COMPLETED) return
 
     // This flow's phrase only.
     val seed = pendingSeed?.words?.takeIf { walletViewModel.holdsPendingSeed(flowId) }.orEmpty()
@@ -197,22 +211,24 @@ fun CreateWalletScreen(
                     NameWalletStep(
                         defaultName = walletViewModel.nextWalletName(),
                         buttonLabel = "Create Wallet",
-                        isBusy = isCreating,
+                        // isInitializing also covers an add that a screen before an
+                        // Activity recreation started.
+                        isBusy = isCreating || walletState.isInitializing,
                         onDone = { name, emoji ->
-                            if (isCreating) return@NameWalletStep
-                            // The phrase is gone only after an add that failed late
-                            // (the ViewModel drops it once the kit is built): start over.
+                            if (isCreating || walletState.isInitializing || walletAdded) return@NameWalletStep
+                            // The ViewModel keeps the phrase until the add succeeds; it is
+                            // gone only when something else ended the flow: start over.
                             if (seed.isEmpty()) {
                                 onBack()
                                 return@NameWalletStep
                             }
                             isCreating = true
                             scope.launch {
-                                val ok = walletViewModel.createWallet(
-                                    seed, SeedType.BIP39_24, name, emoji
-                                )
-                                isCreating = false
-                                if (ok) onWalletCreated()
+                                try {
+                                    walletViewModel.createWallet(seed, SeedType.BIP39_24, flowId, name, emoji)
+                                } finally {
+                                    isCreating = false
+                                }
                             }
                         }
                     )

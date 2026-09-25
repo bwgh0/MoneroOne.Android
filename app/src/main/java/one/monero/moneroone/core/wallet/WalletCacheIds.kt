@@ -43,14 +43,20 @@ object WalletCacheIds {
      *  - migrated rows: stored id is the legacy random UUID (not seed-derived
      *    at all) — recompute base from the row's stored seed.
      *  - rows saved with a prefix typo ("abbxy" for "abbey") before restores
-     *    were canonicalized: wallet2 reads both as the same wallet, so the
-     *    canonical forms are compared too. The row's own id stays as it is.
+     *    were canonicalized: wallet2 reads both as the same wallet, so with
+     *    [matchPrefixTypos] the canonical forms are compared too. The row's
+     *    own id stays as it is.
      * Rows whose seed cannot be read and whose stored id doesn't match are
      * skipped (they cannot be proven duplicates).
+     *
+     * A caller that deletes data on a match (the migration wipes a duplicate
+     * legacy wallet, and its cache is then swept) passes [matchPrefixTypos]
+     * false: a typo form then becomes its own row, and its cache is kept.
      */
     fun findWalletWithSeed(
         seedWords: List<String>,
         wallets: List<WalletInfo>,
+        matchPrefixTypos: Boolean = true,
         storedSeedOf: (walletId: String) -> List<String>?
     ): WalletInfo? {
         val base = derivedWalletId(seedWords, 0)
@@ -59,7 +65,7 @@ object WalletCacheIds {
             row.derivedWalletId == base ||
                 storedSeedOf(row.id)?.let { stored ->
                     derivedWalletId(stored, 0) == base ||
-                        SeedValidation.canonicalElectrumWords(stored) == canonical
+                        (matchPrefixTypos && SeedValidation.canonicalElectrumWords(stored) == canonical)
                 } == true
         }
     }

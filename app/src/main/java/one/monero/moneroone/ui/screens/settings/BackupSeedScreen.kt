@@ -82,6 +82,9 @@ private const val PIN_LENGTH = 6
 private const val WALLET_CHANGED_MESSAGE = "Active wallet changed — please retry"
 private const val NO_SEED_MESSAGE = "No seed phrase found for this wallet"
 
+/** iOS WalletError.seedMismatch wording. */
+private const val SEED_MISMATCH_MESSAGE = "Seed phrase doesn't match current wallet"
+
 /** What the screen may show once the PIN is verified. */
 private sealed interface SeedReveal {
     class Show(val words: List<String>, val type: SeedType, val electrumWords: List<String>?) : SeedReveal
@@ -101,6 +104,9 @@ private fun seedRevealFor(walletViewModel: WalletViewModel, boundWalletId: Strin
     // Checked after the reads, so a switch while they ran is reported as one.
     if (walletViewModel.activeWallet.value?.id != walletId) return SeedReveal.Refuse(WALLET_CHANGED_MESSAGE)
     if (words.isNullOrEmpty() || type == null) return SeedReveal.Refuse(NO_SEED_MESSAGE)
+    // The open wallet file does not derive from these words: a backup of them
+    // would not back up the wallet's funds (iOS seedMismatch).
+    if (!walletViewModel.seedMatchesWalletFile(walletId)) return SeedReveal.Refuse(SEED_MISMATCH_MESSAGE)
     return SeedReveal.Show(words, type, electrumWords)
 }
 

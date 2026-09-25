@@ -157,7 +157,8 @@ object WalletMigration {
                 // The crash-recovery case: the store row IS this legacy wallet
                 // (its cache id was kept verbatim).
                 existing.any { it.derivedWalletId == legacy.walletId } ||
-                    WalletCacheIds.findWalletWithSeed(legacy.seedWords!!, existing) { id ->
+                    // Exact matches only: a duplicate is wiped, and its cache with it.
+                    WalletCacheIds.findWalletWithSeed(legacy.seedWords!!, existing, matchPrefixTypos = false) { id ->
                         secrets.loadSeed(id)?.first
                     } != null
             if (!duplicate) {

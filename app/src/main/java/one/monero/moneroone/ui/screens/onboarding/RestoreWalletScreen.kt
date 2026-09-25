@@ -2,6 +2,7 @@ package one.monero.moneroone.ui.screens.onboarding
 
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +34,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.AddWalletFlowEffect
+import one.monero.moneroone.ui.components.isRecreatingForConfigChange
 import one.monero.moneroone.ui.theme.MoneroOrange
 import io.horizontalsystems.monerokit.util.RestoreHeight
 import java.text.SimpleDateFormat
@@ -64,6 +68,7 @@ import java.util.Locale
 @Composable
 fun RestoreWalletScreen(
     walletViewModel: WalletViewModel,
+    flowId: String,
     onWalletRestored: () -> Unit,
     onBack: () -> Unit,
     isAddingWallet: Boolean = false
@@ -76,6 +81,20 @@ fun RestoreWalletScreen(
 
     val walletState by walletViewModel.walletState.collectAsState()
     val scope = rememberCoroutineScope()
+
+    // The add runs in the ViewModel. Its outcome finishes the flow, so a screen
+    // that the Activity recreates during the restore still moves on.
+    val addOutcomes by walletViewModel.addOutcomes.collectAsState()
+    val walletRestored = addOutcomes[flowId] == true
+    LaunchedEffect(walletRestored) {
+        if (walletRestored) onWalletRestored()
+    }
+    val activity = LocalActivity.current
+    DisposableEffect(flowId) {
+        onDispose {
+            if (!activity.isRecreatingForConfigChange()) walletViewModel.clearAddOutcome(flowId)
+        }
+    }
 
     // Suppress auto-lock while the add-wallet flow is open (iOS parity).
     if (isAddingWallet) AddWalletFlowEffect(walletViewModel)
@@ -118,15 +137,16 @@ fun RestoreWalletScreen(
                     onDone = { name, emoji ->
                         val words = seedPhrase.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
                         val restoreHeightValue = selectedDate?.let { dateToRestoreHeight(it) }?.toString()
+                        if (walletState.isInitializing || walletRestored) return@NameWalletStep
                         scope.launch {
-                            val ok = walletViewModel.restoreWallet(
+                            walletViewModel.restoreWallet(
                                 seed = words,
                                 restoreHeight = restoreHeightValue,
+                                flowId = flowId,
                                 restoreDateMillis = selectedDate,
                                 name = name,
                                 emoji = emoji
                             )
-                            if (ok) onWalletRestored()
                         }
                     }
                 )

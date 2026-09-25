@@ -133,6 +133,15 @@ class WalletCacheIdsTest {
     }
 
     @Test
+    fun `without prefix-typo matching only the exact seed is a duplicate`() {
+        // The migration wipes a duplicate legacy wallet: a typo form must stay its own row.
+        val canonical = row("c", "Canonical", WalletCacheIds.derivedWalletId(electrum, 0))
+        val stored: (String) -> List<String>? = { id -> if (id == "c") electrum else null }
+        assertEquals(null, WalletCacheIds.findWalletWithSeed(typo(2), listOf(canonical), matchPrefixTypos = false, stored))
+        assertEquals(canonical, WalletCacheIds.findWalletWithSeed(electrum, listOf(canonical), matchPrefixTypos = false, stored))
+    }
+
+    @Test
     fun `a typo'd row is not a duplicate of a different seed`() {
         val typoRow = row("t", "Typo", WalletCacheIds.derivedWalletId(typo(2), 0))
         val dup = WalletCacheIds.findWalletWithSeed(seed, listOf(typoRow)) { id ->

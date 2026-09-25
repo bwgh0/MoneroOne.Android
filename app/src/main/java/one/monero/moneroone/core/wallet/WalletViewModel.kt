@@ -18,6 +18,7 @@ import io.horizontalsystems.monerokit.toElectrum
 import io.horizontalsystems.monerokit.util.Helper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -178,8 +179,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * Cache id of a wallet file that failed the key check: its primary address
      * is not the one the stored seed derives. The wallet's addresses stay
      * hidden while that cache is in use. Reset Sync rebuilds the cache from the
-     * seed under a new id.
+     * seed under a new id. Read off Main by [seedMatchesWalletFile].
      */
+    @Volatile
     private var keyMismatchCacheId: String? = null
 
     /** Orders address reads (Main only): a read that started before a newer one never overwrites it. */
@@ -749,7 +751,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     /** How the create screen of [flowId] starts; [savedIssued] is its saved record of a shown phrase. */
     fun createFlowStart(flowId: String, savedIssued: Boolean): CreateFlowStart =
-        createFlowSeed.start(flowId, savedIssued)
+        if (_addOutcomes.value[flowId] == true) CreateFlowStart.COMPLETED
+        else createFlowSeed.start(flowId, savedIssued)
 
     /** True while [pendingSeed] holds the phrase issued to the create flow [flowId]. */
     fun holdsPendingSeed(flowId: String): Boolean = createFlowSeed.holds(flowId)
@@ -766,26 +769,62 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     suspend fun createWallet(
         seed: List<String>,
         seedType: SeedType,
+        flowId: String,
         name: String? = null,
         emoji: String = "💰"
-    ): Boolean = addWalletInternal(
-        seed = seed,
-        seedType = seedType,
-        name = name,
-        emoji = emoji,
-        restoreHeight = MoneroKit.restoreHeightForNewWallet(),
-        restoreDateMillis = System.currentTimeMillis()
-    )
+    ): Boolean = addForScreen(flowId) {
+        addWalletInternal(
+            seed = seed,
+            seedType = seedType,
+            name = name,
+            emoji = emoji,
+            restoreHeight = MoneroKit.restoreHeightForNewWallet(),
+            restoreDateMillis = System.currentTimeMillis()
+        ).also { added ->
+            // Kept until now so that a failed add can be retried with the same words.
+            if (added) createFlowSeed.discard(flowId)
+        }
+    }
 
     /**
-     * Restore a wallet from an existing seed. Returns true on success.
+     * How the wallet add that each create or restore screen started has ended,
+     * by the screen's NavBackStackEntry id (true = the wallet was added). The
+     * add runs in viewModelScope: an Activity recreated during the add (a fold,
+     * a dark-mode switch) used to cancel it halfway, rollback included. The
+     * recreated screen finds the outcome here and finishes its flow.
+     */
+    private val _addOutcomes = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val addOutcomes: StateFlow<Map<String, Boolean>> = _addOutcomes.asStateFlow()
+
+    /** The screen [flowId] has left for good: forget how its add ended. */
+    fun clearAddOutcome(flowId: String) = _addOutcomes.update { it - flowId }
+
+    private suspend fun addForScreen(flowId: String, add: suspend () -> Boolean): Boolean =
+        viewModelScope.async {
+            add().also { added -> _addOutcomes.update { it + (flowId to added) } }
+        }.await()
+
+    /**
+     * Restore a wallet from an existing seed, for the screen [flowId] (see
+     * [addOutcomes]). Returns true on success.
      */
     suspend fun restoreWallet(
         seed: List<String>,
         restoreHeight: String?,
+        flowId: String,
         restoreDateMillis: Long? = null,
         name: String? = null,
         emoji: String = "💰"
+    ): Boolean = addForScreen(flowId) {
+        restoreNormalized(seed, restoreHeight, restoreDateMillis, name, emoji)
+    }
+
+    private suspend fun restoreNormalized(
+        seed: List<String>,
+        restoreHeight: String?,
+        restoreDateMillis: Long?,
+        name: String?,
+        emoji: String
     ): Boolean {
         // Normalize: the same seed typed with different casing/whitespace must
         // derive the same cache id (dedupe) and convert cleanly. wallet2 reads
@@ -900,8 +939,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     error = null
                 )
             }
-
-            _pendingSeed.value = null
 
             publishAddresses(info, kit)
             WalletManager.start()
@@ -1962,6 +1999,17 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             Timber.e(e, "Failed to estimate fee")
             0L
         }
+    }
+
+    /**
+     * False when the open wallet file of [walletId] failed the key check: it does
+     * not derive from the stored seed, so a backup of those words would not back
+     * up the wallet's funds (iOS seedMismatch). Unknown until the file has opened
+     * once in this session; true then.
+     */
+    fun seedMatchesWalletFile(walletId: String): Boolean {
+        val mismatched = keyMismatchCacheId ?: return true
+        return _wallets.value.firstOrNull { it.id == walletId }?.derivedWalletId != mismatched
     }
 
     /** Read the active wallet's addresses again (Receive or the picker came back to the front). */

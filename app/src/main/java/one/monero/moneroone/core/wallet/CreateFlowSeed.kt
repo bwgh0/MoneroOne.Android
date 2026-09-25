@@ -11,7 +11,10 @@ enum class CreateFlowStart {
     RESUME,
 
     /** The flow showed a phrase that is gone: leave the screen, never show a new phrase. */
-    RESTART
+    RESTART,
+
+    /** The flow's wallet was added while the screen was away (an Activity recreated during the add): finish the flow. */
+    COMPLETED
 }
 
 /**
