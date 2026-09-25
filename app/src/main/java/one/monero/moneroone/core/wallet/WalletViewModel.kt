@@ -551,6 +551,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             setupKitObservers(kit)
+            // A rebuilt cache (Reset Sync, heal) gets the user's subaddresses back before refresh starts.
+            kit.requiredSubaddressCount = requiredSubaddressCount(info)
 
             // Until the wallet file is open, the kit derives the addresses from the seed.
             publishAddresses(info, kit)
@@ -585,8 +587,6 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 return
             }
 
-            ensureUserSubaddresses(info, kit)
-            if (_activeWallet.value?.id != info.id) return
             publishAddresses(info, kit)
         } catch (e: Exception) {
             Timber.e(e, "Failed to open wallet")
@@ -604,21 +604,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         SeedType.BIP39_24 -> Seed.Bip39(words, "")
     }
 
-    /** Re-create user-created subaddresses after a cache rebuild (iOS parity). */
-    private suspend fun ensureUserSubaddresses(info: WalletInfo, kit: MoneroKit) {
-        val maxIdx = info.userCreatedSubaddressIndices.maxOrNull() ?: return
-        withContext(Dispatchers.IO) {
-            try {
-                var count = kit.getSubaddresses().size
-                while (count <= maxIdx) {
-                    kit.createSubaddress() ?: break
-                    count++
-                }
-            } catch (e: Exception) {
-                Timber.w(e, "ensureUserSubaddresses failed")
-            }
-        }
-    }
+    /**
+     * How many subaddresses wallet2 must hold in account 0 when this wallet
+     * opens (iOS parity: a rebuilt cache gets the user's subaddresses back).
+     * Each value in [WalletInfo.userCreatedSubaddressIndices] is a count:
+     * the created index + 1. Builds before the kit fix recorded the list size
+     * minus one, and that list had one index past wallet2's table, so their
+     * values have the same meaning. The selected index must exist too.
+     */
+    private fun requiredSubaddressCount(info: WalletInfo): Int =
+        maxOf(info.userCreatedSubaddressIndices.maxOrNull() ?: 0, selectedAddressIndex(info.id) + 1)
 
     /** One read of a kit's addresses (see [publishAddresses]). */
     private class AddressRead(val list: List<Subaddress>, val complete: Boolean, val keyMismatch: Boolean)
@@ -689,9 +684,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
         var mismatch = false
         if (open) {
-            val fromSeed = kit.seedPrimaryAddress()
             val fromFile = kit.openWalletPrimaryAddress()
-            if (fromSeed != null && fromFile != null && fromSeed != fromFile) {
+            if (fromFile != null && fromFile != kit.seedPrimaryAddress()) {
                 Timber.e("Wallet file primary address differs from the stored seed's")
                 mismatch = true
             }
