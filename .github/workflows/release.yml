@@ -45,6 +45,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Gate every release artifact: a dropped or stubbed wallet2 symbol must never ship.
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Native wallet ABI check
+        run: scripts/check_native_wallet_abi.sh
+
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
