@@ -48,10 +48,46 @@ data class WalletState(
     val syncState: SyncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted),
     val balance: Balance = Balance(0, 0),
     val transactions: List<TransactionInfo> = emptyList(),
-    val receiveAddress: String = "",
-    val subaddresses: List<Subaddress> = emptyList(),
+    /** The only source of receive addresses for the UI; null while none are loaded. */
+    val addresses: ReceiveAddresses? = null,
     val error: String? = null
 )
+
+/**
+ * Receive addresses read from the kit of the wallet [walletId] (a
+ * [WalletInfo] id). Screens show them only while [walletId] is the active
+ * wallet: a kit still held for the wallet just left must never lend it its
+ * addresses.
+ */
+data class ReceiveAddresses(
+    val walletId: String,
+    /** Index 0 is the primary address. Look entries up by [Subaddress.addressIndex]. */
+    val list: List<Subaddress>,
+    /** False while the wallet file is not open and the kit derives the addresses from the seed. */
+    val complete: Boolean,
+    /**
+     * The wallet's keys failed a check (a null spend key, or a wallet file that
+     * does not derive from the stored seed). [list] is then empty, and the
+     * screens show an error in place of any address (fail closed, iOS parity).
+     */
+    val blocked: Boolean
+) {
+    /**
+     * The address to show for [selectedIndex]: that address when the list has
+     * it, else the primary (iOS effectiveAddressIndex). The choice itself is
+     * kept, because the list is shorter before the wallet file opens. Null
+     * while nothing may be shown.
+     */
+    fun shownAddress(selectedIndex: Int): Subaddress? {
+        if (blocked) return null
+        return list.firstOrNull { it.addressIndex == selectedIndex }
+            ?: list.firstOrNull { it.addressIndex == 0 }
+    }
+}
+
+/** The published addresses when they belong to [walletId] (the active wallet), else null. */
+fun WalletState.addressesOf(walletId: String?): ReceiveAddresses? =
+    addresses?.takeIf { walletId != null && it.walletId == walletId }
 
 data class PendingSeed(
     val words: List<String>,
@@ -130,6 +166,21 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * [_walletState] divergent (M1).
      */
     private val walletMutationMutex = Mutex()
+
+    /** Wallets whose delete waits behind [walletMutationMutex]: a switch to them is refused. */
+    private val pendingDeleteIds = mutableSetOf<String>()
+
+    /**
+     * Cache id of a wallet file that failed the key check: its primary address
+     * is not the one the stored seed derives. The wallet's addresses stay
+     * hidden while that cache is in use. Reset Sync rebuilds the cache from the
+     * seed under a new id.
+     */
+    private var keyMismatchCacheId: String? = null
+
+    /** Orders address reads (Main only): a read that started before a newer one never overwrites it. */
+    private var addressReadSeq = 0L
+    private var appliedAddressReadSeq = 0L
 
     // Price data
     private val priceRepository = PriceRepository()
@@ -224,12 +275,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _walletState.update { it.copy(hasWallet = has) }
     }
 
-    /** Paint cached balance/address so the UI is instant before unlock/sync. */
+    /**
+     * Paint the cached balance so the UI is instant before unlock/sync. Receive
+     * addresses are never painted from the cache: they come from the wallet's
+     * own kit ([publishAddresses]).
+     */
     private fun paintCachedState(info: WalletInfo) {
         _walletState.update {
             it.copy(
                 balance = Balance(info.cachedBalance ?: 0L, info.cachedUnlockedBalance ?: 0L),
-                receiveAddress = info.cachedPrimaryAddress ?: ""
+                addresses = null
             )
         }
     }
@@ -458,12 +513,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                         it.copy(
                             balance = running.balance,
                             transactions = running.allTransactionsFlow.value,
-                            receiveAddress = running.receiveAddress.ifEmpty { it.receiveAddress },
                             syncState = if (notStarted) SyncState.Connecting(waiting = false) else liveSync
                         )
                     }
                 }
                 WalletManager.start()
+                // A wallet tapped during the start is opened next (openActiveWalletSettled).
+                if (_activeWallet.value?.id != info.id) return
+                publishAddresses(info, running)
                 return
             }
         }
@@ -495,11 +552,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
             setupKitObservers(kit)
 
-            // Before the wallet file is open, receiveAddress derives the
-            // address from the seed (BIP39 -> Electrum PBKDF2 + native keys):
-            // ~0.9 s on the Pixel 10, so never on Main.
-            val address = withContext(Dispatchers.IO) { kit.receiveAddress }
-            _walletState.update { it.copy(receiveAddress = address) }
+            // Until the wallet file is open, the kit derives the addresses from the seed.
+            publishAddresses(info, kit)
+            if (_activeWallet.value?.id != info.id) return
 
             WalletManager.start()
 
@@ -507,6 +562,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             // WalletManager.abandonStart), whose transition opens the right wallet next.
             if (!kit.isStarted && kit.syncStateFlow.value is SyncState.Connecting) {
                 Timber.d("openActiveWallet: start of ${info.id} abandoned")
+                return
+            }
+            // A wallet tapped during the start is opened next (openActiveWalletSettled). Nothing below
+            // may write under that wallet's identity.
+            if (_activeWallet.value?.id != info.id) {
+                Timber.d("openActiveWallet: active wallet changed during the start of ${info.id}")
                 return
             }
 
@@ -525,8 +586,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             ensureUserSubaddresses(info, kit)
-            val primary = persistPrimaryAddress(kit)
-            failClosedOnNullKey(primary)
+            if (_activeWallet.value?.id != info.id) return
+            publishAddresses(info, kit)
         } catch (e: Exception) {
             Timber.e(e, "Failed to open wallet")
             _walletState.update {
@@ -559,31 +620,83 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    /** Cache the primary (index 0) address for instant display on switch. */
-    private suspend fun persistPrimaryAddress(kit: MoneroKit): String? {
-        val primary = withContext(Dispatchers.IO) {
-            runCatching { kit.getSubaddresses().firstOrNull()?.address }.getOrNull()
-        } ?: return null
-        val active = _activeWallet.value ?: return primary
-        mergeWalletUpdate(active.id) { it.copy(cachedPrimaryAddress = primary) }
-        return primary
+    /** One read of a kit's addresses (see [publishAddresses]). */
+    private class AddressRead(val list: List<Subaddress>, val complete: Boolean, val keyMismatch: Boolean)
+
+    /**
+     * Read [kit]'s receive addresses and publish them for [info]. This is the
+     * only source of the addresses that Receive and the address picker show.
+     *
+     * Nothing is published when the active wallet or the running kit changed
+     * while the list was read. The list is blocked (published empty) when the
+     * primary address carries a null spend key, or when the open wallet file
+     * does not derive from the stored seed: a burn address, or an address the
+     * backed-up words cannot spend from, must never be shown (fail closed, iOS
+     * parity). Only a checked primary address from the open wallet file is
+     * cached on the wallet's row.
+     */
+    private suspend fun publishAddresses(info: WalletInfo, kit: MoneroKit) {
+        val cacheId = info.derivedWalletId ?: return
+        val selected = selectedAddressIndex(info.id)
+        val seq = ++addressReadSeq
+        val read = withContext(Dispatchers.IO) {
+            runCatching { readAddresses(kit, selected) }
+                .onFailure { Timber.w(it, "publishAddresses: reading the address list failed") }
+                .getOrNull()
+        } ?: return
+        if (_activeWallet.value?.id != info.id || WalletManager.kit !== kit ||
+            WalletManager.currentWalletId != cacheId
+        ) {
+            Timber.d("publishAddresses: the wallet or its kit changed during the read; list dropped")
+            return
+        }
+        if (seq < appliedAddressReadSeq) return
+        appliedAddressReadSeq = seq
+        if (read.keyMismatch) keyMismatchCacheId = cacheId
+        val primary = read.list.firstOrNull { it.addressIndex == 0 }?.address
+        val blocked = keyMismatchCacheId == cacheId || !SeedValidation.isPlausiblePrimaryAddress(primary)
+        if (blocked) {
+            Timber.e("Receive addresses of wallet ${info.id} blocked: its keys failed a check")
+        }
+        _walletState.update {
+            it.copy(
+                addresses = ReceiveAddresses(
+                    walletId = info.id,
+                    list = if (blocked) emptyList() else read.list,
+                    complete = read.complete,
+                    blocked = blocked
+                )
+            )
+        }
+        if (!blocked && read.complete && primary != null) {
+            mergeWalletUpdate(info.id) {
+                if (it.cachedPrimaryAddress == primary) it else it.copy(cachedPrimaryAddress = primary)
+            }
+        }
     }
 
     /**
-     * A wallet whose primary address carries a null (all-zero) spend key is a
-     * burn address: anything received there is unspendable. New wallets are
-     * rejected up front by [SeedValidation]; for a pre-existing row, refuse to
-     * advertise the address and say why (fail closed, iOS parity).
+     * Before the wallet file is open the kit derives addresses from the seed,
+     * index 0 only: add the selected index the same way so Receive shows it at
+     * once. Once the file is open, check that its primary address is the one
+     * the stored seed derives. Runs JNI; call off Main.
      */
-    private fun failClosedOnNullKey(primary: String?) {
-        if (primary == null || SeedValidation.isPlausiblePrimaryAddress(primary)) return
-        Timber.e("Active wallet has a null-key/malformed primary address; hiding it")
-        _walletState.update {
-            it.copy(
-                receiveAddress = "",
-                error = "This wallet's keys are invalid (null spend key). Do not receive funds with it."
-            )
+    private fun readAddresses(kit: MoneroKit, selected: Int): AddressRead {
+        val open = kit.isWalletOpen
+        var list = kit.getSubaddresses()
+        if (!open && selected > 0 && list.none { it.addressIndex == selected }) {
+            kit.getSubaddress(0, selected)?.let { list = list + it }
         }
+        var mismatch = false
+        if (open) {
+            val fromSeed = kit.seedPrimaryAddress()
+            val fromFile = kit.openWalletPrimaryAddress()
+            if (fromSeed != null && fromFile != null && fromSeed != fromFile) {
+                Timber.e("Wallet file primary address differs from the stored seed's")
+                mismatch = true
+            }
+        }
+        return AddressRead(list, open, mismatch)
     }
 
     /**
@@ -759,13 +872,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     isInitializing = false,
                     balance = Balance(0, 0),
                     transactions = emptyList(),
-                    receiveAddress = kit.receiveAddress,
+                    addresses = null,
                     error = null
                 )
             }
 
             _pendingSeed.value = null
 
+            publishAddresses(info, kit)
             WalletManager.start()
             // Second line of defense: the kit reports a wallet-level failure
             // (recovery/creation error) through its sync state, not an
@@ -775,7 +889,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             if (startState is SyncState.NotSynced && isWalletLevelStartError(startState.error)) {
                 throw WalletOpenException(startState.error.message ?: "Wallet could not be created")
             }
-            persistPrimaryAddress(kit)
+            publishAddresses(info, kit)
             return true
         } catch (e: DuplicateWalletException) {
             Timber.w("addWallet rejected: duplicate of ${e.existingName}")
@@ -827,6 +941,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             _wallets.value = list
             val prev = previous?.let { p -> list.firstOrNull { it.id == p.id } }
             _activeWallet.value = prev
+            _walletState.update { it.copy(addresses = null) }
             _walletSessionId.value += 1
             refreshHasWallet()
             if (prev != null) {
@@ -884,6 +999,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun switchWallet(id: String): Boolean {
         val outgoing = _activeWallet.value
         if (outgoing?.id == id) return false
+        // Its row stays visible until the queued delete runs; it must not become active meanwhile.
+        if (id in pendingDeleteIds) return false
         val target = _wallets.value.firstOrNull { it.id == id } ?: return false
         val locked = walletMutationMutex.tryLock()
         // A switch is already tearing down / opening: repaint for the new
@@ -907,9 +1024,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _walletState.update {
             it.copy(
                 balance = Balance(target.cachedBalance ?: 0L, target.cachedUnlockedBalance ?: 0L),
-                receiveAddress = target.cachedPrimaryAddress ?: "",
                 transactions = emptyList(),
-                subaddresses = emptyList(),
+                addresses = null,
                 syncState = SyncState.Connecting(waiting = false),
                 error = null
             )
@@ -937,21 +1053,32 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 // (switchInFlight stays true until openActiveWalletSettled
                 // clears it, so taps during the persist/teardown coalesce too.)
-                // RemoteViews + logo bitmap per widget: off the main thread so
-                // the collapse animation above stays smooth.
-                withContext(Dispatchers.IO) { WalletWidget.updateAll(context) }
-                if (outgoing != null && oldKit != null && outgoingBalance != null) {
-                    val primary = withContext(Dispatchers.IO) {
-                        runCatching { oldKit.getSubaddresses().firstOrNull()?.address }.getOrNull()
-                    }
-                    // Merge cached fields onto the freshest row — writing the
-                    // captured copy back would revert a concurrent rename etc.
-                    mergeWalletUpdate(outgoing.id) {
-                        it.copy(
-                            cachedBalance = outgoingBalance.all,
-                            cachedUnlockedBalance = outgoingBalance.unlocked,
-                            cachedPrimaryAddress = primary ?: it.cachedPrimaryAddress
-                        )
+                // The widget redraw and the outgoing cache are best effort: a
+                // failure there must not skip the reopen below, or the old kit
+                // keeps running under the new wallet's name.
+                try {
+                    // RemoteViews + logo bitmap per widget: off the main thread so
+                    // the collapse animation above stays smooth.
+                    withContext(Dispatchers.IO) { WalletWidget.updateAll(context) }
+                } catch (e: Exception) {
+                    Timber.w(e, "switchWallet: widget redraw failed")
+                }
+                // The outgoing kit still runs for the wallet just left.
+                if (outgoing != null && outgoingBalance != null && WalletManager.kit === oldKit &&
+                    WalletManager.currentWalletId == outgoing.derivedWalletId
+                ) {
+                    try {
+                        // Merge cached fields onto the freshest row — writing the
+                        // captured copy back would revert a concurrent rename etc.
+                        // Its primary address was cached when its list was published.
+                        mergeWalletUpdate(outgoing.id) {
+                            it.copy(
+                                cachedBalance = outgoingBalance.all,
+                                cachedUnlockedBalance = outgoingBalance.unlocked
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Timber.w(e, "switchWallet: caching the outgoing balance failed")
                     }
                 }
                 // KitManager allows exactly one running kit — await teardown
@@ -960,8 +1087,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 openActiveWalletSettled()
             } catch (e: Exception) {
                 Timber.e(e, "switchWallet phase 2 failed")
-                _walletState.update { it.copy(error = e.message) }
+                _walletState.update {
+                    it.copy(syncState = SyncState.NotSynced(MoneroKit.SyncError.NotStarted), error = e.message)
+                }
             } finally {
+                // openActiveWalletSettled clears it too; a failure before it must not leave later
+                // taps coalescing onto a switch that is over.
+                switchInFlight = false
                 walletMutationMutex.unlock()
             }
         }
@@ -988,21 +1120,20 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return updated
     }
 
-    /** Persist live balance/address of the active wallet into the store. */
-    private suspend fun snapshotActiveWalletCache() {
+    /**
+     * Persist the live balance of the active wallet into the store. Its primary
+     * address is cached only by [publishAddresses], after the key checks.
+     */
+    private fun snapshotActiveWalletCache() {
         val active = _activeWallet.value ?: return
         val kit = WalletManager.kit ?: return
         if (WalletManager.currentWalletId != active.derivedWalletId) return
         val balance = kit.balance
-        val primary = withContext(Dispatchers.IO) {
-            runCatching { kit.getSubaddresses().firstOrNull()?.address }.getOrNull()
-        }
         // Merge ONLY the cached fields onto the freshest row.
         mergeWalletUpdate(active.id) {
             it.copy(
                 cachedBalance = balance.all,
-                cachedUnlockedBalance = balance.unlocked,
-                cachedPrimaryAddress = primary ?: it.cachedPrimaryAddress
+                cachedUnlockedBalance = balance.unlocked
             )
         }
     }
@@ -1038,11 +1169,19 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun deleteWallet(id: String) {
         val target = _wallets.value.firstOrNull { it.id == id } ?: return
-        val wasActive = _activeWallet.value?.id == id
-        Timber.i("deleteWallet: ${target.id} (${target.name}), active=$wasActive")
+        Timber.i("deleteWallet: ${target.id} (${target.name})")
+        pendingDeleteIds += id
 
         viewModelScope.launch {
-            walletMutationMutex.withLock { deleteWalletLocked(id, wasActive) }
+            try {
+                walletMutationMutex.withLock {
+                    // Decided under the lock: a tap that coalesced onto a switch in flight may have made
+                    // this wallet active while the delete waited.
+                    deleteWalletLocked(id, wasActive = _activeWallet.value?.id == id)
+                }
+            } finally {
+                pendingDeleteIds -= id
+            }
         }
     }
 
@@ -1074,9 +1213,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             _walletState.update {
                 it.copy(
                     balance = Balance(next.cachedBalance ?: 0L, next.cachedUnlockedBalance ?: 0L),
-                    receiveAddress = next.cachedPrimaryAddress ?: "",
                     transactions = emptyList(),
-                    subaddresses = emptyList(),
+                    addresses = null,
                     syncState = SyncState.Connecting(waiting = false),
                     error = null
                 )
@@ -1138,6 +1276,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 // Reset state
                 _wallets.value = emptyList()
                 _activeWallet.value = null
+                keyMismatchCacheId = null
                 _pendingSeed.value = null
                 _pin.value = null
                 _isLocked.value = true
@@ -1221,6 +1360,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                             // drained-wallet edge the drop(1) below can hide).
                             _walletState.update { it.copy(balance = kit.balance) }
                             snapshotActiveWalletCache()
+                            // wallet2 grows its subaddress table when funds reach an index near its end.
+                            _activeWallet.value?.let { active ->
+                                viewModelScope.launch { publishAddresses(active, kit) }
+                            }
                         }
                     }
                     _walletState.update { it.copy(syncState = syncState) }
@@ -1562,8 +1705,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     /** Per-wallet selected receive-address index. */
     fun selectedAddressIndex(): Int {
         val active = _activeWallet.value ?: return 0
-        return prefs.getInt("wallet.${active.id}.selected_address_index", 0)
+        return selectedAddressIndex(active.id)
     }
+
+    private fun selectedAddressIndex(walletId: String): Int =
+        prefs.getInt("wallet.$walletId.selected_address_index", 0)
 
     fun setSelectedAddressIndex(index: Int) {
         val active = _activeWallet.value ?: return
@@ -1681,6 +1827,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 it.copy(
                     balance = Balance(0, 0),
                     transactions = emptyList(),
+                    addresses = null,
                     syncState = SyncState.Connecting(waiting = false)
                 )
             }
@@ -1813,28 +1960,43 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun getSubaddresses(): List<Subaddress> {
-        return WalletManager.kit?.getSubaddresses() ?: emptyList()
+    /** Read the active wallet's addresses again (Receive or the picker came back to the front). */
+    fun refreshAddresses() {
+        val info = _activeWallet.value ?: return
+        val kit = WalletManager.kit ?: return
+        if (WalletManager.currentWalletId != info.derivedWalletId) return
+        viewModelScope.launch { publishAddresses(info, kit) }
     }
 
-    fun createSubaddress(): String? {
-        val result = WalletManager.kit?.createSubaddress() ?: return null
-        // Track user-created subaddress indices per wallet so they can be
-        // re-created after a sync reset rebuilds the cache.
-        val active = _activeWallet.value ?: return result
-        val count = try {
-            WalletManager.kit?.getSubaddresses()?.size ?: 0
-        } catch (e: Exception) {
-            0
+    /**
+     * Create the next subaddress of the active wallet. Only a wallet whose file
+     * is open and whose addresses passed the key checks can create one; the
+     * new list is published when it is done. Returns false when nothing was
+     * created.
+     */
+    suspend fun createSubaddress(): Boolean {
+        val info = _activeWallet.value ?: return false
+        val kit = WalletManager.kit ?: return false
+        val shown = _walletState.value.addresses
+        if (WalletManager.currentWalletId != info.derivedWalletId || shown == null ||
+            shown.walletId != info.id || !shown.complete || shown.blocked
+        ) {
+            return false
         }
-        val index = count - 1
-        if (index > 0) {
-            mergeWalletUpdate(active.id) {
-                if (index in it.userCreatedSubaddressIndices) it
-                else it.copy(userCreatedSubaddressIndices = it.userCreatedSubaddressIndices + index)
-            }
+        val created = withContext(Dispatchers.IO) {
+            runCatching { kit.addSubaddress() }
+                .onFailure { Timber.w(it, "createSubaddress failed") }
+                .getOrNull()
+        } ?: return false
+        // Record the subaddress count wallet2 must hold (indices 0..created) so a
+        // rebuilt cache (Reset Sync, heal) creates them again before it scans.
+        val required = created.addressIndex + 1
+        mergeWalletUpdate(info.id) {
+            if (required in it.userCreatedSubaddressIndices) it
+            else it.copy(userCreatedSubaddressIndices = it.userCreatedSubaddressIndices + required)
         }
-        return result
+        publishAddresses(info, kit)
+        return true
     }
 
     fun formatXmr(atomicUnits: Long): String {

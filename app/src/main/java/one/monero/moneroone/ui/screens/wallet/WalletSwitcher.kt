@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import one.monero.moneroone.core.wallet.SeedValidation
 import one.monero.moneroone.core.wallet.WalletInfo
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.Motion
@@ -441,7 +442,7 @@ private fun WalletRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    wallet.cachedPrimaryAddress?.takeIf { it.length > 16 }?.let { address ->
+                    wallet.cachedPrimaryAddress?.takeIf { SeedValidation.isPlausiblePrimaryAddress(it) }?.let { address ->
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "${address.take(8)}…${address.takeLast(8)}",

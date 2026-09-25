@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,28 +34,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.data.Subaddress
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.core.wallet.addressesOf
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.WarningYellow
@@ -67,12 +65,16 @@ fun AddressPickerScreen(
     onBack: () -> Unit,
     onAddressSelected: (String, Int) -> Unit
 ) {
-    val context = LocalContext.current
     val walletState by walletViewModel.walletState.collectAsState()
-    var subaddresses by remember { mutableStateOf(walletViewModel.getSubaddresses()) }
-    LaunchedEffect(walletState.receiveAddress) {
-        subaddresses = withContext(Dispatchers.IO) { walletViewModel.getSubaddresses() }
-    }
+    val activeWallet by walletViewModel.activeWallet.collectAsState()
+
+    // Only the addresses published for the active wallet (see ReceiveScreen).
+    val addresses = walletState.addressesOf(activeWallet?.id)
+    val keysUnavailable = addresses?.blocked == true
+    val list = addresses?.list.orEmpty()
+    // A new subaddress needs the open wallet file, whose keys passed the checks.
+    val canCreate = addresses?.complete == true && !keysUnavailable
+    var creating by remember { mutableStateOf(false) }
 
     var selectedIndex by remember { mutableIntStateOf(walletViewModel.selectedAddressIndex()) }
     val scope = rememberCoroutineScope()
@@ -97,11 +99,18 @@ fun AddressPickerScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    scope.launch {
-                        withContext(Dispatchers.IO) { walletViewModel.createSubaddress() }
-                        subaddresses = withContext(Dispatchers.IO) { walletViewModel.getSubaddresses() }
+                    if (canCreate && !creating) {
+                        creating = true
+                        scope.launch {
+                            try {
+                                walletViewModel.createSubaddress()
+                            } finally {
+                                creating = false
+                            }
+                        }
                     }
                 },
+                modifier = Modifier.alpha(if (canCreate) 1f else DISABLED_ALPHA),
                 containerColor = MoneroOrange,
                 contentColor = Color.White
             ) {
@@ -118,9 +127,18 @@ fun AddressPickerScreen(
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // Main address (subaddresses[0] = primary address)
+            if (keysUnavailable) {
+                item {
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        KeysUnavailableMessage(modifier = Modifier.padding(20.dp))
+                    }
+                }
+                return@LazyColumn
+            }
+
+            // Main address (index 0 = primary address)
             item {
-                val mainAddress = subaddresses.firstOrNull()?.address ?: walletState.receiveAddress
+                val mainAddress = list.firstOrNull { it.addressIndex == 0 }?.address.orEmpty()
                 MainAddressCard(
                     address = mainAddress,
                     isSelected = selectedIndex == 0,
@@ -132,8 +150,8 @@ fun AddressPickerScreen(
                 )
             }
 
-            // Subaddresses (subaddresses[1+])
-            val realSubaddresses = subaddresses.drop(1)
+            // Subaddresses (index 1 and up)
+            val realSubaddresses = list.filter { it.addressIndex > 0 }
             if (realSubaddresses.isNotEmpty()) {
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -146,8 +164,8 @@ fun AddressPickerScreen(
                     )
                 }
 
-                itemsIndexed(realSubaddresses) { index, subaddress ->
-                    val subIndex = index + 1 // maps to subaddresses[1], [2], etc.
+                items(realSubaddresses, key = { it.addressIndex }) { subaddress ->
+                    val subIndex = subaddress.addressIndex
                     SubaddressCard(
                         subaddress = subaddress,
                         index = subIndex,
@@ -165,6 +183,9 @@ fun AddressPickerScreen(
         }
     }
 }
+
+/** The FAB while no subaddress can be created (as the disabled Copy and Share on Receive). */
+private const val DISABLED_ALPHA = 0.4f
 
 @Composable
 private fun MainAddressCard(

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
@@ -57,10 +58,13 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.core.wallet.addressesOf
 import androidx.compose.ui.graphics.toArgb
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
@@ -81,6 +86,7 @@ import one.monero.moneroone.R
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.components.SecondaryButton
+import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,11 +97,12 @@ fun ReceiveScreen(
     onSelectAddress: (() -> Unit)? = null
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
+    val activeWallet by walletViewModel.activeWallet.collectAsState()
     val context = LocalContext.current
 
     // Use a refresh key to force re-read from prefs when screen resumes
     var refreshKey by remember { mutableIntStateOf(0) }
-    val selectedAddressIndex = remember(refreshKey) {
+    val selectedAddressIndex = remember(refreshKey, activeWallet?.id) {
         walletViewModel.selectedAddressIndex()
     }
 
@@ -105,36 +112,22 @@ fun ReceiveScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 refreshKey++
+                walletViewModel.refreshAddresses()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Load subaddresses off the main thread
-    var subaddresses by remember { mutableStateOf(walletViewModel.getSubaddresses()) }
-    LaunchedEffect(refreshKey, walletState.receiveAddress) {
-        subaddresses = withContext(Dispatchers.IO) { walletViewModel.getSubaddresses() }
-    }
-
-    // Derive address and label from subaddresses list
-    // subaddresses[0] = primary address, subaddresses[1+] = subaddresses
-    val address: String
-    val addressLabel: String
-    val sub = subaddresses.getOrNull(selectedAddressIndex)
-    if (sub != null) {
-        address = sub.address
-        addressLabel = if (selectedAddressIndex == 0) "Main Address" else "Subaddress #$selectedAddressIndex"
-    } else {
-        // Saved index is out of bounds or list not loaded yet — fall back to primary
-        address = subaddresses.firstOrNull()?.address ?: ""
-        addressLabel = "Main Address"
-        if (subaddresses.isNotEmpty() && selectedAddressIndex != 0) {
-            LaunchedEffect(Unit) {
-                walletViewModel.setSelectedAddressIndex(0)
-            }
-        }
-    }
+    // Only the addresses published for the active wallet: a kit still held for
+    // the wallet just left must never show its addresses under this name.
+    val addresses = walletState.addressesOf(activeWallet?.id)
+    val keysUnavailable = addresses?.blocked == true
+    val sub = addresses?.shownAddress(selectedAddressIndex)
+    val address = sub?.address.orEmpty()
+    val addressLabel =
+        if (sub == null || sub.addressIndex == 0) "Main Address" else "Subaddress #${sub.addressIndex}"
+    val canShareAddress = address.isNotBlank() && !keysUnavailable
 
     var requestAmount by remember { mutableStateOf("") }
     var isFiatMode by remember { mutableStateOf(false) }
@@ -150,16 +143,37 @@ fun ReceiveScreen(
         else "monero:$address?tx_amount=$requestAmount"
     }
 
-    // Generate QR code off the main thread
-    var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    // Generate QR code off the main thread. Each bitmap remembers the address it
+    // encodes: while a new one is drawn, a QR of the previous address is never shown.
+    var qrCode by remember { mutableStateOf<Pair<String, Bitmap>?>(null) }
     LaunchedEffect(qrData) {
         if (qrData.isNotBlank()) {
-            qrBitmap = withContext(Dispatchers.Default) {
+            val encodedAddress = address
+            val bitmap = withContext(Dispatchers.Default) {
                 generateQRCode(qrData, 512, context)
             }
+            qrCode = bitmap?.let { encodedAddress to it }
         } else {
-            qrBitmap = null
+            qrCode = null
         }
+    }
+    val qrBitmap = qrCode?.takeIf { it.first == address && canShareAddress }?.second
+
+    // Copy and Share act only on a shown address (iOS disables both without one).
+    val copyAddress = {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val copyText = if (requestAmount.isNotBlank()) qrData else address
+        val clip = ClipData.newPlainText("Monero Address", copyText)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+    }
+    val shareAddress = {
+        val shareText = if (requestAmount.isNotBlank()) qrData else address
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share Address"))
     }
 
     Scaffold(
@@ -207,7 +221,9 @@ fun ReceiveScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     val bitmap = qrBitmap
-                    if (bitmap != null) {
+                    if (keysUnavailable) {
+                        KeysUnavailableMessage()
+                    } else if (bitmap != null) {
                         Image(
                             bitmap = bitmap.asImageBitmap(),
                             contentDescription = "QR Code",
@@ -340,7 +356,8 @@ fun ReceiveScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (address.length > 20) "${address.take(12)}. . .${address.takeLast(8)}" else address.ifBlank { "Loading..." },
+                            text = if (address.length > 20) "${address.take(12)}. . .${address.takeLast(8)}"
+                                else address.ifBlank { if (keysUnavailable) "" else "Loading..." },
                             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -364,14 +381,11 @@ fun ReceiveScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 GlassCard(
-                    modifier = Modifier.weight(1f).height(90.dp),
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val copyText = if (requestAmount.isNotBlank()) qrData else address
-                        val clip = ClipData.newPlainText("Monero Address", copyText)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                    }
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(90.dp)
+                        .alpha(if (canShareAddress) 1f else DISABLED_ALPHA),
+                    onClick = copyAddress.takeIf { canShareAddress }
                 ) {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
@@ -384,15 +398,11 @@ fun ReceiveScreen(
                 }
 
                 GlassCard(
-                    modifier = Modifier.weight(1f).height(90.dp),
-                    onClick = {
-                        val shareText = if (requestAmount.isNotBlank()) qrData else address
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Share Address"))
-                    }
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(90.dp)
+                        .alpha(if (canShareAddress) 1f else DISABLED_ALPHA),
+                    onClick = shareAddress.takeIf { canShareAddress }
                 ) {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
@@ -407,6 +417,44 @@ fun ReceiveScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
         }
+    }
+}
+
+/** Copy and Share while no address can be shown (iOS dims disabled buttons the same way). */
+private const val DISABLED_ALPHA = 0.4f
+
+/**
+ * Shown in place of the QR code when the wallet's keys failed a check (iOS
+ * ReceiveView keysUnavailable): no receive address may be shown.
+ */
+@Composable
+internal fun KeysUnavailableMessage(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.semantics(mergeDescendants = true) {
+            contentDescription = "Wallet keys unavailable. No receive address can be shown."
+        },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Error,
+            contentDescription = null,
+            tint = ErrorRed,
+            modifier = Modifier.size(40.dp)
+        )
+        Text(
+            text = "Wallet keys unavailable",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = "The wallet couldn't load its keys, so no receive address can be shown. " +
+                "Do not send funds to any address from this app until this is resolved. " +
+                "Force-quit and reopen the app; if this persists, restore the wallet from its seed.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
