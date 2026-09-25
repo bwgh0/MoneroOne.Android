@@ -1,10 +1,17 @@
 package one.monero.moneroone.ui.navigation
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -92,6 +99,9 @@ sealed class Screen(val route: String) {
     data object AddPriceAlert : Screen("add_price_alert")
 }
 
+// crossFade token: SwiftUI's default .easeInOut (0.35 s, cubic 0.42/0/0.58/1), which iOS runs on unlock.
+private val UnlockCrossFade = tween<Float>(350, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f))
+
 @Composable
 fun MoneroOneNavHost(
     modifier: Modifier = Modifier,
@@ -138,339 +148,354 @@ fun MoneroOneNavHost(
         }
     }
 
-    // When locked, show UnlockScreen directly — no navigation delay, no content flash
-    if (isLocked && walletState.hasWallet) {
-        UnlockScreen(
-            walletViewModel = walletViewModel,
-            onUnlocked = {
-                // verifyPin already sets isLocked = false, which recomposes to show NavHost
-            },
-            onResetWallet = {
-                walletViewModel.removeWallet()
-            }
-        )
-        return
-    }
-
-    val startDestination = remember(walletState.hasWallet) {
-        if (!walletState.hasWallet) Screen.Welcome.route else Screen.Main.route
-    }
-
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
+    // Locked: only the lock screen is composed, nothing of the wallet behind it. Unlocking cross-fades
+    // into the wallet as iOS does (ContentView's .easeInOut); locking is instant, so no wallet content
+    // fades on screen when the app comes back to its lock.
+    AnimatedContent(
+        targetState = isLocked && walletState.hasWallet,
         modifier = modifier,
-        enterTransition = {
-            fadeIn(
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            ) + slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            )
+        transitionSpec = {
+            if (targetState) {
+                EnterTransition.None togetherWith ExitTransition.None
+            } else {
+                fadeIn(UnlockCrossFade) togetherWith fadeOut(UnlockCrossFade)
+            }
         },
-        exitTransition = {
-            fadeOut(
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            ) + slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            )
-        },
-        popEnterTransition = {
-            fadeIn(
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            ) + slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            )
-        },
-        popExitTransition = {
-            fadeOut(
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            ) + slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            )
-        }
-    ) {
-        composable(Screen.Welcome.route) {
-            WelcomeScreen(
-                onCreateWallet = { navController.navigate(Screen.CreateWallet.createRoute(adding = false)) },
-                onRestoreWallet = { navController.navigate(Screen.RestoreWallet.createRoute(adding = false)) }
-            )
-        }
-
-        composable(Screen.AddWallet.route) {
-            AddWalletScreen(
+        label = "lock"
+    ) { locked ->
+        if (locked) {
+            UnlockScreen(
                 walletViewModel = walletViewModel,
-                onCreateWallet = { navController.navigate(Screen.CreateWallet.createRoute(adding = true)) },
-                onRestoreWallet = { navController.navigate(Screen.RestoreWallet.createRoute(adding = true)) },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(
-            route = Screen.CreateWallet.route,
-            arguments = listOf(
-                navArgument("adding") {
-                    type = NavType.BoolType
-                    defaultValue = false
+                onUnlocked = {
+                    // verifyPin already sets isLocked = false, which cross-fades to the wallet
+                },
+                onResetWallet = {
+                    walletViewModel.removeWallet()
                 }
             )
-        ) { backStackEntry ->
-            val adding = backStackEntry.arguments?.getBoolean("adding") ?: false
-            CreateWalletScreen(
-                walletViewModel = walletViewModel,
-                isAddingWallet = adding,
-                onWalletCreated = {
-                    if (adding) {
-                        // 2nd+ wallet: PIN step is skipped, return to Main.
-                        navController.popBackStack(Screen.Main.route, inclusive = false)
-                    } else {
-                        navController.navigate(Screen.SetPin.route) {
-                            popUpTo(Screen.Welcome.route) { inclusive = true }
+            return@AnimatedContent
+        }
+
+        val startDestination = remember(walletState.hasWallet) {
+            if (!walletState.hasWallet) Screen.Welcome.route else Screen.Main.route
+        }
+
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier.fillMaxSize(),
+            enterTransition = {
+                fadeIn(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                ) + slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                )
+            },
+            exitTransition = {
+                fadeOut(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                ) + slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                )
+            },
+            popEnterTransition = {
+                fadeIn(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                ) + slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                )
+            },
+            popExitTransition = {
+                fadeOut(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                ) + slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                )
+            }
+        ) {
+            composable(Screen.Welcome.route) {
+                WelcomeScreen(
+                    onCreateWallet = { navController.navigate(Screen.CreateWallet.createRoute(adding = false)) },
+                    onRestoreWallet = { navController.navigate(Screen.RestoreWallet.createRoute(adding = false)) }
+                )
+            }
+
+            composable(Screen.AddWallet.route) {
+                AddWalletScreen(
+                    walletViewModel = walletViewModel,
+                    onCreateWallet = { navController.navigate(Screen.CreateWallet.createRoute(adding = true)) },
+                    onRestoreWallet = { navController.navigate(Screen.RestoreWallet.createRoute(adding = true)) },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = Screen.CreateWallet.route,
+                arguments = listOf(
+                    navArgument("adding") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                )
+            ) { backStackEntry ->
+                val adding = backStackEntry.arguments?.getBoolean("adding") ?: false
+                CreateWalletScreen(
+                    walletViewModel = walletViewModel,
+                    isAddingWallet = adding,
+                    onWalletCreated = {
+                        if (adding) {
+                            // 2nd+ wallet: PIN step is skipped, return to Main.
+                            navController.popBackStack(Screen.Main.route, inclusive = false)
+                        } else {
+                            navController.navigate(Screen.SetPin.route) {
+                                popUpTo(Screen.Welcome.route) { inclusive = true }
+                            }
+                        }
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = Screen.RestoreWallet.route,
+                arguments = listOf(
+                    navArgument("adding") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                )
+            ) { backStackEntry ->
+                val adding = backStackEntry.arguments?.getBoolean("adding") ?: false
+                RestoreWalletScreen(
+                    walletViewModel = walletViewModel,
+                    isAddingWallet = adding,
+                    onWalletRestored = {
+                        if (adding) {
+                            navController.popBackStack(Screen.Main.route, inclusive = false)
+                        } else {
+                            navController.navigate(Screen.SetPin.route) {
+                                popUpTo(Screen.Welcome.route) { inclusive = true }
+                            }
+                        }
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.SetPin.route) {
+                SetPinScreen(
+                    walletViewModel = walletViewModel,
+                    onPinSet = {
+                        navController.navigate(Screen.SetupBiometrics.route) {
+                            popUpTo(Screen.SetPin.route) { inclusive = true }
                         }
                     }
-                },
-                onBack = { navController.popBackStack() }
-            )
-        }
+                )
+            }
 
-        composable(
-            route = Screen.RestoreWallet.route,
-            arguments = listOf(
-                navArgument("adding") {
-                    type = NavType.BoolType
-                    defaultValue = false
-                }
-            )
-        ) { backStackEntry ->
-            val adding = backStackEntry.arguments?.getBoolean("adding") ?: false
-            RestoreWalletScreen(
-                walletViewModel = walletViewModel,
-                isAddingWallet = adding,
-                onWalletRestored = {
-                    if (adding) {
-                        navController.popBackStack(Screen.Main.route, inclusive = false)
-                    } else {
-                        navController.navigate(Screen.SetPin.route) {
-                            popUpTo(Screen.Welcome.route) { inclusive = true }
+            composable(Screen.SetupBiometrics.route) {
+                SetupBiometricsScreen(
+                    walletViewModel = walletViewModel,
+                    onContinue = {
+                        navController.navigate(Screen.Main.route) {
+                            popUpTo(0) { inclusive = true }
                         }
                     }
-                },
-                onBack = { navController.popBackStack() }
-            )
-        }
+                )
+            }
 
-        composable(Screen.SetPin.route) {
-            SetPinScreen(
-                walletViewModel = walletViewModel,
-                onPinSet = {
-                    navController.navigate(Screen.SetupBiometrics.route) {
-                        popUpTo(Screen.SetPin.route) { inclusive = true }
+            composable(Screen.Main.route) {
+                MainScreen(
+                    walletViewModel = walletViewModel,
+                    navController = navController,
+                    chartViewModel = chartViewModel,
+                    onNavigateToSend = { navController.navigate(Screen.Send.createRoute()) },
+                    onNavigateToReceive = { navController.navigate(Screen.Receive.route) }
+                )
+            }
+
+            composable(
+                route = Screen.Send.route,
+                arguments = listOf(
+                    navArgument("address") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("amount") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
                     }
-                }
-            )
-        }
-
-        composable(Screen.SetupBiometrics.route) {
-            SetupBiometricsScreen(
-                walletViewModel = walletViewModel,
-                onContinue = {
-                    navController.navigate(Screen.Main.route) {
-                        popUpTo(0) { inclusive = true }
+                )
+            ) { backStackEntry ->
+                val address = backStackEntry.arguments?.getString("address")?.takeIf { it.isNotBlank() }
+                val amount = backStackEntry.arguments?.getString("amount")?.takeIf { it.isNotBlank() }
+                SendScreen(
+                    walletViewModel = walletViewModel,
+                    initialAddress = address,
+                    initialAmount = amount,
+                    onBack = { navController.popBackStack() },
+                    onScanQr = { navController.navigate(Screen.QRScanner.route) },
+                    onSent = {
+                        navController.navigate(Screen.Main.route) {
+                            popUpTo(Screen.Main.route) { inclusive = true }
+                        }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        composable(Screen.Main.route) {
-            MainScreen(
-                walletViewModel = walletViewModel,
-                navController = navController,
-                chartViewModel = chartViewModel,
-                onNavigateToSend = { navController.navigate(Screen.Send.createRoute()) },
-                onNavigateToReceive = { navController.navigate(Screen.Receive.route) }
-            )
-        }
-
-        composable(
-            route = Screen.Send.route,
-            arguments = listOf(
-                navArgument("address") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                },
-                navArgument("amount") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }
-            )
-        ) { backStackEntry ->
-            val address = backStackEntry.arguments?.getString("address")?.takeIf { it.isNotBlank() }
-            val amount = backStackEntry.arguments?.getString("amount")?.takeIf { it.isNotBlank() }
-            SendScreen(
-                walletViewModel = walletViewModel,
-                initialAddress = address,
-                initialAmount = amount,
-                onBack = { navController.popBackStack() },
-                onScanQr = { navController.navigate(Screen.QRScanner.route) },
-                onSent = {
-                    navController.navigate(Screen.Main.route) {
-                        popUpTo(Screen.Main.route) { inclusive = true }
+            composable(Screen.QRScanner.route) {
+                QRScannerScreen(
+                    onBack = { navController.popBackStack() },
+                    onScanned = { uriData ->
+                        navController.popBackStack()
+                        navController.navigate(Screen.Send.createRoute(uriData.address, uriData.amount))
                     }
-                }
-            )
-        }
+                )
+            }
 
-        composable(Screen.QRScanner.route) {
-            QRScannerScreen(
-                onBack = { navController.popBackStack() },
-                onScanned = { uriData ->
-                    navController.popBackStack()
-                    navController.navigate(Screen.Send.createRoute(uriData.address, uriData.amount))
-                }
-            )
-        }
+            composable(Screen.Receive.route) {
+                ReceiveScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() },
+                    onSelectAddress = { navController.navigate(Screen.AddressPicker.route) }
+                )
+            }
 
-        composable(Screen.Receive.route) {
-            ReceiveScreen(
-                walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() },
-                onSelectAddress = { navController.navigate(Screen.AddressPicker.route) }
-            )
-        }
-
-        composable(Screen.AddressPicker.route) {
-            AddressPickerScreen(
-                walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() },
-                onAddressSelected = { _, _ ->
-                    navController.popBackStack()
-                }
-            )
-        }
-
-        // Transaction screens
-        composable(
-            route = Screen.TransactionDetail.route,
-            arguments = listOf(
-                navArgument("txId") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val txId = backStackEntry.arguments?.getString("txId") ?: ""
-            TransactionDetailScreen(
-                walletViewModel = walletViewModel,
-                txId = txId,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.TransactionList.route) {
-            TransactionListScreen(
-                walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() },
-                onTransactionClick = { txId ->
-                    navController.navigate(Screen.TransactionDetail.createRoute(txId))
-                }
-            )
-        }
-
-        composable(Screen.PortfolioChart.route) {
-            PortfolioChartScreen(
-                walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() },
-                chartViewModel = chartViewModel
-            )
-        }
-
-        // Settings screens
-        composable(Screen.BackupSeed.route) {
-            BackupSeedScreen(
-                walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.Security.route) {
-            SecurityScreen(
-                walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() },
-                onNavigateToChangePin = { navController.navigate(Screen.ChangePin.route) }
-            )
-        }
-
-        composable(Screen.ChangePin.route) {
-            ChangePinScreen(
-                walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() },
-                onSuccess = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.Theme.route) {
-            ThemeScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.Currency.route) {
-            val currentPrice by walletViewModel.currentPrice.collectAsState()
-            val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
-            val isLoading = currentPrice == null
-
-            CurrencyScreen(
-                currentPrice = currentPrice,
-                selectedCurrency = selectedCurrency,
-                isLoading = isLoading,
-                onBack = { navController.popBackStack() },
-                onCurrencySelected = { currency ->
-                    chartViewModel.selectCurrency(currency)
-                    walletViewModel.refreshPrice(currency)
-                }
-            )
-        }
-
-        composable(Screen.SyncSettings.route) {
-            SyncSettingsScreen(
-                walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() },
-                onNodeSettingsClick = { navController.navigate(Screen.NodeSettings.route) }
-            )
-        }
-
-        composable(Screen.NodeSettings.route) {
-            NodeSettingsScreen(
-                onBack = { navController.popBackStack() },
-                onNodeChanged = { walletViewModel.changeNode() }
-            )
-        }
-
-        composable(Screen.PriceAlerts.route) {
-            PriceAlertsScreen(
-                onBack = { navController.popBackStack() },
-                onAddAlert = { navController.navigate(Screen.AddPriceAlert.route) }
-            )
-        }
-
-        composable(Screen.AddPriceAlert.route) {
-            AddPriceAlertScreen(
-                walletViewModel = walletViewModel,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.Donation.route) {
-            DonationScreen(
-                onBack = { navController.popBackStack() },
-                onSendXmr = { address, amount ->
-                    navController.navigate(Screen.Send.createRoute(address, amount)) {
-                        popUpTo(Screen.Donation.route) { inclusive = true }
+            composable(Screen.AddressPicker.route) {
+                AddressPickerScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() },
+                    onAddressSelected = { _, _ ->
+                        navController.popBackStack()
                     }
-                }
-            )
+                )
+            }
+
+            // Transaction screens
+            composable(
+                route = Screen.TransactionDetail.route,
+                arguments = listOf(
+                    navArgument("txId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val txId = backStackEntry.arguments?.getString("txId") ?: ""
+                TransactionDetailScreen(
+                    walletViewModel = walletViewModel,
+                    txId = txId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.TransactionList.route) {
+                TransactionListScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() },
+                    onTransactionClick = { txId ->
+                        navController.navigate(Screen.TransactionDetail.createRoute(txId))
+                    }
+                )
+            }
+
+            composable(Screen.PortfolioChart.route) {
+                PortfolioChartScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() },
+                    chartViewModel = chartViewModel
+                )
+            }
+
+            // Settings screens
+            composable(Screen.BackupSeed.route) {
+                BackupSeedScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Security.route) {
+                SecurityScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() },
+                    onNavigateToChangePin = { navController.navigate(Screen.ChangePin.route) }
+                )
+            }
+
+            composable(Screen.ChangePin.route) {
+                ChangePinScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() },
+                    onSuccess = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Theme.route) {
+                ThemeScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Currency.route) {
+                val currentPrice by walletViewModel.currentPrice.collectAsState()
+                val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+                val isLoading = currentPrice == null
+
+                CurrencyScreen(
+                    currentPrice = currentPrice,
+                    selectedCurrency = selectedCurrency,
+                    isLoading = isLoading,
+                    onBack = { navController.popBackStack() },
+                    onCurrencySelected = { currency ->
+                        chartViewModel.selectCurrency(currency)
+                        walletViewModel.refreshPrice(currency)
+                    }
+                )
+            }
+
+            composable(Screen.SyncSettings.route) {
+                SyncSettingsScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() },
+                    onNodeSettingsClick = { navController.navigate(Screen.NodeSettings.route) }
+                )
+            }
+
+            composable(Screen.NodeSettings.route) {
+                NodeSettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onNodeChanged = { walletViewModel.changeNode() }
+                )
+            }
+
+            composable(Screen.PriceAlerts.route) {
+                PriceAlertsScreen(
+                    onBack = { navController.popBackStack() },
+                    onAddAlert = { navController.navigate(Screen.AddPriceAlert.route) }
+                )
+            }
+
+            composable(Screen.AddPriceAlert.route) {
+                AddPriceAlertScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.Donation.route) {
+                DonationScreen(
+                    onBack = { navController.popBackStack() },
+                    onSendXmr = { address, amount ->
+                        navController.navigate(Screen.Send.createRoute(address, amount)) {
+                            popUpTo(Screen.Donation.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
         }
     }
 }

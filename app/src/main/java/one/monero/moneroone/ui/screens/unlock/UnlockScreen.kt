@@ -1,6 +1,8 @@
 package one.monero.moneroone.ui.screens.unlock
 
 import android.content.Context
+import android.os.Build
+import android.view.HapticFeedbackConstants
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.AnimatedVisibility
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -73,10 +76,10 @@ fun UnlockScreen(
 ) {
     var pin by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var shakeAnimation by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val view = LocalView.current
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
@@ -123,17 +126,22 @@ fun UnlockScreen(
         if (pin.length == PIN_LENGTH) {
             val entered = pin // a backspace landing before the launch runs must not change it
             scope.launch {
+                // As on iOS: a right PIN just cross-fades to the wallet; a wrong one gets the error haptic.
                 if (walletViewModel.verifyPin(entered)) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onUnlocked()
                 } else {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    view.performHapticFeedback(
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            HapticFeedbackConstants.REJECT
+                        } else {
+                            HapticFeedbackConstants.LONG_PRESS
+                        }
+                    )
                     errorMessage = if (isLockedOut) {
                         "Too many attempts. Try again in ${lockoutSeconds}s"
                     } else {
                         "Incorrect PIN"
                     }
-                    shakeAnimation = true
                     pin = ""
                 }
             }
@@ -182,13 +190,6 @@ fun UnlockScreen(
         biometricPrompt.authenticate(promptInfo)
     }
 
-    LaunchedEffect(shakeAnimation) {
-        if (shakeAnimation) {
-            delay(500)
-            shakeAnimation = false
-        }
-    }
-
     // Try biometric on first load if available (with delay to ensure UI is ready)
     LaunchedEffect(Unit) {
         if (biometricAvailable) {
@@ -223,8 +224,7 @@ fun UnlockScreen(
         // PIN dots
         PinDots(
             enteredLength = pin.length,
-            totalLength = PIN_LENGTH,
-            shake = shakeAnimation
+            totalLength = PIN_LENGTH
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -321,8 +321,7 @@ fun UnlockScreen(
 @Composable
 private fun PinDots(
     enteredLength: Int,
-    totalLength: Int,
-    shake: Boolean
+    totalLength: Int
 ) {
     Row(
         modifier = Modifier.padding(horizontal = 24.dp),
