@@ -1929,7 +1929,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         _pin.value = null
     }
 
+    /**
+     * Restart the active wallet's kit if its sync dropped (the app resumed).
+     * Only that wallet's own kit, and never while a lifecycle transition owns
+     * the kit: its teardown and reopen start the right one. A resume during a
+     * switch or an add used to restart the kit being released.
+     */
     fun startWallet() {
+        val active = _activeWallet.value ?: return
+        if (walletMutationMutex.isLocked || WalletManager.currentWalletId != active.derivedWalletId) return
         viewModelScope.launch {
             try {
                 WalletManager.start()

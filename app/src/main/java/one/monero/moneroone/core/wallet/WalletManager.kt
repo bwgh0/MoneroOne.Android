@@ -178,7 +178,12 @@ object WalletManager {
         try {
             // Native store + close (seconds for a large cache): the wallet
             // switch used to freeze the UI here because viewModelScope is Main.
-            withContext(Dispatchers.IO) { k?.stop() }
+            // Released first: a start() that picked this kit up meanwhile (an
+            // app resume) must not reopen it after the stop.
+            withContext(Dispatchers.IO) {
+                k?.release()
+                k?.stop()
+            }
         } catch (e: Exception) {
             Timber.w(e, "WalletManager.stopAndRelease() stop failed")
         }
