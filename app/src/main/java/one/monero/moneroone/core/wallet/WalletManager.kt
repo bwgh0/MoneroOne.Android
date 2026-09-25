@@ -10,6 +10,7 @@ import io.horizontalsystems.monerokit.model.TransactionInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -179,8 +180,10 @@ object WalletManager {
             // Native store + close (seconds for a large cache): the wallet
             // switch used to freeze the UI here because viewModelScope is Main.
             // Released first: a start() that picked this kit up meanwhile (an
-            // app resume) must not reopen it after the stop.
-            withContext(Dispatchers.IO) {
+            // app resume) must not reopen it after the stop. Not cancellable:
+            // a release without its stop would leave a start that completes
+            // holding the wallet and KitManager's running slot.
+            withContext(NonCancellable + Dispatchers.IO) {
                 k?.release()
                 k?.stop()
             }

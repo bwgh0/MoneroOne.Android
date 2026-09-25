@@ -551,6 +551,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
                 WalletManager.start()
+                // An abandon from a tap that since came back to this wallet (B, C, B) can land after
+                // the start it was meant for: this start then gives up although the wallet is active.
+                if (startWasAbandoned(running) && _activeWallet.value?.id == info.id && !reopenRequested) {
+                    Timber.d("openActiveWallet: late abandon for ${info.id}; starting again")
+                    WalletManager.start()
+                }
                 // A wallet tapped during the start is opened next (openActiveWalletSettled).
                 if (_activeWallet.value?.id != info.id) return
                 publishAddresses(info, running)
@@ -595,7 +601,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
             // Neither started nor failed: the start was abandoned for a newer tap or a node change (see
             // WalletManager.abandonStart), whose transition opens the right wallet next.
-            if (!kit.isStarted && kit.syncStateFlow.value is SyncState.Connecting) {
+            if (startWasAbandoned(kit)) {
                 Timber.d("openActiveWallet: start of ${info.id} abandoned")
                 return
             }
@@ -631,6 +637,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
+
+    /** Neither started nor failed: an abandon (WalletManager.abandonStart) made the start give up. */
+    private fun startWasAbandoned(kit: MoneroKit): Boolean =
+        !kit.isStarted && kit.syncStateFlow.value is SyncState.Connecting
 
     private fun moneroSeed(words: List<String>, type: SeedType): Seed = when (type) {
         SeedType.ELECTRUM_25 -> Seed.Electrum(words, "")
@@ -1850,6 +1860,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
         // An open in flight is for the old node: don't queue behind its first node contact.
         if (switchInFlight) WalletManager.abandonStart()
+        reopenRequested = true
         viewModelScope.launch {
             walletMutationMutex.withLock { reopenActiveWallet(errorPrefix = "Failed to change node") }
         }
@@ -1862,6 +1873,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * in flight.
      */
     private suspend fun reopenActiveWallet(errorPrefix: String) {
+        reopenRequested = false
         switchInFlight = true
         try {
             _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
@@ -1883,6 +1895,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     private var failoverJob: Job? = null
     private var failoverAttempts = 0
+
+    /** A node change or refresh is queued: it reopens the wallet itself, so an abandoned start is not retried. */
+    private var reopenRequested = false
 
     // Support P1: "disconnected, always — on any node". Retrying the same dead
     // node can never self-heal, so when a connection fails and auto-select is on,
@@ -1912,6 +1927,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshSync() {
         failoverAttempts = 0
         if (switchInFlight) WalletManager.abandonStart()
+        reopenRequested = true
         viewModelScope.launch {
             walletMutationMutex.withLock { reopenActiveWallet(errorPrefix = "Failed to refresh") }
         }
