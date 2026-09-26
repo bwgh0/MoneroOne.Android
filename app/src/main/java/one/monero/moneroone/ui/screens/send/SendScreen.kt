@@ -39,6 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Cancel
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,8 +59,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -103,12 +103,18 @@ import one.monero.moneroone.core.util.NetworkMonitor
 import one.monero.moneroone.core.wallet.SendState
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.AuthGateDialog
+import one.monero.moneroone.ui.components.CapsuleShape
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.components.PrimaryButton
+import one.monero.moneroone.ui.components.ShrinkToFitText
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.SuccessGreen
+import one.monero.moneroone.ui.theme.TabularFigures
+import one.monero.moneroone.ui.theme.WarningYellow
 
 private enum class SendPhase { ADDRESS, AMOUNT, REVIEW, SENDING, SUCCESS, ERROR }
 
@@ -214,7 +220,7 @@ fun SendScreen(
                             SendPhase.REVIEW -> "Review"
                             else -> ""
                         },
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -397,22 +403,18 @@ private fun AddressPhase(
 
         Text(
             text = "Recipient Address",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        OutlinedTextField(
+        // Addresses are mono caption, as on iOS.
+        MoneroTextField(
             value = address,
             onValueChange = onAddressChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Enter XMR address") },
-            shape = RoundedCornerShape(14.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MoneroOrange,
-                cursorColor = MoneroOrange,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-            ),
+            placeholder = { Text("Enter XMR address", style = MonoCaption) },
+            textStyle = MonoCaption,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Done),
             singleLine = true
         )
@@ -433,7 +435,7 @@ private fun AddressPhase(
                 )
                 Text(
                     if (valid) "Valid address" else "Invalid address",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = if (valid) SuccessGreen else ErrorRed
                 )
             }
@@ -446,35 +448,21 @@ private fun AddressPhase(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            GlassButton(
+            PrimaryButton(
                 onClick = onScanQr,
-                modifier = Modifier.weight(1f).height(52.dp),
-                cornerRadius = 14.dp
+                modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = MoneroOrange, modifier = Modifier.size(20.dp))
-                    Text("Scan QR", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = MoneroOrange)
-                }
+                Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text("Scan QR")
             }
-            GlassButton(
+            PrimaryButton(
                 onClick = {
                     clipboardManager.getText()?.text?.let { onAddressChange(it.trim()) }
                 },
-                modifier = Modifier.weight(1f).height(52.dp),
-                cornerRadius = 14.dp
+                modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MoneroOrange, modifier = Modifier.size(20.dp))
-                    Text("Paste", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = MoneroOrange)
-                }
+                Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text("Paste")
             }
         }
 
@@ -483,11 +471,11 @@ private fun AddressPhase(
         // Continue button
         PrimaryButton(
             onClick = onContinue,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            enabled = isValid,
-            color = MoneroOrange
+            modifier = Modifier.fillMaxWidth(),
+            enabled = isValid
         ) {
-            Text("Continue", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text("Continue")
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
         }
 
         Spacer(modifier = Modifier.height(40.dp))
@@ -558,8 +546,8 @@ private fun AmountPhase(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(top = 8.dp)
             ) {
-                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFFCC00), modifier = Modifier.size(14.dp))
-                Text("Amount pre-filled from QR code", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.Warning, contentDescription = null, tint = WarningYellow, modifier = Modifier.size(14.dp))
+                Text("Amount pre-filled from QR code", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -570,15 +558,20 @@ private fun AmountPhase(
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {
                 Text(
                     text = currencySymbol,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.alignByBaseline()
                 )
-                Text(
+                Spacer(modifier = Modifier.width(8.dp))
+                // Shrinks like iOS (minimumScaleFactor 0.4) instead of clipping.
+                ShrinkToFitText(
                     text = fiatString.ifEmpty { "0" },
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 56.sp, fontWeight = FontWeight.Bold),
-                    maxLines = 1,
-                    modifier = Modifier.alignByBaseline()
+                    style = MaterialTheme.typography.displayLarge,
+                    minScale = 0.4f,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .alignByBaseline()
                 )
             }
             // XMR conversion below
@@ -590,16 +583,20 @@ private fun AmountPhase(
             )
         } else {
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {
-                Text(
+                // Shrinks like iOS (minimumScaleFactor 0.4) instead of clipping.
+                ShrinkToFitText(
                     text = amount.ifEmpty { "0" },
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 56.sp, fontWeight = FontWeight.Bold),
-                    maxLines = 1,
-                    modifier = Modifier.alignByBaseline()
+                    style = MaterialTheme.typography.displayLarge,
+                    minScale = 0.4f,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .alignByBaseline()
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "XMR",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.alignByBaseline()
                 )
@@ -614,7 +611,7 @@ private fun AmountPhase(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(CapsuleShape)
                     .background(MoneroOrange.copy(alpha = 0.1f))
                     .clickable {
                         if (isFiatMode) {
@@ -653,8 +650,8 @@ private fun AmountPhase(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MoneroOrange.copy(alpha = 0.12f))
+                    .clip(CapsuleShape)
+                    .background(MoneroOrange.copy(alpha = 0.15f))
                     .clickable {
                         clipboardManager.getText()?.text?.let { clip ->
                             val filtered = clip.filter { it.isDigit() || it == '.' }
@@ -667,21 +664,21 @@ private fun AmountPhase(
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MoneroOrange, modifier = Modifier.size(14.dp))
-                Text("Paste", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MoneroOrange)
+                Text("Paste", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MoneroOrange)
             }
             Spacer(modifier = Modifier.width(8.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MoneroOrange.copy(alpha = 0.12f))
+                    .clip(CapsuleShape)
+                    .background(MoneroOrange.copy(alpha = 0.15f))
                     .clickable {
                         isFiatMode = false
                         onMaxTap()
                     }
-                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Text("Max", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MoneroOrange)
+                Text("Max", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MoneroOrange)
             }
         }
 
@@ -694,24 +691,18 @@ private fun AmountPhase(
                 .clickable { showMemo = !showMemo }
                 .padding(vertical = 8.dp)
         ) {
-            Icon(Icons.Default.Description, contentDescription = null, tint = MoneroOrange, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Add memo", style = MaterialTheme.typography.bodyMedium, color = MoneroOrange)
+            Text("Add memo", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.weight(1f))
             Text(if (showMemo) "▲" else "▼", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         AnimatedVisibility(visible = showMemo) {
-            OutlinedTextField(
+            MoneroTextField(
                 value = memo,
                 onValueChange = onMemoChange,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Add a note") },
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MoneroOrange,
-                    cursorColor = MoneroOrange,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                ),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium
             )
@@ -753,11 +744,11 @@ private fun AmountPhase(
         // Continue button (below keypad, matching iOS)
         PrimaryButton(
             onClick = onContinue,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            enabled = canContinue,
-            color = MoneroOrange
+            modifier = Modifier.fillMaxWidth(),
+            enabled = canContinue
         ) {
-            Text("Continue", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text("Continue")
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
         }
 
         Spacer(modifier = Modifier.height(40.dp))
@@ -835,13 +826,18 @@ private fun ReviewPhase(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 8.dp)
             ) {
-                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFFCC00), modifier = Modifier.size(14.dp))
-                Text("Amount pre-filled from QR code", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Default.Warning, contentDescription = null, tint = WarningYellow, modifier = Modifier.size(14.dp))
+                Text("Amount pre-filled from QR code", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
-        // Transaction card
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
+        // Transaction card: iOS review table (radius 16, fill, no shadow)
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = 16.dp,
+            shadow = false,
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
             Column(modifier = Modifier.padding(16.dp)) {
 
                 // Recipient
@@ -857,10 +853,10 @@ private fun ReviewPhase(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text("Recipient", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Recipient", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             text = address.take(12) + "..." + address.takeLast(8),
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            style = MonoCaption,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -877,20 +873,20 @@ private fun ReviewPhase(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (isSweepAll) {
-                        Text("All Funds", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("All Funds", style = MaterialTheme.typography.headlineMedium)
                         Spacer(modifier = Modifier.height(4.dp))
                         if (feeReady) {
                             val sendAmount = (unlockedBalance - estimatedFee).coerceAtLeast(0)
                             Text(
                                 "${formatXmr(sendAmount)} XMR",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             xmrPrice?.let { price ->
                                 val fiat = atomicToXmr(sendAmount) * price
                                 Text(
                                     "≈ ${currencySymbol}${"%.2f".format(fiat)}",
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -900,8 +896,7 @@ private fun ReviewPhase(
                     } else {
                         Text(
                             "${formatXmr(parsedAmount)} XMR",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.headlineMedium
                         )
                         xmrPrice?.let { price ->
                             val fiat = atomicToXmr(parsedAmount) * price
@@ -920,7 +915,7 @@ private fun ReviewPhase(
 
                 // Fee row
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    Text("Network Fee", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                    Text("Network Fee", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.weight(1f))
                     when {
                         feeLoading -> CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -931,7 +926,7 @@ private fun ReviewPhase(
                                 val fiat = atomicToXmr(estimatedFee) * price
                                 Text(
                                     "≈ ${currencySymbol}${"%.2f".format(fiat)}",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -953,14 +948,14 @@ private fun ReviewPhase(
                             Text(
                                 "${formatXmr(total)} XMR",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MoneroOrange
                             )
                             xmrPrice?.let { price ->
                                 val fiat = atomicToXmr(total) * price
                                 Text(
                                     "≈ ${currencySymbol}${"%.2f".format(fiat)}",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -979,7 +974,7 @@ private fun ReviewPhase(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFFCC00), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = WarningYellow, modifier = Modifier.size(18.dp))
                         Text(
                             "Amount plus network fee exceeds your available balance",
                             style = MaterialTheme.typography.bodyMedium,
@@ -1005,17 +1000,13 @@ private fun ReviewPhase(
             onClick = onConfirm,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
                 .pointerInteropFilter { event ->
                     (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0
                 },
-            enabled = feeReady && !sendInProgress && !needsSweepAllChoice,
-            color = MoneroOrange
+            enabled = feeReady && !sendInProgress && !needsSweepAllChoice
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                Text("Send", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
-            }
+            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text("Send")
         }
 
         Spacer(modifier = Modifier.height(40.dp))
@@ -1040,13 +1031,13 @@ private fun SendingPhase() {
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            Text("Sending Transaction...", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Sending Transaction...", style = MaterialTheme.typography.headlineSmall)
 
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 "Please wait while your transaction is being broadcast",
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
@@ -1077,6 +1068,8 @@ private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
     )
     val ringAlpha by animateFloatAsState(if (showCheck) 0f else 1f, tween(800), label = "ringAlpha")
 
+    // Read the adaptive green here: drawBehind is not a composable scope.
+    val successGreen = SuccessGreen
     Box(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
@@ -1093,7 +1086,7 @@ private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
                         .graphicsLayer { scaleX = ringScale; scaleY = ringScale; alpha = ringAlpha }
                         .drawBehind {
                             drawCircle(
-                                color = SuccessGreen,
+                                color = successGreen,
                                 style = Stroke(width = 3.dp.toPx())
                             )
                         }
@@ -1119,7 +1112,7 @@ private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
 
             Text(
                 "Your transaction has been submitted to the network",
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
@@ -1127,20 +1120,20 @@ private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
             if (txHash.isNotBlank()) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Text("Transaction ID", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Transaction ID", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(CapsuleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Text(
                         text = if (copied) "Copied!" else txHash.take(10) + "..." + txHash.takeLast(6),
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        style = MonoCaption,
                         color = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
                     )
@@ -1165,10 +1158,9 @@ private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
 
             PrimaryButton(
                 onClick = onDone,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                color = SuccessGreen
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Done", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text("Done")
             }
         }
     }
@@ -1193,21 +1185,27 @@ private fun ErrorPhase(message: String, onRetry: () -> Unit, onClose: () -> Unit
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            Text("Transaction Failed", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = ErrorRed)
+            Text("Transaction Failed", style = MaterialTheme.typography.headlineSmall, color = ErrorRed)
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(onClick = onClose, modifier = Modifier.weight(1f).height(56.dp)) {
-                    Text("Close", style = MaterialTheme.typography.titleMedium)
-                }
-                PrimaryButton(onClick = onRetry, modifier = Modifier.weight(1f).height(56.dp), color = MoneroOrange) {
-                    Text("Retry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
-                }
+            // iOS: Retry is the glass action, Close a secondary text button under it.
+            PrimaryButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text("Retry")
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Close",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -1226,17 +1224,16 @@ private fun NumericKeypad(onKey: (String) -> Unit) {
         listOf(".", "0", "⌫")
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         keys.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 row.forEach { key ->
                     GlassButton(
                         onClick = { onKey(key) },
-                        modifier = Modifier.weight(1f).height(64.dp),
-                        cornerRadius = 16.dp
+                        modifier = Modifier.weight(1f).height(60.dp)
                     ) {
                         if (key == "⌫") {
                             Icon(
@@ -1247,7 +1244,7 @@ private fun NumericKeypad(onKey: (String) -> Unit) {
                         } else {
                             Text(
                                 text = key,
-                                style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Default),
+                                style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = TabularFigures),
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.align(Alignment.Center)
                             )

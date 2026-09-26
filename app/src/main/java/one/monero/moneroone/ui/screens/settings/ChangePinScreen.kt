@@ -49,6 +49,7 @@ import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
 
 private const val PIN_LENGTH = 6
 
@@ -190,7 +191,7 @@ fun ChangePinScreen(
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
@@ -254,7 +255,7 @@ private fun PinDots(
                     .scale(scale)
                     .clip(CircleShape)
                     .background(
-                        if (isFilled) MoneroOrange else Color.Gray.copy(alpha = 0.3f)
+                        if (isFilled) MoneroOrange else MoneroTheme.colors.gray.copy(alpha = 0.3f)
                     )
             )
         }
@@ -300,8 +301,7 @@ private fun NumberPad(
                         else -> {
                             GlassButton(
                                 onClick = { onDigitPress(button) },
-                                modifier = Modifier.size(80.dp),
-                                cornerRadius = 40.dp
+                                modifier = Modifier.size(80.dp)
                             ) {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
@@ -309,7 +309,7 @@ private fun NumberPad(
                                 ) {
                                     Text(
                                         text = button,
-                                        fontSize = 28.sp,
+                                        style = MaterialTheme.typography.headlineMedium,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onBackground
                                     )

@@ -1,5 +1,7 @@
 package one.monero.moneroone.ui.screens.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,7 +35,10 @@ import androidx.compose.ui.unit.dp
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.model.CurrentPrice
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
+import one.monero.moneroone.ui.theme.SuccessGreen
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -48,6 +53,7 @@ fun CurrencyScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MoneroTheme.colors.bgGrouped)
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
@@ -68,8 +74,7 @@ fun CurrencyScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Currency",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineSmall
             )
         }
 
@@ -78,22 +83,29 @@ fun CurrencyScreen(
         Text(
             text = "Select your preferred display currency for prices.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            modifier = Modifier.padding(horizontal = 4.dp)
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Currency list (no prices per row - matches iOS)
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Currency.entries.forEach { currency ->
-                CurrencyItem(
-                    currency = currency,
-                    isSelected = currency == selectedCurrency,
-                    onClick = { onCurrencySelected(currency) }
-                )
+        // Currency list (no prices per row - matches iOS): one grouped card
+        GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
+            Column {
+                Currency.entries.forEachIndexed { index, currency ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 60.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    }
+                    CurrencyItem(
+                        currency = currency,
+                        isSelected = currency == selectedCurrency,
+                        onClick = { onCurrencySelected(currency) }
+                    )
+                }
             }
         }
 
@@ -101,14 +113,17 @@ fun CurrencyScreen(
 
         // Current Price section
         Text(
-            text = "CURRENT PRICE",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+            text = "Current Price",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
         )
 
         GlassCard(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = 16.dp,
+            shadow = false
         ) {
             Column(
                 modifier = Modifier
@@ -131,7 +146,7 @@ fun CurrencyScreen(
                         Text(
                             text = "Fetching price...",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else if (currentPrice != null) {
@@ -156,7 +171,8 @@ fun CurrencyScreen(
 
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 12.dp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
                     )
 
                     // 24h change row
@@ -168,13 +184,13 @@ fun CurrencyScreen(
                         Text(
                             text = "24h Change",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         val change = currentPrice.change24h
                         if (change != null) {
                             val isPositive = change >= 0
-                            val changeColor = if (isPositive) Color(0xFF4CAF50) else Color(0xFFE53935)
+                            val changeColor = if (isPositive) SuccessGreen else ErrorRed
                             val arrow = if (isPositive) "\u2197" else "\u2198" // ↗ or ↘
                             Text(
                                 text = "$arrow ${if (isPositive) "+" else ""}${String.format(Locale.US, "%.2f", change)}%",
@@ -186,14 +202,15 @@ fun CurrencyScreen(
                             Text(
                                 text = "—",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                color = MoneroTheme.colors.labelTertiary
                             )
                         }
                     }
 
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 12.dp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
                     )
 
                     // Last updated row
@@ -205,12 +222,12 @@ fun CurrencyScreen(
                         Text(
                             text = "Last Updated",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = formatRelativeTime(currentPrice.lastUpdated),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else {
@@ -228,7 +245,7 @@ fun CurrencyScreen(
                         Text(
                             text = "Unable to fetch price",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -241,7 +258,7 @@ fun CurrencyScreen(
         Text(
             text = "Prices from CoinGecko",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp),
@@ -258,16 +275,13 @@ private fun CurrencyItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
             // Flag emoji
             Text(
                 text = currency.flag,
@@ -280,15 +294,14 @@ private fun CurrencyItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = currency.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    color = if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = currency.code.uppercase(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -301,7 +314,6 @@ private fun CurrencyItem(
                     modifier = Modifier.size(24.dp)
                 )
             }
-        }
     }
 }
 

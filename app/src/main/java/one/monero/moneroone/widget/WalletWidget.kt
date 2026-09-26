@@ -62,8 +62,8 @@ class WalletWidget : AppWidgetProvider() {
             val status = WidgetDataStore.getSyncStatus(context)
             val (statusText, statusColor) = when (status) {
                 "synced" -> "● Synced" to 0xFF34C759.toInt()
-                "syncing" -> "● Syncing" to 0xFFFF9500.toInt()
-                "connecting" -> "● Connecting" to 0xFFFF9500.toInt()
+                "syncing" -> "● Syncing" to 0xFFFF6600.toInt()
+                "connecting" -> "● Connecting" to 0xFFFF6600.toInt()
                 else -> "● Offline" to 0xFFFF3B30.toInt()
             }
             views.setTextViewText(R.id.wallet_sync_status, statusText)
@@ -106,7 +106,7 @@ class WalletWidget : AppWidgetProvider() {
 
                     val iconBg = if (tx.isIncoming) R.drawable.widget_tx_icon_green else R.drawable.widget_tx_icon_orange
                     val iconRes = if (tx.isIncoming) R.drawable.ic_widget_arrow_down else R.drawable.ic_widget_arrow_up
-                    val iconColor = if (tx.isIncoming) 0xFF34C759.toInt() else 0xFFFF9500.toInt()
+                    val iconColor = if (tx.isIncoming) 0xFF34C759.toInt() else 0xFFFF6600.toInt()
                     views.setInt(row.iconId, "setBackgroundResource", iconBg)
                     views.setImageViewResource(row.iconId, iconRes)
                     views.setInt(row.iconId, "setColorFilter", iconColor)

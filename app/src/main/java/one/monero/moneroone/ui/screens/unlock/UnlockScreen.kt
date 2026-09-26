@@ -24,8 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +59,7 @@ import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.MoneroLogo
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
 
 private const val PIN_LENGTH = 6
 
@@ -271,7 +270,7 @@ fun UnlockScreen(
             Text(
                 text = "Forgot PIN?",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -295,16 +294,13 @@ fun UnlockScreen(
                 )
             },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
                         onResetWallet()
                         showResetDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ErrorRed
-                    )
+                    }
                 ) {
-                    Text("Remove")
+                    Text("Remove", color = ErrorRed)
                 }
             },
             dismissButton = {
@@ -340,7 +336,7 @@ private fun PinDots(
                     .scale(scale)
                     .clip(CircleShape)
                     .background(
-                        if (isFilled) MoneroOrange else Color.Gray.copy(alpha = 0.3f)
+                        if (isFilled) MoneroOrange else MoneroTheme.colors.gray.copy(alpha = 0.3f)
                     )
             )
         }
@@ -417,8 +413,7 @@ private fun NumberButton(
 ) {
     GlassButton(
         onClick = onClick,
-        modifier = Modifier.size(80.dp),
-        cornerRadius = 40.dp
+        modifier = Modifier.size(80.dp)
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -426,7 +421,7 @@ private fun NumberButton(
         ) {
             Text(
                 text = digit,
-                fontSize = 28.sp,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onBackground
             )

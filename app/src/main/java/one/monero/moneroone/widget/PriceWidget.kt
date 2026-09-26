@@ -45,7 +45,7 @@ class PriceWidget : AppWidgetProvider() {
     }
 
     companion object {
-        private const val ORANGE = 0xFFFF7500.toInt()
+        private const val ORANGE = 0xFFFF6600.toInt()
 
         private enum class Size { SMALL, MEDIUM, LARGE }
 

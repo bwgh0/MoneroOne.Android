@@ -15,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import one.monero.moneroone.MainActivity
+import androidx.core.content.ContextCompat
 import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletManager
 import one.monero.moneroone.core.wallet.WalletStore
@@ -99,6 +100,7 @@ class WalletSyncService : Service() {
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setColor(ContextCompat.getColor(this, R.color.monero_orange))
             .setContentIntent(contentIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

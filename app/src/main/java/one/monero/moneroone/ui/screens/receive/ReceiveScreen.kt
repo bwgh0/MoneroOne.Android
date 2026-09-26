@@ -32,8 +32,6 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,7 +60,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,9 +75,11 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import one.monero.moneroone.R
+import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
-import one.monero.moneroone.ui.components.PrimaryButton
-import one.monero.moneroone.ui.components.SecondaryButton
+import one.monero.moneroone.ui.components.MoneroTextField
+import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.MoneroOrange
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -170,7 +169,7 @@ fun ReceiveScreen(
                 title = {
                     Text(
                         text = "Receive XMR",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleMedium
                     )
                 },
                 navigationIcon = {
@@ -233,7 +232,7 @@ fun ReceiveScreen(
             ) {
                 Text(
                     text = "Request Amount (optional)",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.weight(1f))
@@ -242,7 +241,7 @@ fun ReceiveScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(CapsuleShape)
                             .background(MoneroOrange.copy(alpha = 0.1f))
                             .clickable {
                                 if (isFiatMode) {
@@ -255,10 +254,10 @@ fun ReceiveScreen(
                             }
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Text("⇅", style = MaterialTheme.typography.labelMedium, color = MoneroOrange)
+                        Text("⇅", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MoneroOrange)
                         Text(
                             text = if (isFiatMode) "XMR" else selectedCurrency.code.uppercase(),
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MoneroOrange
                         )
@@ -270,7 +269,7 @@ fun ReceiveScreen(
 
             // Amount input field
             if (isFiatMode) {
-                OutlinedTextField(
+                MoneroTextField(
                     value = fiatAmount,
                     onValueChange = {
                         if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
@@ -293,13 +292,11 @@ fun ReceiveScreen(
                             }
                         }
                     },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MoneroOrange, cursorColor = MoneroOrange, unfocusedBorderColor = MaterialTheme.colorScheme.outline),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
                 )
             } else {
-                OutlinedTextField(
+                MoneroTextField(
                     value = requestAmount,
                     onValueChange = {
                         if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) requestAmount = it
@@ -314,8 +311,6 @@ fun ReceiveScreen(
                             }
                         }
                     },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = MoneroOrange, cursorColor = MoneroOrange, unfocusedBorderColor = MaterialTheme.colorScheme.outline),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
                 )
@@ -323,10 +318,13 @@ fun ReceiveScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Address card (truncated, matching iOS)
+            // Address card (truncated, matching iOS): radius 12 on the fill
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = onSelectAddress
+                onClick = onSelectAddress,
+                cornerRadius = 12.dp,
+                shadow = false,
+                color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp).fillMaxWidth(),
@@ -335,13 +333,12 @@ fun ReceiveScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = addressLabel,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.titleSmall
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (address.length > 20) "${address.take(12)}. . .${address.takeLast(8)}" else address.ifBlank { "Loading..." },
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            text = if (address.length > 20) "${address.take(12)}...${address.takeLast(8)}" else address.ifBlank { "Loading..." },
+                            style = MonoCaption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -349,7 +346,7 @@ fun ReceiveScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = "Select address",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -363,7 +360,7 @@ fun ReceiveScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                GlassCard(
+                GlassButton(
                     modifier = Modifier.weight(1f).height(90.dp),
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -374,16 +371,15 @@ fun ReceiveScreen(
                     }
                 ) {
                     Column(
-                        modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(24.dp))
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Copy", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                        Text("Copy", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
 
-                GlassCard(
+                GlassButton(
                     modifier = Modifier.weight(1f).height(90.dp),
                     onClick = {
                         val shareText = if (requestAmount.isNotBlank()) qrData else address
@@ -395,12 +391,11 @@ fun ReceiveScreen(
                     }
                 ) {
                     Column(
-                        modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, tint = MoneroOrange, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Share", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium, color = MoneroOrange)
+                        Text("Share", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = MoneroOrange)
                     }
                 }
             }
@@ -454,7 +449,7 @@ private fun addMoneroLogoOverlay(qrBitmap: Bitmap, context: Context): Bitmap {
     canvas.drawCircle(cx, cy, radius + 4f, bgPaint)
 
     // Draw logo into a circle-clipped bitmap
-    val logoDrawable = ContextCompat.getDrawable(context, R.drawable.monero_logo) ?: return result
+    val logoDrawable = ContextCompat.getDrawable(context, R.drawable.monero_mark) ?: return result
     val clipped = Bitmap.createBitmap(logoSize, logoSize, Bitmap.Config.ARGB_8888)
     val clipCanvas = android.graphics.Canvas(clipped)
 

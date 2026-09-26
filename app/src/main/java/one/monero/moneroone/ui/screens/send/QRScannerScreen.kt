@@ -425,7 +425,7 @@ fun QRScannerScreen(
                 title = {
                     Text(
                         text = "Scan Monero Address",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleMedium
                     )
                 },
                 navigationIcon = {
@@ -477,7 +477,7 @@ fun QRScannerScreen(
                         Text(
                             text = "To scan QR codes, please allow camera access.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
 
@@ -488,13 +488,9 @@ fun QRScannerScreen(
                                 permissionLauncher.launch(Manifest.permission.CAMERA)
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            color = MoneroOrange
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                         ) {
-                            Text(
-                                text = "Grant Permission",
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Text(text = "Grant Permission")
                         }
                     }
                 }
@@ -522,13 +518,9 @@ fun QRScannerScreen(
                                 hasScanned = false
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            color = MoneroOrange
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                         ) {
-                            Text(
-                                text = "Try Again",
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Text(text = "Try Again")
                         }
                     }
                 }
@@ -571,7 +563,7 @@ fun QRScannerScreen(
                 Text(
                     text = "Position QR code within the frame",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
             }

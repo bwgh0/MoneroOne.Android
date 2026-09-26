@@ -2,6 +2,7 @@ package one.monero.moneroone.ui.screens.settings
 
 import android.content.Context
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,16 +36,10 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -79,9 +74,14 @@ import one.monero.moneroone.core.node.parseNodeInput
 import one.monero.moneroone.core.node.validateNodeCredentials
 import one.monero.moneroone.core.wallet.DefaultNodes
 import one.monero.moneroone.core.wallet.SecurePrefs
+import one.monero.moneroone.ui.components.CapsuleShape
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.MoneroSwitch
+import one.monero.moneroone.ui.components.MoneroTextField
+import one.monero.moneroone.ui.components.moneroTextFieldColors
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.WarningYellow
 
@@ -175,6 +175,7 @@ fun NodeSettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MoneroTheme.colors.bgGrouped)
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
@@ -195,8 +196,7 @@ fun NodeSettingsScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Remote Node",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineSmall
             )
         }
 
@@ -205,14 +205,14 @@ fun NodeSettingsScreen(
         Text(
             text = "Select a remote node for blockchain sync.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            modifier = Modifier.padding(horizontal = 4.dp)
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // Auto-Select Toggle
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -229,10 +229,10 @@ fun NodeSettingsScreen(
                     Text(
                         text = "Automatically use the fastest node",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
+                MoneroSwitch(
                     checked = autoSelectEnabled,
                     onCheckedChange = { enabled ->
                         autoSelectEnabled = enabled
@@ -248,13 +248,7 @@ fun NodeSettingsScreen(
                                 onNodeChanged()
                             }
                         }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = MoneroOrange,
-                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    }
                 )
             }
         }
@@ -262,7 +256,7 @@ fun NodeSettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // Default Nodes
-        SectionLabel("DEFAULT NODES")
+        SectionLabel("Default Nodes")
 
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -300,7 +294,7 @@ fun NodeSettingsScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SectionLabel("CUSTOM NODES")
+            SectionLabel("Custom Nodes")
             IconButton(onClick = { showAddNodeDialog = true }) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -311,7 +305,7 @@ fun NodeSettingsScreen(
         }
 
         if (customNodes.isEmpty()) {
-            GlassCard(modifier = Modifier.fillMaxWidth()) {
+            GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -321,7 +315,7 @@ fun NodeSettingsScreen(
                     Text(
                         text = "No custom nodes added",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -432,11 +426,10 @@ fun NodeSettingsScreen(
 private fun SectionLabel(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-        letterSpacing = MaterialTheme.typography.labelMedium.letterSpacing * 1.5f,
-        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
     )
 }
 
@@ -456,7 +449,9 @@ private fun NodeItem(
 
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = if (enabled) onSelect else null
+        onClick = if (enabled) onSelect else null,
+        cornerRadius = 16.dp,
+        shadow = false
     ) {
         Row(
             modifier = Modifier
@@ -476,7 +471,7 @@ private fun NodeItem(
                     text = node.name,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Medium,
-                    color = (if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface).copy(alpha = alpha)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -490,14 +485,14 @@ private fun NodeItem(
                     Text(
                         text = node.uri,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f * alpha)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
                     )
                     if (node.hasCredentials) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Icon(
                             imageVector = Icons.Default.Key,
                             contentDescription = "Requires authentication",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f * alpha),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
                             modifier = Modifier.size(12.dp)
                         )
                     }
@@ -520,7 +515,7 @@ private fun NodeItem(
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Edit",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -552,22 +547,26 @@ private fun NodeItem(
 
 @Composable
 private fun LatencyBadge(latencyMs: Long) {
+    val caution = latencyMs in 200 until 500
     val (text, color) = when {
         latencyMs == NodeBenchmark.UNAUTHORIZED -> "Auth failed" to ErrorRed
         latencyMs < 0 -> "Unreachable" to ErrorRed
         latencyMs < 200 -> "${latencyMs}ms" to SuccessGreen
-        latencyMs < 500 -> "${latencyMs}ms" to WarningYellow
+        caution -> "${latencyMs}ms" to WarningYellow
         else -> "${latencyMs}ms" to ErrorRed
     }
 
+    // A chip tinted in its hue. Yellow is never a text color, so a slow
+    // node's label keeps the label color on its yellow tint.
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.SemiBold,
-        color = color,
+        color = if (caution) MaterialTheme.colorScheme.onSurface else color,
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .clip(CapsuleShape)
+            .background(color.copy(alpha = 0.15f))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
     )
 }
 
@@ -593,10 +592,7 @@ private fun NodeDialog(
     var error by remember { mutableStateOf<String?>(null) }
     var credentialError by remember { mutableStateOf<String?>(null) }
     val parsed = parseNodeInput(nodeUri)
-    val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = MoneroOrange,
-        cursorColor = MoneroOrange
-    )
+    val fieldColors = moneroTextFieldColors()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -606,10 +602,10 @@ private fun NodeDialog(
                 Text(
                     text = "Enter the node URI (e.g., node.example.com:18081)",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
+                MoneroTextField(
                     value = nodeUri,
                     onValueChange = {
                         nodeUri = it
@@ -642,7 +638,7 @@ private fun NodeDialog(
                                 "Connection will be unencrypted (HTTP)"
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (tls) SuccessGreen else WarningYellow
+                            color = if (tls) SuccessGreen else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -660,7 +656,7 @@ private fun NodeDialog(
                     Icon(
                         imageVector = Icons.Default.Key,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -673,13 +669,13 @@ private fun NodeDialog(
                     Icon(
                         imageVector = if (showAuth) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = if (showAuth) "Hide authentication" else "Show authentication",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 if (showAuth) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedTextField(
+                    MoneroTextField(
                         value = username,
                         onValueChange = {
                             username = it
@@ -692,7 +688,7 @@ private fun NodeDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
+                    MoneroTextField(
                         value = password,
                         onValueChange = {
                             password = it
@@ -719,13 +715,13 @@ private fun NodeDialog(
                     Text(
                         text = "Only needed for nodes that require RPC credentials",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         },
         confirmButton = {
-            Button(
+            TextButton(
                 onClick = {
                     when (parsed) {
                         is NodeInput.Invalid -> error = parsed.message
@@ -752,10 +748,9 @@ private fun NodeDialog(
                             }
                         }
                     }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = MoneroOrange)
+                }
             ) {
-                Text(confirmLabel)
+                Text(confirmLabel, color = MoneroOrange)
             }
         },
         dismissButton = {

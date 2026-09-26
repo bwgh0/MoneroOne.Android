@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,7 +54,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,7 +62,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
-import one.monero.moneroone.ui.components.SecondaryButton
+import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.MoneroRefreshIndicator
+import one.monero.moneroone.ui.components.PrimaryButton
+import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.components.StatusDot
 import one.monero.moneroone.ui.components.TransactionStatus
 import one.monero.moneroone.ui.theme.ErrorRed
@@ -94,7 +97,7 @@ fun TransactionDetailScreen(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text(navTitle) },
+                title = { Text(navTitle, style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -107,8 +110,17 @@ fun TransactionDetailScreen(
             )
         }
     ) { padding ->
+        val refreshState = rememberPullToRefreshState()
         PullToRefreshBox(
             isRefreshing = isRefreshing,
+            state = refreshState,
+            indicator = {
+                MoneroRefreshIndicator(
+                    state = refreshState,
+                    isRefreshing = isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            },
             onRefresh = {
                 scope.launch {
                     isRefreshing = true
@@ -128,7 +140,7 @@ fun TransactionDetailScreen(
                     Text(
                         text = "Transaction not found",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             } else {
@@ -149,7 +161,10 @@ private fun TransactionDetailContent(
     context: Context
 ) {
     val isIncoming = transaction.direction == TransactionInfo.Direction.Direction_In
-    val amountColor = if (isIncoming) SuccessGreen else MoneroOrange
+    // Incoming: green disc and green amount. Outgoing: brand disc, amount in
+    // the label color (tokens.json color.status, iOS TransactionDetailView).
+    val discColor = if (isIncoming) SuccessGreen else MoneroOrange
+    val amountColor = if (isIncoming) SuccessGreen else MaterialTheme.colorScheme.onSurface
     val amountPrefix = if (isIncoming) "+" else "-"
     val typeLabel = if (isIncoming) "Received" else "Sent"
 
@@ -195,13 +210,13 @@ private fun TransactionDetailContent(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
-                        .background(amountColor.copy(alpha = 0.15f)),
+                        .background(discColor.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (isIncoming) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
                         contentDescription = null,
-                        tint = amountColor,
+                        tint = discColor,
                         modifier = Modifier.size(28.dp).rotate(45f)
                     )
                 }
@@ -211,7 +226,7 @@ private fun TransactionDetailContent(
                 Text(
                     text = typeLabel,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -228,7 +243,7 @@ private fun TransactionDetailContent(
                     Text(
                         text = "Fee: ${formatXmr(transaction.fee)} XMR",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -238,7 +253,7 @@ private fun TransactionDetailContent(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .clip(MaterialTheme.shapes.small)
+                        .clip(CapsuleShape)
                         .background(statusColor.copy(alpha = 0.15f))
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
@@ -310,13 +325,12 @@ private fun TransactionDetailContent(
                         Text(
                             text = "Transaction ID",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = transaction.hash,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
+                            style = MonoCaption,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -342,35 +356,20 @@ private fun TransactionDetailContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Actions Section
-        SecondaryButton(
+        PrimaryButton(
             onClick = {
                 val explorerUrl = "https://xmrchain.net/tx/${transaction.hash}"
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(explorerUrl))
                 context.startActivity(intent)
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            borderColor = MoneroOrange
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                    contentDescription = null,
-                    tint = MoneroOrange,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "View in Block Explorer",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MoneroOrange
-                )
-            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(text = "View in Block Explorer")
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -389,7 +388,7 @@ private fun DetailRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = value,

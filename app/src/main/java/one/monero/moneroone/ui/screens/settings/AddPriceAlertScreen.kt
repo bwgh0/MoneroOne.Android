@@ -20,8 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -43,8 +41,10 @@ import one.monero.moneroone.data.model.AlertCondition
 import one.monero.moneroone.data.model.PriceAlert
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.GlassSegmentedPicker
+import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.TabularFigures
 import java.text.NumberFormat
 import java.util.Locale
 import java.util.UUID
@@ -86,8 +86,7 @@ fun AddPriceAlertScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "New Price Alert",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineSmall
             )
         }
 
@@ -99,13 +98,12 @@ fun AddPriceAlertScreen(
                 Text(
                     text = "Current XMR Price",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = currentPrice?.let { format.format(it.price) } ?: "Loading...",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = TabularFigures)
                 )
             }
         }
@@ -115,8 +113,8 @@ fun AddPriceAlertScreen(
         // Condition picker
         Text(
             text = "Alert when price goes",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
         )
 
@@ -133,12 +131,12 @@ fun AddPriceAlertScreen(
         // Target price input
         Text(
             text = "Target Price",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
         )
 
-        OutlinedTextField(
+        MoneroTextField(
             value = targetPrice,
             onValueChange = {
                 if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) {
@@ -154,12 +152,6 @@ fun AddPriceAlertScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
-            shape = RoundedCornerShape(14.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MoneroOrange,
-                cursorColor = MoneroOrange,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-            ),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true
         )
@@ -179,18 +171,10 @@ fun AddPriceAlertScreen(
                 PriceAlertWorker.schedule(context)
                 onBack()
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            enabled = targetPrice.toDoubleOrNull() != null && targetPrice.toDoubleOrNull()!! > 0,
-            color = MoneroOrange
+            modifier = Modifier.fillMaxWidth(),
+            enabled = targetPrice.toDoubleOrNull() != null && targetPrice.toDoubleOrNull()!! > 0
         ) {
-            Text(
-                text = "Create Alert",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
-            )
+            Text(text = "Create Alert")
         }
 
         Spacer(modifier = Modifier.height(32.dp))

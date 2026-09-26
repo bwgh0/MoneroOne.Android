@@ -33,8 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -53,10 +51,13 @@ import one.monero.moneroone.core.alert.PriceAlertWorker
 import one.monero.moneroone.data.model.AlertCondition
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.model.PriceAlert
+import one.monero.moneroone.ui.components.CapsuleShape
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.MoneroSwitch
 import androidx.compose.material.icons.filled.Info
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SuccessGreen
 import java.text.NumberFormat
 import java.util.Locale
@@ -72,11 +73,12 @@ fun PriceAlertsScreen(
     var alerts by remember { mutableStateOf(manager.getAlerts()) }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MoneroTheme.colors.bgGrouped,
         contentWindowInsets = WindowInsets(0.dp),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddAlert,
+                shape = CapsuleShape,
                 containerColor = MoneroOrange,
                 contentColor = Color.White
             ) {
@@ -104,15 +106,14 @@ fun PriceAlertsScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Price Alerts",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.headlineSmall
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             if (alerts.isEmpty()) {
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -122,20 +123,19 @@ fun PriceAlertsScreen(
                         Icon(
                             imageVector = Icons.Default.TrendingUp,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "No price alerts",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Medium
+                            style = MaterialTheme.typography.titleMedium
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Tap + to create your first alert",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -203,14 +203,14 @@ fun PriceAlertsScreen(
                 Icon(
                     imageVector = Icons.Default.Info,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Alerts are checked every 15 minutes and trigger at most once per hour.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -235,7 +235,7 @@ private fun AlertItem(
     val conditionColor = if (isAbove) SuccessGreen else ErrorRed
     val conditionText = if (isAbove) "Above" else "Below"
 
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
+    GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -259,18 +259,12 @@ private fun AlertItem(
                 Text(
                     text = currency?.displayName ?: alert.currencyCode.uppercase(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Switch(
+            MoneroSwitch(
                 checked = alert.isEnabled,
-                onCheckedChange = { onToggle() },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = MoneroOrange,
-                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                onCheckedChange = { onToggle() }
             )
         }
     }

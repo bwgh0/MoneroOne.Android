@@ -64,6 +64,8 @@ import one.monero.moneroone.ui.screens.chart.ChartViewModel
 import one.monero.moneroone.ui.screens.chart.TimeRange
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
+import one.monero.moneroone.ui.theme.TabularFigures
 import one.monero.moneroone.ui.theme.SuccessGreen
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -110,7 +112,7 @@ fun PortfolioChartScreen(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Portfolio") },
+                title = { Text("Portfolio", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -151,7 +153,7 @@ fun PortfolioChartScreen(
                     Text(
                         text = if (isShowingSelection) formatDate(selectedPoint!!.timestamp, selectedRange) else "Current Value",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -165,15 +167,13 @@ fun PortfolioChartScreen(
                     if (displayValue != null) {
                         Text(
                             text = formatCurrency(displayValue, selectedCurrency),
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.displayMedium
                         )
                     } else if (chartUiState.isLoading) {
                         Text(
                             text = "Loading...",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            style = MaterialTheme.typography.displayMedium,
+                            color = MoneroTheme.colors.labelTertiary
                         )
                     }
 
@@ -182,7 +182,7 @@ fun PortfolioChartScreen(
                     Text(
                         text = "${walletViewModel.formatXmr(walletState.balance.all)} XMR",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -263,7 +263,7 @@ fun PortfolioChartScreen(
                         Text(
                             text = "Unable to load chart",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -316,9 +316,13 @@ private fun PortfolioChart(
     val lineColor = MoneroOrange
     val areaTopColor = MoneroOrange.copy(alpha = 0.4f)
     val areaBottomColor = MoneroOrange.copy(alpha = 0.0f)
-    val axisColor = Color.Gray.copy(alpha = 0.5f)
+    val axisColor = MoneroTheme.colors.gray.copy(alpha = 0.5f)
     val textMeasurer = rememberTextMeasurer()
-    val labelStyle = TextStyle(fontSize = 10.sp, color = Color.Gray)
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Normal,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 
     var chartWidth by remember { mutableFloatStateOf(0f) }
 
@@ -479,14 +483,13 @@ private fun StatItem(
     Column {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = TabularFigures),
             color = valueColor
         )
     }

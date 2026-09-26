@@ -7,7 +7,7 @@
 
     <!-- Background circle -->
     <path
-        android:fillColor="#FFFF7500"
+        android:fillColor="#FFFF6600"
         android:pathData="M24,24m-24,0a24,24 0,1 1,48 0a24,24 0,1 1,-48 0"/>
 
     <!-- Monero M shape -->

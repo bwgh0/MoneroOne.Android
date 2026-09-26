@@ -18,7 +18,7 @@
             android:id="@+id/price_logo"
             android:layout_width="28dp"
             android:layout_height="28dp"
-            android:src="@drawable/monero_logo"
+            android:src="@drawable/monero_mark"
             android:scaleType="centerCrop"
             android:importantForAccessibility="no" />
 
@@ -98,7 +98,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="24h"
-            android:textColor="#FF7500"
+            android:textColor="#FF6600"
             android:textSize="10sp"
             android:textStyle="bold"
             android:background="@drawable/widget_badge_orange"

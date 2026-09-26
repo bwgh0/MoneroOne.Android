@@ -21,14 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -62,6 +58,10 @@ import one.monero.moneroone.core.wallet.SeedType
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroLogo
+import one.monero.moneroone.ui.components.PrimaryButton
+import one.monero.moneroone.ui.components.TintedButton
+import one.monero.moneroone.ui.theme.MonoFamily
+import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.WarningYellow
 
@@ -105,7 +105,7 @@ fun CreateWalletScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Create Wallet") },
+                title = { Text("Create Wallet", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = {
                         if (currentStep > 0) currentStep-- else onBack()
@@ -139,7 +139,7 @@ fun CreateWalletScreen(
                         modifier = Modifier
                             .size(if (step == currentStep) 12.dp else 8.dp)
                             .background(
-                                color = if (step <= currentStep) MoneroOrange else Color.Gray.copy(alpha = 0.3f),
+                                color = if (step <= currentStep) MoneroOrange else MoneroTheme.colors.gray.copy(alpha = 0.3f),
                                 shape = RoundedCornerShape(50)
                             )
                     )
@@ -194,6 +194,9 @@ fun CreateWalletScreen(
                     }
                 }
             }
+
+            // Room under the last button so its capsule and shadow clear the edge.
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -249,9 +252,12 @@ private fun SeedDisplay(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Seed words grid
+        // Seed words grid (iOS: fill container, radius 16, elevated cells)
         GlassCard(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = 16.dp,
+            shadow = false,
+            color = MaterialTheme.colorScheme.surfaceVariant
         ) {
             FlowRow(
                 modifier = Modifier
@@ -271,43 +277,27 @@ private fun SeedDisplay(
         // Copy seed button
         val clipboardManager = LocalClipboardManager.current
         var copied by remember { mutableStateOf(false) }
-        OutlinedButton(
+        TintedButton(
             onClick = {
                 clipboardManager.setText(AnnotatedString(seed.joinToString(" ")))
                 copied = true
-            },
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, MoneroOrange),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MoneroOrange)
+            }
         ) {
             Icon(
                 if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                if (copied) "Copied!" else "Copy to Clipboard",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium
-            )
+            Text(if (copied) "Copied!" else "Copy to Clipboard")
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
+        PrimaryButton(
             onClick = onContinue,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MoneroOrange,
-                contentColor = Color.White
-            )
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue", style = MaterialTheme.typography.titleMedium)
+            Text("Continue")
         }
     }
 }
@@ -362,18 +352,11 @@ private fun ScreenReaderSeedWarning(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
+        PrimaryButton(
             onClick = onReveal,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MoneroOrange,
-                contentColor = Color.White
-            )
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Show Seed Phrase", style = MaterialTheme.typography.titleMedium)
+            Text("Show Seed Phrase")
         }
     }
 }
@@ -385,7 +368,7 @@ private fun SeedWordChip(
 ) {
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
         shape = RoundedCornerShape(8.dp)
     ) {
@@ -396,12 +379,13 @@ private fun SeedWordChip(
             Text(
                 text = "$number.",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = word,
                 style = MaterialTheme.typography.bodyMedium,
+                fontFamily = MonoFamily,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -430,7 +414,7 @@ private fun SeedConfirmation(
         Text(
             text = "Please confirm that you have safely stored your seed phrase.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
@@ -456,7 +440,7 @@ private fun SeedConfirmation(
                         .then(
                             if (!confirmChecked) {
                                 Modifier.background(
-                                    color = Color.Gray.copy(alpha = 0.2f),
+                                    color = MoneroTheme.colors.gray.copy(alpha = 0.2f),
                                     shape = RoundedCornerShape(6.dp)
                                 )
                             } else Modifier
@@ -482,20 +466,12 @@ private fun SeedConfirmation(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Button(
+        PrimaryButton(
             onClick = onConfirmed,
             enabled = confirmChecked,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MoneroOrange,
-                contentColor = Color.White,
-                disabledContainerColor = MoneroOrange.copy(alpha = 0.4f)
-            )
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Create Wallet", style = MaterialTheme.typography.titleMedium)
+            Text("Create Wallet")
         }
     }
 }

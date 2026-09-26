@@ -48,11 +48,9 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,16 +64,12 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import one.monero.moneroone.R
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.PrimaryButton
-import one.monero.moneroone.ui.components.SecondaryButton
+import one.monero.moneroone.ui.theme.MonoCaption
+import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.SettingsGreen
 
 private const val DONATION_ADDRESS = "86AWuSFkMKCNp4e7dWho3CBvFpvAzj8hnZNWM9fedD5LKb2mXVfnmH9XuDD9zYqzzR6LAFxUSsdGTVUDABzcgjMfFVfBHpP"
 private const val SUGGESTED_DONATION_AMOUNT = "0.25"
-
-// Gradient colors for heart icon and Send button (pink -> orange -> yellow)
-private val GradientPink = Color(0xFFFF2D55)
-private val GradientOrange = Color(0xFFFF9500)
-private val GradientYellow = Color(0xFFFFCC00)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,10 +87,6 @@ fun DonationScreen(
         }
     }
 
-    val donationGradient = Brush.horizontalGradient(
-        colors = listOf(GradientPink, GradientOrange, GradientYellow)
-    )
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp),
@@ -105,7 +95,7 @@ fun DonationScreen(
                 title = {
                     Text(
                         text = "Donate XMR",
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleMedium
                     )
                 },
                 navigationIcon = {
@@ -130,11 +120,11 @@ fun DonationScreen(
         ) {
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Heart icon with gradient
+            // Heart in the brand orange, as on iOS
             Icon(
                 imageVector = Icons.Default.Favorite,
                 contentDescription = null,
-                tint = GradientPink,
+                tint = MoneroOrange,
                 modifier = Modifier.size(48.dp)
             )
 
@@ -151,7 +141,7 @@ fun DonationScreen(
             Text(
                 text = "If you enjoy MoneroOne, consider donating to support continued development.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
@@ -188,24 +178,25 @@ fun DonationScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Address display
+            // Address display: iOS radius-12 card on the fill
             GlassCard(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 12.dp,
+                shadow = false,
+                color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
                         text = "Monero Address",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = DONATION_ADDRESS,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
+                        style = MonoCaption,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                         lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
@@ -220,8 +211,8 @@ fun DonationScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Copy button
-                SecondaryButton(
+                // Copy: glass with a label-color title, green once copied (iOS)
+                PrimaryButton(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("Donation Address", DONATION_ADDRESS)
@@ -229,61 +220,30 @@ fun DonationScreen(
                         copied = true
                         Toast.makeText(context, "Address copied", Toast.LENGTH_SHORT).show()
                     },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    borderColor = MaterialTheme.colorScheme.outline
+                    modifier = Modifier.weight(1f),
+                    contentColor = if (copied) SettingsGreen else MaterialTheme.colorScheme.onSurface
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = if (copied) SettingsGreen else MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (copied) "Copied!" else "Copy",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (copied) SettingsGreen else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    Icon(
+                        imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(text = if (copied) "Copied!" else "Copy")
                 }
 
-                // Send XMR button with gradient colors
+                // Send XMR: glass with the brand label (iOS)
                 PrimaryButton(
                     onClick = {
                         onSendXmr(DONATION_ADDRESS, SUGGESTED_DONATION_AMOUNT)
                     },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    color = GradientOrange
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Send XMR",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(text = "Send XMR")
                 }
             }
 
@@ -335,7 +295,7 @@ private fun addMoneroLogoOverlay(qrBitmap: Bitmap, context: Context): Bitmap {
     canvas.drawCircle(centerX, centerY, logoSize / 2f + 4f, bgPaint)
 
     // Render slightly larger than clip to cover corner padding, then circle-clip
-    val logoDrawable = ContextCompat.getDrawable(context, R.drawable.monero_logo) ?: return result
+    val logoDrawable = ContextCompat.getDrawable(context, R.drawable.monero_mark) ?: return result
     val imgSize = (logoSize * 1.03f).toInt()
     val logoBitmap = logoDrawable.toBitmap(imgSize, imgSize, Bitmap.Config.ARGB_8888)
 

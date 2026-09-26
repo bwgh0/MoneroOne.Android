@@ -15,7 +15,7 @@ object WidgetUtils {
         val density = context.resources.displayMetrics.density
         val sizePx = (sizeDp * density).toInt()
 
-        val drawable = ContextCompat.getDrawable(context, R.drawable.monero_logo) ?: return Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val drawable = ContextCompat.getDrawable(context, R.drawable.monero_mark) ?: return Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
 
         // Draw source bitmap
         val src = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)

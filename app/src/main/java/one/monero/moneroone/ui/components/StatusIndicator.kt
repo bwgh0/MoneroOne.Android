@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.SyncState
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.PendingOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
 
@@ -145,7 +146,7 @@ private fun ConnectionStepIndicator(
                 if (i > 0) {
                     // Connecting line between dots
                     val lineColor = if (i <= currentStage) MoneroOrange
-                        else Color.Gray.copy(alpha = 0.3f)
+                        else MoneroTheme.colors.gray.copy(alpha = 0.3f)
                     Box(
                         modifier = Modifier
                             .width(12.dp)
@@ -173,7 +174,7 @@ private fun ConnectionStepIndicator(
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .border(1.5.dp, Color.Gray.copy(alpha = 0.4f), CircleShape)
+                                .border(1.5.dp, MoneroTheme.colors.gray.copy(alpha = 0.4f), CircleShape)
                         )
                     }
                 }
@@ -186,7 +187,7 @@ private fun ConnectionStepIndicator(
         Text(
             text = statusText,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
