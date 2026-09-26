@@ -114,10 +114,8 @@ fun SecurityScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
         // Authentication Section
-        SectionLabel("Authentication")
+        SettingsSectionHeader("Authentication")
 
         GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
         Column {
@@ -202,10 +200,8 @@ fun SecurityScreen(
         }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Auto-Lock Section
-        SectionLabel("Auto-Lock")
+        SettingsSectionHeader("Auto-Lock")
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
@@ -264,17 +260,6 @@ fun SecurityScreen(
             onDismiss = { showAutoLockDialog = false }
         )
     }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-    )
 }
 
 @Composable

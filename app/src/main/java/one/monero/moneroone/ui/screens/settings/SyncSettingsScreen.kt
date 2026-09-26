@@ -115,10 +115,8 @@ fun SyncSettingsScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
         // Sync Status Section
-        SectionLabel("Status")
+        SettingsSectionHeader("Status")
 
         GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
             Column(
@@ -172,10 +170,8 @@ fun SyncSettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Background Sync Section
-        SectionLabel("Background Sync")
+        SettingsSectionHeader("Background Sync")
 
         GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
             Row(
@@ -223,10 +219,8 @@ fun SyncSettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Restore Height Section
-        SectionLabel("Wallet Birthday")
+        SettingsSectionHeader("Wallet Birthday")
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
@@ -277,10 +271,8 @@ fun SyncSettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Node Settings Section
-        SectionLabel("Node")
+        SettingsSectionHeader("Node")
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
@@ -370,17 +362,6 @@ fun SyncSettingsScreen(
             DatePicker(state = datePickerState)
         }
     }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-    )
 }
 
 private fun getSyncStatusText(syncState: SyncState): String {

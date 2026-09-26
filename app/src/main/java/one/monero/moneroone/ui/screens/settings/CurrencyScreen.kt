@@ -109,16 +109,8 @@ fun CurrencyScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
         // Current Price section
-        Text(
-            text = "Current Price",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-        )
+        SettingsSectionHeader("Current Price")
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),

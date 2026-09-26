@@ -254,10 +254,8 @@ fun NodeSettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Default Nodes
-        SectionLabel("Default Nodes")
+        SettingsSectionHeader("Default Nodes")
 
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -287,23 +285,19 @@ fun NodeSettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Custom Nodes
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SectionLabel("Custom Nodes")
-            IconButton(onClick = { showAddNodeDialog = true }) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Node",
-                    tint = MoneroOrange
-                )
+        SettingsSectionHeader(
+            title = "Custom Nodes",
+            trailing = {
+                IconButton(onClick = { showAddNodeDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add Node",
+                        tint = MoneroOrange
+                    )
+                }
             }
-        }
+        )
 
         if (customNodes.isEmpty()) {
             GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
@@ -421,17 +415,6 @@ fun NodeSettingsScreen(
             onDismiss = { editingNode = null }
         )
     }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-    )
 }
 
 @Composable
