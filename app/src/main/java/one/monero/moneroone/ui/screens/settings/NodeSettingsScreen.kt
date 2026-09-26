@@ -75,6 +75,7 @@ import one.monero.moneroone.core.node.validateNodeCredentials
 import one.monero.moneroone.core.wallet.DefaultNodes
 import one.monero.moneroone.core.wallet.SecurePrefs
 import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroSwitch
 import one.monero.moneroone.ui.components.MoneroTextField
@@ -253,10 +254,8 @@ fun NodeSettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Default Nodes
-        SectionLabel("Default Nodes")
+        SettingsSectionHeader("Default Nodes")
 
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -286,23 +285,19 @@ fun NodeSettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Custom Nodes
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SectionLabel("Custom Nodes")
-            IconButton(onClick = { showAddNodeDialog = true }) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Node",
-                    tint = MoneroOrange
-                )
+        SettingsSectionHeader(
+            title = "Custom Nodes",
+            trailing = {
+                IconButton(onClick = { showAddNodeDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add Node",
+                        tint = MoneroOrange
+                    )
+                }
             }
-        }
+        )
 
         if (customNodes.isEmpty()) {
             GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
@@ -420,17 +415,6 @@ fun NodeSettingsScreen(
             onDismiss = { editingNode = null }
         )
     }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-    )
 }
 
 @Composable
@@ -687,7 +671,8 @@ private fun NodeDialog(
                         colors = fieldColors,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    // Twice the label gap, so the Password label reads with its own field.
+                    Spacer(modifier = Modifier.height(16.dp))
                     MoneroTextField(
                         value = password,
                         onValueChange = {
@@ -754,7 +739,7 @@ private fun NodeDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            DismissTextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }

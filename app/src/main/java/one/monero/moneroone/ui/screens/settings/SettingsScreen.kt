@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,10 +55,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.BuildConfig
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroSwitch
 import one.monero.moneroone.ui.theme.ErrorRed
@@ -108,8 +109,6 @@ fun SettingsScreen(
             style = MaterialTheme.typography.headlineLarge
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Wallet Section
         SettingsSection(title = "Wallet") {
             SettingsItem(
@@ -129,8 +128,6 @@ fun SettingsScreen(
                 iconColor = SettingsBlue
             )
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
 
         // Display Section
         SettingsSection(title = "Display") {
@@ -177,8 +174,6 @@ fun SettingsScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Sync Section
         SettingsSection(title = "Sync") {
             SettingsItem(
@@ -190,8 +185,6 @@ fun SettingsScreen(
                 showDivider = false
             )
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
 
         // About Section
         SettingsSection(title = "About") {
@@ -217,8 +210,6 @@ fun SettingsScreen(
 
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Help & Feedback
         SettingsSection(title = "Help & Feedback") {
             SettingsItem(
@@ -228,7 +219,7 @@ fun SettingsScreen(
                 onClick = {
                     val intent = Intent(Intent.ACTION_SENDTO).apply {
                         data = Uri.parse("mailto:android_support@monero.one")
-                        putExtra(Intent.EXTRA_SUBJECT, "MoneroOne Android - Feedback")
+                        putExtra(Intent.EXTRA_SUBJECT, "Monero One Android - Feedback")
                     }
                     try { context.startActivity(intent) } catch (_: Exception) {}
                 },
@@ -237,8 +228,6 @@ fun SettingsScreen(
             )
 
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
 
         // Support Section
         SettingsSection(title = "Support the Developer") {
@@ -251,8 +240,6 @@ fun SettingsScreen(
                 showDivider = false
             )
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
 
         // Danger Zone: destructive rows keep their tile colors (Reset Sync is
         // brand, Remove is red) and show red titles, as on iOS.
@@ -308,7 +295,7 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
+                DismissTextButton(onClick = { showDeleteDialog = false }) {
                     Text("Cancel")
                 }
             }
@@ -343,7 +330,7 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResetSyncDialog = false }) {
+                DismissTextButton(onClick = { showResetSyncDialog = false }) {
                     Text("Cancel")
                 }
             }
@@ -352,22 +339,57 @@ fun SettingsScreen(
 
 }
 
+/** Space above a section header (tokens.json space.named.sectionAbove). */
+private val SectionAbove = 24.dp
+
+/** Section header to its card (tokens.json space.named.sectionBelow). */
+private val SectionBelow = 12.dp
+
 /**
- * A settings group as on iOS: a title-case section header in the secondary
- * color, then one radius-16 card holding the rows, separated by inset hairlines.
+ * A settings section header as on iOS: title case, the headline role in the
+ * secondary label color, inset to the row text, 24 above and 12 to its card
+ * (tokens.json space.named). Every settings page uses it, so the rhythm lives
+ * here and the pages add no spacers of their own. [trailing] (an Add button)
+ * is centered on the title line and adds no height, so the gaps hold.
  */
 @Composable
-private fun SettingsSection(
+internal fun SettingsSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = SectionAbove, bottom = SectionBelow)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        if (trailing != null) {
+            Box(
+                modifier = Modifier.matchParentSize(),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Box(modifier = Modifier.wrapContentHeight(unbounded = true)) { trailing() }
+            }
+        }
+    }
+}
+
+/**
+ * A settings group as on iOS: a [SettingsSectionHeader], then one radius-16
+ * card holding the rows, separated by inset hairlines.
+ */
+@Composable
+internal fun SettingsSection(
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-    )
+    SettingsSectionHeader(title)
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
         cornerRadius = 16.dp,

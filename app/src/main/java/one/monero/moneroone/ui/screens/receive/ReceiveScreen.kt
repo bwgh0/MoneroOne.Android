@@ -87,6 +87,7 @@ import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.truncateMiddle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -353,7 +354,7 @@ fun ReceiveScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (address.length > 20) "${address.take(12)}...${address.takeLast(8)}"
+                            text = if (address.length > 20) truncateMiddle(address)
                                 else address.ifBlank { if (keysUnavailable) "" else "Loading..." },
                             style = MonoCaption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -390,7 +391,7 @@ fun ReceiveScreen(
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Copy", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Copy", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
 
@@ -407,7 +408,7 @@ fun ReceiveScreen(
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, tint = MoneroOrange, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Share", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = MoneroOrange)
+                        Text("Share", style = MaterialTheme.typography.labelLarge, color = MoneroOrange)
                     }
                 }
             }

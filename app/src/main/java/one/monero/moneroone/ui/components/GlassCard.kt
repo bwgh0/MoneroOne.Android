@@ -29,14 +29,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import one.monero.moneroone.ui.theme.GradientOrangeEnd
-import one.monero.moneroone.ui.theme.GradientOrangeStart
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroOrangePressed
 import one.monero.moneroone.ui.theme.MoneroTheme
@@ -92,9 +89,13 @@ fun Modifier.raisedShadow(shape: Shape): Modifier =
     }
 
 /**
- * The floating tab bar elevation, iOS `0 10 30 rgba(0,0,0,0.12)` (tokens.json
- * elevation.float). On the black dark-mode page a shadow cannot show, so it
- * is drawn in light mode only.
+ * The floating tab bar elevation (tokens.json elevation.float): iOS
+ * `0 10 30 rgba(0,0,0,0.12)` in light mode and `0 10 30 rgba(0,0,0,0.5)` in
+ * dark mode. The float is the one elevation that keeps a shadow in dark mode.
+ * Dark asks for about four times the light strength; Android caps a shadow at
+ * the theme's shadow alphas, so dark mode draws its colors at full black, the
+ * darkest the platform shadow goes. On the black page it cannot show; it shows
+ * only over lighter content.
  */
 @Composable
 fun Modifier.floatShadow(shape: Shape): Modifier =
@@ -107,7 +108,13 @@ fun Modifier.floatShadow(shape: Shape): Modifier =
             spotColor = Color.Black.copy(alpha = 0.30f)
         )
     } else {
-        this
+        this.shadow(
+            elevation = 16.dp,
+            shape = shape,
+            clip = false,
+            ambientColor = Color.Black,
+            spotColor = Color.Black
+        )
     }
 
 /**
@@ -204,48 +211,6 @@ fun GlassButton(
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center,
-        content = content
-    )
-}
-
-/**
- * Gradient card for balance display with orange gradient
- */
-@Composable
-fun GradientCard(
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-    cornerRadius: Dp = 20.dp,
-    colors: List<Color> = listOf(GradientOrangeStart, GradientOrangeEnd),
-    content: @Composable BoxScope.() -> Unit
-) {
-    val shape = RoundedCornerShape(cornerRadius)
-    val interactionSource = remember { MutableInteractionSource() }
-    val scale = pressScale(interactionSource, enabled = onClick != null)
-
-    val baseModifier = modifier
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-        .shadow(8.dp, shape, clip = false)
-        .clip(shape)
-        .background(
-            brush = Brush.linearGradient(colors = colors)
-        )
-
-    val finalModifier = if (onClick != null) {
-        baseModifier.clickable(
-            interactionSource = interactionSource,
-            indication = ripple(color = Color.White),
-            onClick = onClick
-        )
-    } else {
-        baseModifier
-    }
-
-    Box(
-        modifier = finalModifier,
         content = content
     )
 }

@@ -104,6 +104,7 @@ import one.monero.moneroone.core.wallet.SendState
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.AuthGateDialog
 import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroTextField
@@ -115,6 +116,7 @@ import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.TabularFigures
 import one.monero.moneroone.ui.theme.WarningYellow
+import one.monero.moneroone.ui.theme.truncateMiddle
 
 private enum class SendPhase { ADDRESS, AMOUNT, REVIEW, SENDING, SUCCESS, ERROR }
 
@@ -216,7 +218,7 @@ fun SendScreen(
                     Text(
                         text = when (phase) {
                             SendPhase.ADDRESS -> "Send XMR"
-                            SendPhase.AMOUNT -> if (address.length > 20) "Send to ${address.take(8)}...${address.takeLast(4)}" else "Amount"
+                            SendPhase.AMOUNT -> if (address.length > 20) "Send to ${truncateMiddle(address)}" else "Amount"
                             SendPhase.REVIEW -> "Review"
                             else -> ""
                         },
@@ -855,7 +857,7 @@ private fun ReviewPhase(
                     Column {
                         Text("Recipient", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            text = address.take(12) + "..." + address.takeLast(8),
+                            text = truncateMiddle(address),
                             style = MonoCaption,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1132,7 +1134,7 @@ private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Text(
-                        text = if (copied) "Copied!" else txHash.take(10) + "..." + txHash.takeLast(6),
+                        text = if (copied) "Copied!" else truncateMiddle(txHash),
                         style = MonoCaption,
                         color = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)
@@ -1199,13 +1201,8 @@ private fun ErrorPhase(message: String, onRetry: () -> Unit, onClose: () -> Unit
                 Text("Retry")
             }
             Spacer(modifier = Modifier.height(12.dp))
-            TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Close",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            DismissTextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+                Text("Close")
             }
         }
     }
@@ -1256,6 +1253,10 @@ private fun NumericKeypad(onKey: (String) -> Unit) {
     }
 }
 
+/** Share of the circle each GradientSpinner ring draws (tokens.json motion.loops). */
+private const val SpinnerOuterTrim = 0.7f
+private const val SpinnerInnerTrim = 0.4f
+
 @Composable
 private fun GradientSpinner() {
     val infiniteTransition = rememberInfiniteTransition(label = "spinner")
@@ -1301,7 +1302,7 @@ private fun GradientSpinner() {
                             )
                         ),
                         startAngle = 0f,
-                        sweepAngle = 270f,
+                        sweepAngle = SpinnerOuterTrim * 360f,
                         useCenter = false,
                         style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
                     )
@@ -1323,7 +1324,7 @@ private fun GradientSpinner() {
                             )
                         ),
                         startAngle = 0f,
-                        sweepAngle = 270f,
+                        sweepAngle = SpinnerInnerTrim * 360f,
                         useCenter = false,
                         style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                     )

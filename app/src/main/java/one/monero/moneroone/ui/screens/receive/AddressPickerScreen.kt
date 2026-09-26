@@ -48,7 +48,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.data.Subaddress
 import one.monero.moneroone.core.wallet.WalletViewModel
@@ -59,6 +58,7 @@ import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.WarningYellow
+import one.monero.moneroone.ui.theme.truncateMiddle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -243,12 +243,12 @@ private fun MainAddressCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // The full main address, wrapped rather than cut: this card shows
+            // all of it, so no end of it may be hidden on a narrow screen.
             Text(
                 text = address.ifBlank { "Loading..." },
                 style = MonoCaption,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -321,11 +321,10 @@ private fun SubaddressCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = subaddress.address,
+                    text = truncateMiddle(subaddress.address),
                     style = MonoCaption,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 1
                 )
             }
 

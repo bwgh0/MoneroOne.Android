@@ -58,6 +58,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.KeypadKey
 import one.monero.moneroone.ui.components.MoneroLogo
@@ -180,7 +181,7 @@ fun UnlockScreen(
         )
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock MoneroOne")
+            .setTitle("Unlock Monero One")
             .setSubtitle("Use biometrics to unlock your wallet")
             .setNegativeButtonText("Use PIN")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
@@ -306,7 +307,7 @@ fun UnlockScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
+                DismissTextButton(onClick = { showResetDialog = false }) {
                     Text("Cancel")
                 }
             }

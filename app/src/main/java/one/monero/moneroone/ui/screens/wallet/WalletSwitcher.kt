@@ -74,6 +74,7 @@ import one.monero.moneroone.core.wallet.SeedValidation
 import one.monero.moneroone.core.wallet.WalletInfo
 import one.monero.moneroone.ui.components.CapsuleShape
 import one.monero.moneroone.ui.components.CellFill
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.components.PrimaryButton
@@ -85,6 +86,7 @@ import one.monero.moneroone.ui.theme.MonoFamily
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SuccessGreen
+import one.monero.moneroone.ui.theme.truncateMiddle
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -306,7 +308,7 @@ fun WalletManagerRows(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deleteCandidate = null }) { Text("Cancel") }
+                DismissTextButton(onClick = { deleteCandidate = null }) { Text("Cancel") }
             }
         )
     }
@@ -445,7 +447,7 @@ private fun WalletRow(
                     wallet.cachedPrimaryAddress?.takeIf { SeedValidation.isPlausiblePrimaryAddress(it) }?.let { address ->
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "${address.take(8)}…${address.takeLast(8)}",
+                            text = truncateMiddle(address),
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = MonoFamily,
                             fontWeight = FontWeight.Normal,

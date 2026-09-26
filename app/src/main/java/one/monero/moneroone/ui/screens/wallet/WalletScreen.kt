@@ -5,10 +5,14 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -103,6 +107,9 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+/** Banner slide and fade (tokens.json motion.curves.banner). */
+private const val BannerMs = 350
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletScreen(
@@ -181,9 +188,18 @@ fun WalletScreen(
     ) {
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
-        // Offline banner
+        // Offline banner: slides down from the top and fades in, and leaves
+        // the same way (tokens.json motion.curves.banner, tween 350). Its
+        // slot grows and shrinks on the same tween, so the dashboard below
+        // moves with it instead of jumping, as SwiftUI does on iOS.
         item {
-            AnimatedVisibility(visible = !isOnline) {
+            AnimatedVisibility(
+                visible = !isOnline,
+                enter = slideInVertically(tween(BannerMs)) { -it } + fadeIn(tween(BannerMs)) +
+                    expandVertically(tween(BannerMs), expandFrom = Alignment.Top),
+                exit = slideOutVertically(tween(BannerMs)) { -it } + fadeOut(tween(BannerMs)) +
+                    shrinkVertically(tween(BannerMs), shrinkTowards = Alignment.Top)
+            ) {
                 // Offline is a neutral state, not an error: gray tint, label text.
                 val gray = MoneroTheme.colors.gray
                 Row(

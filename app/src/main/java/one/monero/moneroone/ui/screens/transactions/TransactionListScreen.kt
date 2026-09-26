@@ -297,7 +297,7 @@ private fun TransactionListItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    StatusDot(color = statusColor, size = 6.dp)
+                    StatusDot(color = statusColor)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = when (status) {

@@ -33,7 +33,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroSwitch
 import one.monero.moneroone.ui.theme.MoneroOrange
@@ -114,10 +114,8 @@ fun SecurityScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
         // Authentication Section
-        SectionLabel("Authentication")
+        SettingsSectionHeader("Authentication")
 
         GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
         Column {
@@ -202,10 +200,8 @@ fun SecurityScreen(
         }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
         // Auto-Lock Section
-        SectionLabel("Auto-Lock")
+        SettingsSectionHeader("Auto-Lock")
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
@@ -264,17 +260,6 @@ fun SecurityScreen(
             onDismiss = { showAutoLockDialog = false }
         )
     }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-    )
 }
 
 @Composable
@@ -347,7 +332,7 @@ private fun AutoLockDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            DismissTextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }
