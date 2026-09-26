@@ -2,6 +2,8 @@ package one.monero.moneroone.ui.screens.settings
 
 import android.content.Context
 import androidx.biometric.BiometricManager
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,12 +26,12 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,7 +47,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.MoneroSwitch
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
+import one.monero.moneroone.ui.theme.SettingsBlue
 import one.monero.moneroone.ui.theme.WarningYellow
 
 enum class AutoLockTimeout(val label: String, val seconds: Int) {
@@ -84,6 +89,7 @@ fun SecurityScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MoneroTheme.colors.bgGrouped)
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
@@ -104,17 +110,17 @@ fun SecurityScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Security",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineSmall
             )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         // Authentication Section
-        SectionLabel("AUTHENTICATION")
+        SectionLabel("Authentication")
 
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
+        Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -124,7 +130,7 @@ fun SecurityScreen(
                 Icon(
                     imageVector = Icons.Default.Fingerprint,
                     contentDescription = null,
-                    tint = if (biometricAvailable) MoneroOrange else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    tint = if (biometricAvailable) SettingsBlue else MoneroTheme.colors.labelTertiary,
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
@@ -133,40 +139,36 @@ fun SecurityScreen(
                         text = "Biometrics",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium,
-                        color = if (biometricAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        color = if (biometricAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = if (biometricAvailable) "Use fingerprint or face to unlock" else "Not available on this device",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Switch(
+                MoneroSwitch(
                     checked = biometricsEnabled,
                     onCheckedChange = { enabled ->
                         biometricsEnabled = enabled
                         prefs.edit().putBoolean("biometrics_enabled", enabled).apply()
                         walletViewModel.setBiometricsEnabled(enabled)
                     },
-                    enabled = biometricAvailable,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = MoneroOrange,
-                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    enabled = biometricAvailable
                 )
             }
-        }
 
-        GlassCard(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onNavigateToChangePin
-        ) {
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 56.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable(onClick = onNavigateToChangePin)
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -187,26 +189,29 @@ fun SecurityScreen(
                     Text(
                         text = "Update your wallet PIN",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    tint = MoneroTheme.colors.labelTertiary,
                     modifier = Modifier.size(20.dp)
                 )
             }
+        }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
         // Auto-Lock Section
-        SectionLabel("AUTO-LOCK")
+        SectionLabel("Auto-Lock")
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            onClick = { showAutoLockDialog = true }
+            onClick = { showAutoLockDialog = true },
+            cornerRadius = 16.dp,
+            shadow = false
         ) {
             Row(
                 modifier = Modifier
@@ -231,13 +236,13 @@ fun SecurityScreen(
                     Text(
                         text = selectedAutoLock.label,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MoneroOrange
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    tint = MoneroTheme.colors.labelTertiary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -265,11 +270,10 @@ fun SecurityScreen(
 private fun SectionLabel(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-        letterSpacing = MaterialTheme.typography.labelMedium.letterSpacing * 1.5f,
-        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
     )
 }
 
@@ -289,7 +293,10 @@ private fun AutoLockDialog(
                 AutoLockTimeout.entries.forEach { timeout ->
                     GlassCard(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = { onSelect(timeout) }
+                        onClick = { onSelect(timeout) },
+                        cornerRadius = 12.dp,
+                        shadow = false,
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Column(
                             modifier = Modifier
@@ -304,7 +311,7 @@ private fun AutoLockDialog(
                                 Text(
                                     text = timeout.label,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = if (timeout == selected) MoneroOrange else MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 if (timeout == selected) {
                                     Icon(
@@ -316,12 +323,22 @@ private fun AutoLockDialog(
                                 }
                             }
                             if (timeout == AutoLockTimeout.NEVER) {
+                                // Yellow marks the glyph only; the text keeps the label color.
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "The wallet stays unlocked until the app is force-closed",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = WarningYellow
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = WarningYellow,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "The wallet stays unlocked until the app is force-closed",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
                         }
                     }

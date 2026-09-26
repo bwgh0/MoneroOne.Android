@@ -29,15 +29,11 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -63,11 +59,9 @@ import androidx.compose.foundation.border
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,10 +72,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.SeedValidation
 import one.monero.moneroone.core.wallet.WalletInfo
+import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.CellFill
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.MoneroTextField
+import one.monero.moneroone.ui.components.PrimaryButton
+import one.monero.moneroone.ui.components.cardShadow
+import one.monero.moneroone.ui.components.moneroTextFieldColors
 import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.theme.ErrorRed
+import one.monero.moneroone.ui.theme.MonoFamily
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SuccessGreen
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -118,10 +120,10 @@ fun WalletSwitcherButton(
     Box(
         modifier = modifier
             .width(74.dp)
-            .shadow(4.dp, RoundedCornerShape(12.dp))
-            .clip(RoundedCornerShape(12.dp))
+            .cardShadow(CapsuleShape)
+            .clip(CapsuleShape)
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.5.dp, ring, RoundedCornerShape(12.dp))
+            .border(1.5.dp, ring, CapsuleShape)
             .clickable(onClick = onToggle)
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center
@@ -133,12 +135,12 @@ fun WalletSwitcherButton(
             Text(text = wallet?.emoji ?: "💰", fontSize = 22.sp)
             Text(
                 text = wallet?.name ?: "Wallet",
-                fontSize = 11.sp,
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.widthIn(max = 66.dp)
             )
         }
@@ -219,7 +221,7 @@ fun WalletManagerRows(
                             scaleX = s
                             scaleY = s
                             shadowElevation = 14.dp.toPx() * lift
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(20.dp)
                         }
                         .pointerInput(index, wallets.size) {
                             detectDragGesturesAfterLongPress(
@@ -286,7 +288,7 @@ fun WalletManagerRows(
                 )
             },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
                         // Double-tap guard: deletion races kit teardown.
                         if (!isDeleting) {
@@ -298,10 +300,9 @@ fun WalletManagerRows(
                             }
                         }
                         deleteCandidate = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                    }
                 ) {
-                    Text("Remove")
+                    Text("Remove", color = ErrorRed)
                 }
             },
             dismissButton = {
@@ -367,7 +368,7 @@ private fun WalletRow(
                 .fillMaxWidth()
                 .offset { IntOffset(animatedOffset.roundToInt(), 0) }
                 .then(
-                    if (isActive) Modifier.border(1.5.dp, MoneroOrange.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                    if (isActive) Modifier.border(1.5.dp, MoneroOrange.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
                     else Modifier
                 )
                 .pointerInput(swipeEnabled, revealPx, dragStartPx) {
@@ -417,7 +418,6 @@ private fun WalletRow(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (isActive) Modifier.background(MoneroOrange.copy(alpha = 0.06f)) else Modifier)
                     .padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -436,8 +436,8 @@ private fun WalletRow(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = balanceText,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
                         color = MoneroOrange,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -447,8 +447,9 @@ private fun WalletRow(
                         Text(
                             text = "${address.take(8)}…${address.takeLast(8)}",
                             style = MaterialTheme.typography.labelSmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            fontFamily = MonoFamily,
+                            fontWeight = FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
                         )
                     }
@@ -458,7 +459,7 @@ private fun WalletRow(
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Rename wallet",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        tint = MoneroTheme.colors.labelTertiary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -511,7 +512,7 @@ private fun AddWalletRow(onClick: () -> Unit) {
                 text = "Add Wallet",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MoneroOrange
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -523,7 +524,7 @@ fun EmojiCircle(emoji: String, size: androidx.compose.ui.unit.Dp) {
         modifier = Modifier
             .size(size)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            .background(CellFill),
         contentAlignment = Alignment.Center
     ) {
         Text(text = emoji, fontSize = (size.value * 0.5f).sp)
@@ -543,9 +544,14 @@ fun RenameWalletSheet(
     var emoji by remember { mutableStateOf(wallet.emoji) }
     var showEmojiPicker by remember { mutableStateOf(false) }
 
+    // Content color is explicit: in dark mode the card color equals the fill
+    // color (#1C1C1E), and Material's contentColorFor would pick the gray
+    // secondary label for it.
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         Column(
             modifier = Modifier
@@ -566,7 +572,7 @@ fun RenameWalletSheet(
                 modifier = Modifier
                     .size(72.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(CellFill)
                     .clickable { showEmojiPicker = !showEmojiPicker },
                 contentAlignment = Alignment.Center
             ) {
@@ -576,7 +582,7 @@ fun RenameWalletSheet(
             Text(
                 text = "Tap to change",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             if (showEmojiPicker) {
@@ -592,35 +598,24 @@ fun RenameWalletSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
+            MoneroTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Wallet name") },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MoneroOrange,
-                    cursorColor = MoneroOrange
-                ),
+                colors = moneroTextFieldColors(containerColor = CellFill),
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Button(
+            PrimaryButton(
                 onClick = { onSave(name.trim(), emoji) },
                 enabled = name.trim().isNotEmpty(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MoneroOrange,
-                    contentColor = androidx.compose.ui.graphics.Color.White,
-                    disabledContainerColor = MoneroOrange.copy(alpha = 0.4f)
-                )
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Save", style = MaterialTheme.typography.titleSmall)
+                Text("Save")
             }
         }
     }
@@ -645,7 +640,7 @@ fun EmojiPickerGrid(
                     .size(36.dp)
                     .clip(CircleShape)
                     .background(
-                        if (candidate == selected) MoneroOrange.copy(alpha = 0.25f)
+                        if (candidate == selected) MoneroOrange.copy(alpha = 0.15f)
                         else androidx.compose.ui.graphics.Color.Transparent
                     )
                     .clickable { onSelect(candidate) },

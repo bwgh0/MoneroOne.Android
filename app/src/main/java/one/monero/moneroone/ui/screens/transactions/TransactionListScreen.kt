@@ -32,8 +32,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -53,10 +51,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.model.TransactionInfo
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.CapsuleShape
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.components.StatusDot
 import one.monero.moneroone.ui.components.TransactionStatus
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.PendingOrange
 import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.ErrorRed
@@ -108,7 +109,7 @@ fun TransactionListScreen(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("All Transactions") },
+                title = { Text("All Transactions", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -128,7 +129,7 @@ fun TransactionListScreen(
                 .padding(horizontal = 16.dp)
         ) {
             // Search bar
-            OutlinedTextField(
+            MoneroTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = { Text("Search by transaction ID...") },
@@ -140,11 +141,6 @@ fun TransactionListScreen(
                     )
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MoneroOrange,
-                    cursorColor = MoneroOrange
-                ),
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -156,13 +152,18 @@ fun TransactionListScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TransactionFilter.entries.forEach { filter ->
+                    // Chips: capsules, the selected one tinted in the brand hue.
                     FilterChip(
                         selected = selectedFilter == filter,
                         onClick = { selectedFilter = filter },
-                        label = { Text(filter.label) },
+                        label = { Text(filter.label, fontWeight = FontWeight.SemiBold) },
+                        shape = CapsuleShape,
+                        border = null,
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MoneroOrange,
-                            selectedLabelColor = Color.White
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            labelColor = MaterialTheme.colorScheme.onSurface,
+                            selectedContainerColor = MoneroOrange.copy(alpha = 0.15f),
+                            selectedLabelColor = MoneroOrange
                         )
                     )
                 }
@@ -184,14 +185,14 @@ fun TransactionListScreen(
                         Text(
                             text = if (searchQuery.isNotBlank()) "No matching transactions" else "No transactions",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         if (searchQuery.isNotBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "Try a different search term",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -282,7 +283,7 @@ private fun TransactionListItem(
                 Text(
                     text = formatDate(transaction.timestamp * 1000),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -316,7 +317,7 @@ private fun TransactionListItem(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                tint = MoneroTheme.colors.labelTertiary,
                 modifier = Modifier.size(16.dp)
             )
         }

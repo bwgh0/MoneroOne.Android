@@ -3,6 +3,8 @@ package one.monero.moneroone.ui.screens.settings
 import android.app.Activity
 import android.content.Context
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
 
 enum class ThemeOption(
     val title: String,
@@ -83,6 +87,7 @@ fun ThemeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MoneroTheme.colors.bgGrouped)
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
@@ -103,8 +108,7 @@ fun ThemeScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Appearance",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineSmall
             )
         }
 
@@ -113,16 +117,23 @@ fun ThemeScreen(
         Text(
             text = "Choose your preferred app appearance.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            modifier = Modifier.padding(horizontal = 4.dp)
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ThemeOption.entries.forEach { theme ->
+        // One grouped card, as an iOS inset grouped list
+        GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
+        Column {
+            ThemeOption.entries.forEachIndexed { index, theme ->
+                if (index > 0) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+                }
                 ThemeItem(
                     theme = theme,
                     isSelected = theme == selectedTheme,
@@ -136,6 +147,7 @@ fun ThemeScreen(
                 )
             }
         }
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
     }
@@ -147,45 +159,41 @@ private fun ThemeItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Icon(
+            imageVector = theme.icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = theme.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = theme.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        // The check marks the selection; the row text stays in the label color.
+        if (isSelected) {
             Icon(
-                imageVector = theme.icon,
-                contentDescription = null,
-                tint = if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface,
+                imageVector = Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = MoneroOrange,
                 modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = theme.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
-                    color = if (isSelected) MoneroOrange else MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = theme.subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Selected",
-                    tint = MoneroOrange,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
         }
     }
 }

@@ -25,7 +25,7 @@
                 android:id="@+id/price_logo"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/monero_logo"
+                android:src="@drawable/monero_mark"
                 android:scaleType="centerCrop"
                 android:importantForAccessibility="no" />
 

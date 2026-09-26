@@ -1,7 +1,6 @@
 package one.monero.moneroone.ui.components
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -15,27 +14,45 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.R
 
+/**
+ * The official flat Monero mark (vector, #FF6600 / #4C4C4C, white M on its
+ * own white disc so the M stays white on dark surfaces). Every logo in the
+ * app uses it except the Welcome and Add Wallet hero ([MoneroHeroLogo]).
+ */
 @Composable
 fun MoneroLogo(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp
 ) {
-    // Day PNG has no padding around logo; night PNG has ~8.5% transparent
-    // padding. Use a smaller scale on day so the circle clip doesn't cut
-    // into logo content, matching night's visual proportions.
-    val scaleFactor = if (isSystemInDarkTheme()) 1.2f else 1.0f
+    Image(
+        painter = painterResource(id = R.drawable.monero_mark),
+        contentDescription = "Monero",
+        modifier = modifier.size(size)
+    )
+}
+
+/**
+ * Glossy hero art from the iOS app (light and night variants, converted to
+ * sRGB). Hero use only: Welcome and Add Wallet. Like iOS, the art is scaled
+ * 1.15 and clipped to a circle so only the coin shows, not its plate.
+ */
+@Composable
+fun MoneroHeroLogo(
+    modifier: Modifier = Modifier,
+    size: Dp = 120.dp
+) {
     Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
     ) {
         Image(
-            painter = painterResource(id = R.drawable.monero_logo),
+            painter = painterResource(id = R.drawable.monero_hero),
             contentDescription = "Monero",
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .matchParentSize()
-                .scale(scaleFactor)
+                .scale(1.15f)
         )
     }
 }

@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -110,6 +111,7 @@ class PriceAlertWorker(
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
+            .setColor(ContextCompat.getColor(context, R.color.monero_orange))
             .setContentTitle("XMR Price Alert")
             .setContentText("Monero is $conditionText ${format.format(alert.targetPrice)} (now ${format.format(currentPrice)})")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

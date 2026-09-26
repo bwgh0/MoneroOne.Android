@@ -18,7 +18,7 @@
             android:id="@+id/wallet_logo"
             android:layout_width="28dp"
             android:layout_height="28dp"
-            android:src="@drawable/monero_logo"
+            android:src="@drawable/monero_mark"
             android:scaleType="centerCrop"
             android:importantForAccessibility="no" />
 

@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ReplayCircleFilled
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,7 +39,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import one.monero.moneroone.ui.components.MoneroLogo
+import one.monero.moneroone.ui.components.MoneroHeroLogo
+import one.monero.moneroone.ui.components.PrimaryButton
+import one.monero.moneroone.ui.components.ProminentButton
 import one.monero.moneroone.ui.theme.MoneroOrange
 
 @Composable
@@ -53,14 +57,15 @@ fun WelcomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .systemBarsPadding()
+                .padding(horizontal = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Spacer(modifier = Modifier.weight(1f))
 
-            // Monero Logo
-            MoneroLogo(size = 120.dp)
+            // Hero art (the glossy render lives only here and on Add Wallet)
+            MoneroHeroLogo(size = 120.dp)
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -72,53 +77,37 @@ fun WelcomeScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Subtitle
             Text(
                 text = "Simple. Private. Secure.",
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Create Wallet Button
-            Button(
+            // Create Wallet: the one filled button, as on iOS
+            ProminentButton(
                 onClick = onCreateWallet,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MoneroOrange,
-                    contentColor = Color.White
-                )
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "Create New Wallet",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Icon(Icons.Filled.AddCircle, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text(text = "Create New Wallet")
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Restore Wallet Button
-            OutlinedButton(
+            // Restore Wallet: glass with a label-color title, as on iOS
+            PrimaryButton(
                 onClick = onRestoreWallet,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MoneroOrange
-                )
+                modifier = Modifier.fillMaxWidth(),
+                contentColor = MaterialTheme.colorScheme.onSurface
             ) {
-                Text(
-                    text = "Restore Wallet",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Icon(Icons.Filled.ReplayCircleFilled, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text(text = "Restore Wallet")
             }
 
             Spacer(modifier = Modifier.height(32.dp))

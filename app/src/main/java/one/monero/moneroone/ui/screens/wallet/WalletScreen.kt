@@ -35,8 +35,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.NorthEast
+import androidx.compose.material.icons.filled.SouthEast
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Sync
@@ -48,6 +48,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -77,8 +78,10 @@ import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.components.RollingText
+import one.monero.moneroone.ui.components.ShrinkToFitText
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroLogo
+import one.monero.moneroone.ui.components.MoneroRefreshIndicator
 import one.monero.moneroone.ui.components.StatusDot
 import one.monero.moneroone.ui.components.SyncStatus
 import one.monero.moneroone.ui.components.SyncStatusIndicator
@@ -88,6 +91,8 @@ import one.monero.moneroone.ui.components.TransactionStatusIndicator
 import one.monero.moneroone.core.util.NetworkMonitor
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
+import one.monero.moneroone.ui.theme.SystemFill
 import one.monero.moneroone.ui.theme.SuccessGreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -136,8 +141,17 @@ fun WalletScreen(
         "${selectedCurrency.symbol}${fiatFormat.format(fiatAmount)}"
     }
 
+    val refreshState = rememberPullToRefreshState()
     PullToRefreshBox(
         isRefreshing = isRefreshing,
+        state = refreshState,
+        indicator = {
+            MoneroRefreshIndicator(
+                state = refreshState,
+                isRefreshing = isRefreshing,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        },
         onRefresh = {
             scope.launch {
                 isRefreshing = true
@@ -170,26 +184,27 @@ fun WalletScreen(
         // Offline banner
         item {
             AnimatedVisibility(visible = !isOnline) {
+                // Offline is a neutral state, not an error: gray tint, label text.
+                val gray = MoneroTheme.colors.gray
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(ErrorRed)
-                        .padding(12.dp),
+                        .background(gray.copy(alpha = 0.1f))
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Default.WifiOff,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = gray,
                         modifier = Modifier.size(20.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "You're offline. Some features may be unavailable.",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -380,12 +395,16 @@ private fun GreetingHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
+        // largeTitle on one line; like iOS (minimumScaleFactor 0.7) it shrinks,
+        // never below 70%, when a long greeting or a large font scale would
+        // run into the wallet chip.
+        ShrinkToFitText(
             text = greeting,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            modifier = Modifier.padding(end = 12.dp)
+            style = MaterialTheme.typography.headlineLarge,
+            minScale = 0.7f,
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp)
         )
 
         WalletSwitcherButton(
@@ -465,15 +484,14 @@ private fun BalanceCard(
                         // Digits roll on change (iOS .contentTransition(.numericText())).
                         RollingText(
                             text = balance,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontSize = balanceFontSize,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.displaySmall,
+                            fontSize = balanceFontSize
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "XMR",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             softWrap = false,
                             modifier = Modifier.padding(bottom = 4.dp)
@@ -485,7 +503,7 @@ private fun BalanceCard(
                         RollingText(
                             text = fiatValue,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -500,24 +518,24 @@ private fun BalanceCard(
                     Text(
                         text = "Available: ",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = unlockedBalance,
                         style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = " XMR",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (unlockedFiatValue != null) {
                         Text(
                             text = " ($unlockedFiatValue)",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -550,7 +568,7 @@ private fun BalanceCard(
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp)),
                     color = MoneroOrange,
-                    trackColor = MoneroOrange.copy(alpha = 0.3f),
+                    trackColor = SystemFill,
                     strokeCap = StrokeCap.Round
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -561,7 +579,7 @@ private fun BalanceCard(
                         "$pct% synced - ${formatBlockCount(blocks)} blocks remaining"
                     else "$pct% synced",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
                 )
@@ -574,7 +592,7 @@ private fun BalanceCard(
 private fun PriceChangeIndicator(priceChange: Double) {
     val isPositive = priceChange >= 0
     val color = if (isPositive) SuccessGreen else ErrorRed
-    val icon = if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown
+    val icon = if (isPositive) Icons.Default.NorthEast else Icons.Default.SouthEast
     val sign = if (isPositive) "+" else ""
 
     Row(
@@ -593,8 +611,7 @@ private fun PriceChangeIndicator(priceChange: Double) {
         Spacer(modifier = Modifier.width(2.dp))
         Text(
             text = "$sign${String.format("%.2f", priceChange)}%",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.bodySmall,
             color = color
         )
     }
@@ -615,7 +632,7 @@ private fun ActionButton(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 18.dp),
+                .padding(vertical = 14.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -636,8 +653,7 @@ private fun ActionButton(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge,
                 color = color
             )
         }
@@ -664,27 +680,26 @@ private fun EmptyTransactionsCard(isSyncing: Boolean) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "Syncing transactions...",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium
+                    style = MaterialTheme.typography.titleMedium
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "Your transactions will appear here once synced",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
                 )
             } else {
                 Icon(
                     imageVector = Icons.Default.Sync,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(48.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "No transactions yet",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
         }
@@ -740,7 +755,7 @@ private fun TransactionCard(
                 Text(
                     text = formatRelativeTime(transaction.timestamp * 1000),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -770,7 +785,7 @@ private fun TransactionCard(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                tint = MoneroTheme.colors.labelTertiary,
                 modifier = Modifier.size(16.dp)
             )
         }

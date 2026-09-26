@@ -47,14 +47,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.data.Subaddress
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.core.wallet.addressesOf
+import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.CellFill
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.WarningYellow
 
@@ -84,7 +86,7 @@ fun AddressPickerScreen(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
-                title = { Text("Select Address") },
+                title = { Text("Select Address", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -111,6 +113,7 @@ fun AddressPickerScreen(
                     }
                 },
                 modifier = Modifier.alpha(if (canCreate) 1f else DISABLED_ALPHA),
+                shape = CapsuleShape,
                 containerColor = MoneroOrange,
                 contentColor = Color.White
             ) {
@@ -156,10 +159,10 @@ fun AddressPickerScreen(
                 item {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "SUBADDRESSES",
-                        style = MaterialTheme.typography.labelMedium,
+                        text = "Subaddresses",
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
                     )
                 }
@@ -242,9 +245,8 @@ private fun MainAddressCard(
 
             Text(
                 text = address.ifBlank { "Loading..." },
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                style = MonoCaption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -255,7 +257,7 @@ private fun MainAddressCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(WarningYellow.copy(alpha = 0.15f))
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -270,7 +272,7 @@ private fun MainAddressCard(
                 Text(
                     text = "Main address links all transactions. Use subaddresses for privacy.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
@@ -298,7 +300,7 @@ private fun SubaddressCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(CellFill),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -320,9 +322,8 @@ private fun SubaddressCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = subaddress.address,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    style = MonoCaption,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

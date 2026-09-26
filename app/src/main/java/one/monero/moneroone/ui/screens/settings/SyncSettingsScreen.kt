@@ -1,6 +1,7 @@
 package one.monero.moneroone.ui.screens.settings
 
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,8 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -49,7 +48,10 @@ import one.monero.moneroone.core.service.WalletSyncService
 import one.monero.moneroone.core.util.rememberNotificationPermission
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.GlassCard
+import one.monero.moneroone.ui.components.MoneroSwitch
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
+import one.monero.moneroone.ui.theme.SystemFill
 import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.ErrorRed
 import io.horizontalsystems.monerokit.util.RestoreHeight
@@ -88,6 +90,7 @@ fun SyncSettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MoneroTheme.colors.bgGrouped)
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
@@ -108,17 +111,16 @@ fun SyncSettingsScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Sync Settings",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineSmall
             )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         // Sync Status Section
-        SectionLabel("STATUS")
+        SectionLabel("Status")
 
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
             Column(
                 modifier = Modifier.padding(16.dp)
             ) {
@@ -158,13 +160,13 @@ fun SyncSettingsScreen(
                         progress = { progress.toFloat() },
                         modifier = Modifier.fillMaxWidth(),
                         color = MoneroOrange,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        trackColor = SystemFill
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "$progressPct% complete",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -173,9 +175,9 @@ fun SyncSettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // Background Sync Section
-        SectionLabel("BACKGROUND SYNC")
+        SectionLabel("Background Sync")
 
-        GlassCard(modifier = Modifier.fillMaxWidth()) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 16.dp, shadow = false) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -199,11 +201,11 @@ fun SyncSettingsScreen(
                     Text(
                         text = "Keep wallet synced when app is backgrounded",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Switch(
+                MoneroSwitch(
                     checked = backgroundSyncEnabled,
                     onCheckedChange = { enabled ->
                         if (enabled && !hasNotificationPermission) {
@@ -216,11 +218,7 @@ fun SyncSettingsScreen(
                         } else {
                             WalletSyncService.stop(context)
                         }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MoneroOrange,
-                        checkedTrackColor = MoneroOrange.copy(alpha = 0.3f)
-                    )
+                    }
                 )
             }
         }
@@ -228,11 +226,13 @@ fun SyncSettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // Restore Height Section
-        SectionLabel("WALLET BIRTHDAY")
+        SectionLabel("Wallet Birthday")
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            onClick = { showDatePicker = true }
+            onClick = { showDatePicker = true },
+            cornerRadius = 16.dp,
+            shadow = false
         ) {
             Row(
                 modifier = Modifier
@@ -265,13 +265,13 @@ fun SyncSettingsScreen(
                     Text(
                         text = displayText,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MoneroOrange
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    tint = MoneroTheme.colors.labelTertiary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -280,11 +280,13 @@ fun SyncSettingsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // Node Settings Section
-        SectionLabel("NODE")
+        SectionLabel("Node")
 
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            onClick = onNodeSettingsClick
+            onClick = onNodeSettingsClick,
+            cornerRadius = 16.dp,
+            shadow = false
         ) {
             Row(
                 modifier = Modifier
@@ -309,13 +311,13 @@ fun SyncSettingsScreen(
                     Text(
                         text = "Manage remote nodes",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    tint = MoneroTheme.colors.labelTertiary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -374,11 +376,10 @@ fun SyncSettingsScreen(
 private fun SectionLabel(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-        letterSpacing = MaterialTheme.typography.labelMedium.letterSpacing * 1.5f,
-        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
     )
 }
 
@@ -391,6 +392,7 @@ private fun getSyncStatusText(syncState: SyncState): String {
     }
 }
 
+@Composable
 private fun getSyncStatusColor(syncState: SyncState): androidx.compose.ui.graphics.Color {
     return when (syncState) {
         is SyncState.Synced -> SuccessGreen

@@ -1,6 +1,7 @@
 package one.monero.moneroone.ui.screens
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -49,7 +49,10 @@ import one.monero.moneroone.ui.screens.chart.ChartScreen
 import one.monero.moneroone.ui.screens.chart.ChartViewModel
 import one.monero.moneroone.ui.screens.settings.SettingsScreen
 import one.monero.moneroone.ui.screens.wallet.WalletScreen
+import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.floatShadow
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.MoneroTheme
 
 data class BottomNavItem(
     val label: String,
@@ -88,9 +91,22 @@ fun MainScreen(
         BottomNavItem("Chart", Icons.Filled.ShowChart, Icons.Outlined.ShowChart),
         BottomNavItem("Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
     )
+    // The selected pill is the fill color on the white bar. In dark mode the
+    // bar and the fill are both #1C1C1E, so the pill takes the elevated fill.
+    val indicatorColor = if (MoneroTheme.isDark) {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    // Settings is a grouped list: its gray page runs behind the floating bar.
+    val pageColor by animateColorAsState(
+        targetValue = if (selectedTab == 2) MoneroTheme.colors.bgGrouped else MaterialTheme.colorScheme.background,
+        label = "pageColor"
+    )
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = pageColor,
         contentWindowInsets = WindowInsets(0.dp),
         bottomBar = {
             Box(
@@ -99,10 +115,12 @@ fun MainScreen(
                     .windowInsetsPadding(WindowInsets.navigationBars)
             ) {
                 NavigationBar(
-                    modifier = Modifier.clip(RoundedCornerShape(28.dp)),
+                    modifier = Modifier
+                        .floatShadow(CapsuleShape)
+                        .clip(CapsuleShape),
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     contentColor = MaterialTheme.colorScheme.onSurface,
-                    tonalElevation = 3.dp
+                    tonalElevation = 0.dp
                 ) {
                 navItems.forEachIndexed { index, item ->
                     NavigationBarItem(
@@ -117,15 +135,15 @@ fun MainScreen(
                         label = {
                             Text(
                                 text = item.label,
-                                style = MaterialTheme.typography.labelMedium
+                                style = MaterialTheme.typography.labelSmall
                             )
                         },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MoneroOrange,
                             selectedTextColor = MoneroOrange,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            indicatorColor = MoneroOrange.copy(alpha = 0.12f)
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurface,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            indicatorColor = indicatorColor
                         )
                     )
                 }

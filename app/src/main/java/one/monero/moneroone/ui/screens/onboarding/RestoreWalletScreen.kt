@@ -11,22 +11,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,7 +51,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.AddWalletFlowEffect
+import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.components.OnNavEntryEnd
+import one.monero.moneroone.ui.components.PrimaryButton
+import one.monero.moneroone.ui.components.moneroTextFieldColors
 import one.monero.moneroone.ui.theme.MoneroOrange
 import io.horizontalsystems.monerokit.util.RestoreHeight
 import java.text.SimpleDateFormat
@@ -103,7 +101,7 @@ fun RestoreWalletScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Restore Wallet") },
+                title = { Text("Restore Wallet", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = { if (namingStep) namingStep = false else onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -169,7 +167,7 @@ fun RestoreWalletScreen(
             Text(
                 text = "24 words (BIP39) or 25 words (Monero legacy)",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
@@ -179,7 +177,7 @@ fun RestoreWalletScreen(
             // learn the words: a learned word can come back as a suggestion.
             // No KeyboardType.Password, which turns off glide typing.
             NoPersonalizedLearning {
-                OutlinedTextField(
+                MoneroTextField(
                     value = seedPhrase,
                     onValueChange = {
                         seedPhrase = it.lowercase()
@@ -195,11 +193,6 @@ fun RestoreWalletScreen(
                         Text("$wordCount words")
                     },
                     isError = errorMessage != null,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MoneroOrange,
-                        cursorColor = MoneroOrange
-                    ),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.None,
                         autoCorrectEnabled = false,
@@ -212,7 +205,7 @@ fun RestoreWalletScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Restore height input
-            OutlinedTextField(
+            MoneroTextField(
                 value = selectedDate?.let { dateFormatter.format(Date(it)) } ?: "",
                 onValueChange = { },
                 modifier = Modifier
@@ -221,17 +214,8 @@ fun RestoreWalletScreen(
                 label = { Text("Wallet Birthday (Optional)") },
                 placeholder = { Text("Select date when wallet was created") },
                 supportingText = { Text("Leave empty to scan from beginning (slower)") },
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MoneroOrange,
-                    cursorColor = MoneroOrange,
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.outline,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
+                // Disabled only so the whole field takes the click; it reads as enabled.
+                colors = moneroTextFieldColors(disabledTextColor = MaterialTheme.colorScheme.onSurface),
                 trailingIcon = {
                     IconButton(onClick = { showDatePicker = true }) {
                         Icon(
@@ -266,7 +250,7 @@ fun RestoreWalletScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            Button(
+            PrimaryButton(
                 onClick = {
                     val words = seedPhrase.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
                     when {
@@ -283,20 +267,9 @@ fun RestoreWalletScreen(
                     }
                 },
                 enabled = !walletState.isInitializing && seedPhrase.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MoneroOrange,
-                    contentColor = Color.White,
-                    disabledContainerColor = MoneroOrange.copy(alpha = 0.4f)
-                )
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = if (walletState.isInitializing) "Restoring..." else "Continue",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                Text(text = if (walletState.isInitializing) "Restoring..." else "Continue")
             }
 
             Spacer(modifier = Modifier.height(32.dp))

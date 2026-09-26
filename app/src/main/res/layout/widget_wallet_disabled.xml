@@ -12,7 +12,7 @@
         android:id="@+id/wallet_disabled_logo"
         android:layout_width="32dp"
         android:layout_height="32dp"
-        android:src="@drawable/monero_logo"
+        android:src="@drawable/monero_mark"
         android:scaleType="centerCrop"
         android:importantForAccessibility="no" />
 

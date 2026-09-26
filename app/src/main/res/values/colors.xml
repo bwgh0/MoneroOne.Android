@@ -1,26 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Monero Brand Colors -->
-    <color name="monero_orange">#FFFF7500</color>
-    <color name="monero_orange_light">#FFFF9933</color>
-    <color name="monero_orange_dark">#FFCC5C00</color>
+    <!-- Monero brand (monero-one-brand tokens.json color.brand). Compose reads ui/theme. -->
+    <color name="monero_orange">#FFFF6600</color>
+    <!-- Pressed orange; the XML themes use it as colorPrimaryDark. -->
+    <color name="monero_orange_dark">#FFE65C00</color>
 
-    <!-- Status Colors -->
+    <!-- Status colors (light values; Compose switches light/dark in ui/theme) -->
     <color name="success_green">#FF34C759</color>
-    <color name="error_red">#FFFF3B30</color>
+    <color name="error_red">#FFFF383C</color>
     <color name="warning_yellow">#FFFFCC00</color>
 
-
-    <!-- Background Colors -->
+    <!-- Background colors (iOS system neutrals) -->
     <color name="background_light">#FFFFFFFF</color>
-    <color name="background_dark">#FF121212</color>
-    <color name="surface_light">#FFF5F5F5</color>
-    <color name="surface_dark">#FF1E1E1E</color>
+    <color name="background_dark">#FF000000</color>
+    <color name="surface_light">#FFFFFFFF</color>
+    <color name="surface_dark">#FF1C1C1E</color>
 
-    <!-- Glass Effect Colors -->
-    <color name="glass_background_light">#80FFFFFF</color>
-    <color name="glass_background_dark">#40FFFFFF</color>
-
-    <!-- App Icon -->
-    <color name="ic_launcher_background">#FFFFFFFF</color>
 </resources>
