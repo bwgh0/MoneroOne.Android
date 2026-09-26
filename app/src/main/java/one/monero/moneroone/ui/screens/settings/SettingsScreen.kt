@@ -219,7 +219,7 @@ fun SettingsScreen(
                 onClick = {
                     val intent = Intent(Intent.ACTION_SENDTO).apply {
                         data = Uri.parse("mailto:android_support@monero.one")
-                        putExtra(Intent.EXTRA_SUBJECT, "MoneroOne Android - Feedback")
+                        putExtra(Intent.EXTRA_SUBJECT, "Monero One Android - Feedback")
                     }
                     try { context.startActivity(intent) } catch (_: Exception) {}
                 },

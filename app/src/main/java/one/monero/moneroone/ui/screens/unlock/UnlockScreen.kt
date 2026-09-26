@@ -171,7 +171,7 @@ fun UnlockScreen(
         )
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock MoneroOne")
+            .setTitle("Unlock Monero One")
             .setSubtitle("Use biometrics to unlock your wallet")
             .setNegativeButtonText("Use PIN")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)

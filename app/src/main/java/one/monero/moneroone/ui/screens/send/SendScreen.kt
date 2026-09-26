@@ -1253,6 +1253,10 @@ private fun NumericKeypad(onKey: (String) -> Unit) {
     }
 }
 
+/** Share of the circle each GradientSpinner ring draws (tokens.json motion.loops). */
+private const val SpinnerOuterTrim = 0.7f
+private const val SpinnerInnerTrim = 0.4f
+
 @Composable
 private fun GradientSpinner() {
     val infiniteTransition = rememberInfiniteTransition(label = "spinner")
@@ -1298,7 +1302,7 @@ private fun GradientSpinner() {
                             )
                         ),
                         startAngle = 0f,
-                        sweepAngle = 270f,
+                        sweepAngle = SpinnerOuterTrim * 360f,
                         useCenter = false,
                         style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
                     )
@@ -1320,7 +1324,7 @@ private fun GradientSpinner() {
                             )
                         ),
                         startAngle = 0f,
-                        sweepAngle = 270f,
+                        sweepAngle = SpinnerInnerTrim * 360f,
                         useCenter = false,
                         style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                     )

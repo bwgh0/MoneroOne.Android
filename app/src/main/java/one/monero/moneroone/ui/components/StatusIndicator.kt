@@ -78,6 +78,9 @@ private fun syncStateToStage(syncState: SyncState): Pair<Int, String> = when (sy
 
 private const val TOTAL_STEPS = 6
 
+/** Sync and status dots (tokens.json size.statusDot). */
+val StatusDotSize = 8.dp
+
 @Composable
 fun SyncStatusIndicator(
     status: SyncStatus,
@@ -172,7 +175,7 @@ private fun ConnectionStepIndicator(
                     else -> {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(StatusDotSize)
                                 .clip(CircleShape)
                                 .border(1.5.dp, MoneroTheme.colors.gray.copy(alpha = 0.4f), CircleShape)
                         )
@@ -195,7 +198,7 @@ private fun ConnectionStepIndicator(
 @Composable
 private fun PulsingDot(
     color: Color,
-    size: Dp = 8.dp
+    size: Dp = StatusDotSize
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val scale by infiniteTransition.animateFloat(
@@ -246,7 +249,7 @@ fun TransactionStatusIndicator(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        StatusDot(color = color, size = 6.dp)
+        StatusDot(color = color)
         Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = text,
@@ -259,7 +262,7 @@ fun TransactionStatusIndicator(
 @Composable
 fun StatusDot(
     color: Color,
-    size: Dp = 8.dp,
+    size: Dp = StatusDotSize,
     modifier: Modifier = Modifier,
     pulsing: Boolean = false
 ) {

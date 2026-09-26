@@ -92,9 +92,13 @@ fun Modifier.raisedShadow(shape: Shape): Modifier =
     }
 
 /**
- * The floating tab bar elevation, iOS `0 10 30 rgba(0,0,0,0.12)` (tokens.json
- * elevation.float). On the black dark-mode page a shadow cannot show, so it
- * is drawn in light mode only.
+ * The floating tab bar elevation (tokens.json elevation.float): iOS
+ * `0 10 30 rgba(0,0,0,0.12)` in light mode and `0 10 30 rgba(0,0,0,0.5)` in
+ * dark mode. The float is the one elevation that keeps a shadow in dark mode.
+ * Dark asks for about four times the light strength; Android caps a shadow at
+ * the theme's shadow alphas, so dark mode draws its colors at full black, the
+ * darkest the platform shadow goes. On the black page it cannot show; it shows
+ * only over lighter content.
  */
 @Composable
 fun Modifier.floatShadow(shape: Shape): Modifier =
@@ -107,7 +111,13 @@ fun Modifier.floatShadow(shape: Shape): Modifier =
             spotColor = Color.Black.copy(alpha = 0.30f)
         )
     } else {
-        this
+        this.shadow(
+            elevation = 16.dp,
+            shape = shape,
+            clip = false,
+            ambientColor = Color.Black,
+            spotColor = Color.Black
+        )
     }
 
 /**

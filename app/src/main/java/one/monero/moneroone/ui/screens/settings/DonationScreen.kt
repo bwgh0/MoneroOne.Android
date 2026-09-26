@@ -138,7 +138,7 @@ fun DonationScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "If you enjoy MoneroOne, consider donating to support continued development.",
+                text = "If you enjoy Monero One, consider donating to support continued development.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
