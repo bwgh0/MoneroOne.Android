@@ -1,32 +1,51 @@
 package one.monero.moneroone.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchColors
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import one.monero.moneroone.ui.theme.ErrorRed
@@ -146,10 +165,31 @@ fun moneroTextFieldColors(
     )
 }
 
+/** Height of a single-line text field (tokens.json size.fieldHeight). */
+val FieldHeight = 54.dp
+
+/** Field label to field (tokens.json space.named.labelGap); the supporting line keeps the same gap below. */
+private val FieldLabelGap = 8.dp
+
 /**
- * The shared text field: radius 12, fill color, no border, brand caret.
- * Errors show in the label, caret and supporting text, which turn red.
+ * Material lays the input line in a box at least 24dp tall, so 15 above and
+ * below makes a single-line field exactly [FieldHeight]: 15 + 24 + 15. Text
+ * sits 16 from the edges, as on iOS (`.padding()`).
  */
+private val FieldContentPadding = PaddingValues(
+    horizontal = 16.dp,
+    vertical = (FieldHeight - 24.dp) / 2
+)
+
+/**
+ * The shared text field (tokens.json components.field): 54 tall for a single
+ * line, radius 12, fill color, no border, brand caret, body text. The label
+ * sits 8 above the field in subheadline and the secondary label color, never
+ * inside it; supporting text sits 8 below in caption. The modifier sizes the
+ * whole block: a caller's height (the seed phrase box) goes to the field, the
+ * part that grows. Errors turn the label, caret and supporting text red.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoneroTextField(
     value: String,
@@ -175,30 +215,168 @@ fun MoneroTextField(
     interactionSource: MutableInteractionSource? = null,
     colors: TextFieldColors = moneroTextFieldColors()
 ) {
-    TextField(
-        value = value,
-        onValueChange = onValueChange,
+    @Suppress("NAME_SHADOWING")
+    val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    // TextFieldColors resolves its state colors internally; pick them the same way.
+    fun stateColor(focusedColor: Color, unfocusedColor: Color, disabledColor: Color, errorColor: Color) =
+        when {
+            !enabled -> disabledColor
+            isError -> errorColor
+            focused -> focusedColor
+            else -> unfocusedColor
+        }
+    val textColor = textStyle.color.takeOrElse {
+        stateColor(colors.focusedTextColor, colors.unfocusedTextColor, colors.disabledTextColor, colors.errorTextColor)
+    }
+    val labelColor = stateColor(
+        colors.focusedLabelColor, colors.unfocusedLabelColor, colors.disabledLabelColor, colors.errorLabelColor
+    )
+    val supportingColor = stateColor(
+        colors.focusedSupportingTextColor, colors.unfocusedSupportingTextColor,
+        colors.disabledSupportingTextColor, colors.errorSupportingTextColor
+    )
+    val containerColor = stateColor(
+        colors.focusedContainerColor, colors.unfocusedContainerColor,
+        colors.disabledContainerColor, colors.errorContainerColor
+    )
+    val labelStyle = MaterialTheme.typography.bodyMedium
+    val supportingStyle = MaterialTheme.typography.bodySmall
+
+    CompositionLocalProvider(LocalTextSelectionColors provides colors.textSelectionColors) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = modifier
+                .then(if (isError) Modifier.semantics { error("Invalid input") } else Modifier)
+                .defaultMinSize(minWidth = TextFieldDefaults.MinWidth),
+            enabled = enabled,
+            readOnly = readOnly,
+            textStyle = textStyle.merge(TextStyle(color = textColor)),
+            cursorBrush = SolidColor(if (isError) colors.errorCursorColor else colors.cursorColor),
+            visualTransformation = visualTransformation,
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            interactionSource = interactionSource,
+            singleLine = singleLine,
+            maxLines = maxLines,
+            minLines = minLines,
+            decorationBox = { innerTextField ->
+                // The label and the supporting text live inside the text field
+                // node, as Material's do, so TalkBack reads them with it.
+                FieldLayout(
+                    label = label?.let { content ->
+                        {
+                            CompositionLocalProvider(LocalContentColor provides labelColor) {
+                                ProvideTextStyle(labelStyle.copy(color = labelColor), content)
+                            }
+                        }
+                    },
+                    field = {
+                        TextFieldDefaults.DecorationBox(
+                            value = value,
+                            innerTextField = innerTextField,
+                            enabled = enabled,
+                            singleLine = singleLine,
+                            visualTransformation = visualTransformation,
+                            interactionSource = interactionSource,
+                            isError = isError,
+                            placeholder = placeholder,
+                            leadingIcon = leadingIcon,
+                            trailingIcon = trailingIcon,
+                            prefix = prefix,
+                            suffix = suffix,
+                            colors = colors,
+                            contentPadding = FieldContentPadding,
+                            container = { Box(Modifier.background(containerColor, FieldShape)) }
+                        )
+                    },
+                    supporting = supportingText?.let { content ->
+                        {
+                            CompositionLocalProvider(LocalContentColor provides supportingColor) {
+                                ProvideTextStyle(supportingStyle.copy(color = supportingColor), content)
+                            }
+                        }
+                    }
+                )
+            }
+        )
+    }
+}
+
+private val EmptySlot: @Composable () -> Unit = {}
+
+/**
+ * Label, field and supporting text in one column: label 8 above the field,
+ * supporting text 8 below. The field is at least [FieldHeight] tall and takes
+ * any extra height the caller's modifier gives the block, so a multi-line
+ * field keeps the height its caller sets.
+ */
+@Composable
+private fun FieldLayout(
+    label: (@Composable () -> Unit)?,
+    field: @Composable () -> Unit,
+    supporting: (@Composable () -> Unit)?
+) {
+    Layout(
+        contents = listOf(label ?: EmptySlot, field, supporting ?: EmptySlot)
+    ) { (labelMeasurables, fieldMeasurables, supportingMeasurables), constraints ->
+        val gap = FieldLabelGap.roundToPx()
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val labelPlaceable = labelMeasurables.firstOrNull()?.measure(loose)
+        val supportingPlaceable = supportingMeasurables.firstOrNull()?.measure(loose)
+        val above = labelPlaceable?.let { it.height + gap } ?: 0
+        val below = supportingPlaceable?.let { it.height + gap } ?: 0
+
+        val minFieldHeight = maxOf(FieldHeight.roundToPx(), constraints.minHeight - above - below)
+        val maxFieldHeight = if (constraints.hasBoundedHeight) {
+            maxOf(minFieldHeight, constraints.maxHeight - above - below)
+        } else {
+            Constraints.Infinity
+        }
+        val minFieldWidth = maxOf(
+            constraints.minWidth,
+            labelPlaceable?.width ?: 0,
+            supportingPlaceable?.width ?: 0
+        ).coerceAtMost(constraints.maxWidth)
+        val fieldPlaceable = fieldMeasurables.first().measure(
+            Constraints(
+                minWidth = minFieldWidth,
+                maxWidth = constraints.maxWidth,
+                minHeight = minFieldHeight,
+                maxHeight = maxFieldHeight
+            )
+        )
+
+        val width = constraints.constrainWidth(fieldPlaceable.width)
+        val height = constraints.constrainHeight(above + fieldPlaceable.height + below)
+        layout(width, height) {
+            labelPlaceable?.placeRelative(0, 0)
+            fieldPlaceable.placeRelative(0, above)
+            supportingPlaceable?.placeRelative(0, above + fieldPlaceable.height + gap)
+        }
+    }
+}
+
+/**
+ * A dismissive text action such as Cancel, Close or Skip for Now: no fill, a
+ * callout-semibold label in the secondary label color (tokens.json
+ * components.buttonText). Confirming actions stay brand orange; destructive
+ * ones take an ErrorRed label (components.buttonDestructive).
+ */
+@Composable
+fun DismissTextButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    TextButton(
+        onClick = onClick,
         modifier = modifier,
-        enabled = enabled,
-        readOnly = readOnly,
-        textStyle = textStyle,
-        label = label,
-        placeholder = placeholder,
-        leadingIcon = leadingIcon,
-        trailingIcon = trailingIcon,
-        prefix = prefix,
-        suffix = suffix,
-        supportingText = supportingText,
-        isError = isError,
-        visualTransformation = visualTransformation,
-        keyboardOptions = keyboardOptions,
-        keyboardActions = keyboardActions,
-        singleLine = singleLine,
-        maxLines = maxLines,
-        minLines = minLines,
-        interactionSource = interactionSource,
-        shape = FieldShape,
-        colors = colors
+        colors = ButtonDefaults.textButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        content = content
     )
 }
 

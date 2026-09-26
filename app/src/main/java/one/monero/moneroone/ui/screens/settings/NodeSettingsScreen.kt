@@ -687,7 +687,8 @@ private fun NodeDialog(
                         colors = fieldColors,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    // Twice the label gap, so the Password label reads with its own field.
+                    Spacer(modifier = Modifier.height(16.dp))
                     MoneroTextField(
                         value = password,
                         onValueChange = {
