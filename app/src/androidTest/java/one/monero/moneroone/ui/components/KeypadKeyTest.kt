@@ -36,8 +36,7 @@ class KeypadKeyTest {
                     KeypadKey(onPress = { pressed += digit }) { onClick ->
                         GlassButton(
                             onClick = onClick,
-                            modifier = Modifier.size(80.dp).testTag("key$digit"),
-                            cornerRadius = 40.dp
+                            modifier = Modifier.size(80.dp).testTag("key$digit")
                         ) {
                             Text(digit)
                         }
