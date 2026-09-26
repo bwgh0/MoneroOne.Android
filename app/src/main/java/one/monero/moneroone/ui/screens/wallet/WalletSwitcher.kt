@@ -85,6 +85,7 @@ import one.monero.moneroone.ui.theme.MonoFamily
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SuccessGreen
+import one.monero.moneroone.ui.theme.truncateMiddle
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -445,7 +446,7 @@ private fun WalletRow(
                     wallet.cachedPrimaryAddress?.takeIf { it.length > 16 }?.let { address ->
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "${address.take(8)}…${address.takeLast(8)}",
+                            text = truncateMiddle(address),
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = MonoFamily,
                             fontWeight = FontWeight.Normal,

@@ -55,7 +55,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.model.TransactionInfo
 import kotlinx.coroutines.delay
@@ -328,11 +327,10 @@ private fun TransactionDetailContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
+                        // The whole hash, wrapped rather than cut.
                         Text(
                             text = transaction.hash,
-                            style = MonoCaption,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            style = MonoCaption
                         )
                     }
                     IconButton(

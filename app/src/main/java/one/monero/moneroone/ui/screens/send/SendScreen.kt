@@ -116,6 +116,7 @@ import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.TabularFigures
 import one.monero.moneroone.ui.theme.WarningYellow
+import one.monero.moneroone.ui.theme.truncateMiddle
 
 private enum class SendPhase { ADDRESS, AMOUNT, REVIEW, SENDING, SUCCESS, ERROR }
 
@@ -217,7 +218,7 @@ fun SendScreen(
                     Text(
                         text = when (phase) {
                             SendPhase.ADDRESS -> "Send XMR"
-                            SendPhase.AMOUNT -> if (address.length > 20) "Send to ${address.take(8)}...${address.takeLast(4)}" else "Amount"
+                            SendPhase.AMOUNT -> if (address.length > 20) "Send to ${truncateMiddle(address)}" else "Amount"
                             SendPhase.REVIEW -> "Review"
                             else -> ""
                         },
@@ -856,7 +857,7 @@ private fun ReviewPhase(
                     Column {
                         Text("Recipient", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            text = address.take(12) + "..." + address.takeLast(8),
+                            text = truncateMiddle(address),
                             style = MonoCaption,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1133,7 +1134,7 @@ private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Text(
-                        text = if (copied) "Copied!" else txHash.take(10) + "..." + txHash.takeLast(6),
+                        text = if (copied) "Copied!" else truncateMiddle(txHash),
                         style = MonoCaption,
                         color = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f)

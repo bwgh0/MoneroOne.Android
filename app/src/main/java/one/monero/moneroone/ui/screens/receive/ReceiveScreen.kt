@@ -81,6 +81,7 @@ import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.theme.truncateMiddle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -337,7 +338,7 @@ fun ReceiveScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (address.length > 20) "${address.take(12)}...${address.takeLast(8)}" else address.ifBlank { "Loading..." },
+                            text = if (address.length > 20) truncateMiddle(address) else address.ifBlank { "Loading..." },
                             style = MonoCaption,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

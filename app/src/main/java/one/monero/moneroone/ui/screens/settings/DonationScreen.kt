@@ -53,7 +53,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
@@ -194,11 +193,10 @@ fun DonationScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(12.dp))
+                    // The whole address, wrapped rather than cut.
                     Text(
                         text = DONATION_ADDRESS,
                         style = MonoCaption,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
                         lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
                     )
                 }

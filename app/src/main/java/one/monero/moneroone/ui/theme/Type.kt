@@ -136,3 +136,17 @@ val MonoCaption: TextStyle = TextStyle(
     letterSpacing = 0.em,
     lineHeightStyle = MoneroLineHeightStyle
 )
+
+/** Characters kept at each end of a shortened address or hash. */
+private const val MiddleTruncationKeep = 8
+
+/**
+ * An address or hash shortened in the middle, as tokens.json `type.rules`
+ * asks: the first 8 and the last 8 characters around one ellipsis
+ * character, `49zFK9je…nFELPobk`. Shorter strings come back unchanged.
+ * Views that exist to show the whole address (the main address card, the
+ * donation address, a transaction's hash) keep it in full.
+ */
+fun truncateMiddle(value: String): String =
+    if (value.length <= 2 * MiddleTruncationKeep + 1) value
+    else value.take(MiddleTruncationKeep) + "…" + value.takeLast(MiddleTruncationKeep)
