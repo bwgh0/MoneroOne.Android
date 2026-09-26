@@ -119,9 +119,11 @@ fun WalletSwitcherButton(
         animationSpec = Motion.snappy(),
         label = "switcherRing"
     )
+    // 98 x 56, as iOS measures it: a 74pt label frame plus the 12pt side
+    // insets of the glass button style.
     Box(
         modifier = modifier
-            .width(74.dp)
+            .width(98.dp)
             .cardShadow(CapsuleShape)
             .clip(CapsuleShape)
             .background(MaterialTheme.colorScheme.surfaceContainer)

@@ -186,13 +186,22 @@ fun WalletScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        item { Spacer(modifier = Modifier.height(12.dp)) }
-
-        // Offline banner: slides down from the top and fades in, and leaves
-        // the same way (tokens.json motion.curves.banner, tween 350). Its
-        // slot grows and shrinks on the same tween, so the dashboard below
-        // moves with it instead of jumping, as SwiftUI does on iOS.
+        // Header, then the dashboard 12dp below it, in one item so the list's
+        // 20dp item gap stays out of it. The header row starts right under the
+        // status bar: iOS pins it there in a safeAreaBar(spacing: 12).
         item {
+            Column {
+            GreetingHeader(
+                activeWallet = activeWallet,
+                expanded = switcherExpanded,
+                onToggleSwitcher = { switcherExpanded = !switcherExpanded }
+            )
+
+            // Offline banner, 8dp under the greeting as in the iOS header:
+            // slides down from the top and fades in, and leaves the same way
+            // (tokens.json motion.curves.banner, tween 350). Its slot grows
+            // and shrinks on the same tween, so the dashboard below moves
+            // with it instead of jumping, as SwiftUI does on iOS.
             AnimatedVisibility(
                 visible = !isOnline,
                 enter = slideInVertically(tween(BannerMs)) { -it } + fadeIn(tween(BannerMs)) +
@@ -204,6 +213,7 @@ fun WalletScreen(
                 val gray = MoneroTheme.colors.gray
                 Row(
                     modifier = Modifier
+                        .padding(top = 8.dp)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(gray.copy(alpha = 0.1f))
@@ -224,22 +234,13 @@ fun WalletScreen(
                     )
                 }
             }
-        }
 
-        // Greeting header with inline wallet switcher chip
-        item {
-            GreetingHeader(
-                activeWallet = activeWallet,
-                expanded = switcherExpanded,
-                onToggleSwitcher = { switcherExpanded = !switcherExpanded }
-            )
-        }
+            Spacer(modifier = Modifier.height(12.dp))
 
-        // Balance card + actions <-> wallet rows (iOS WalletView: rows slide in
-        // from the trailing edge on .snappy(0.4) while the balance block
-        // collapses; reversed on the way back). Recent activity below hides
-        // instantly, as on iOS.
-        item {
+            // Balance card + actions <-> wallet rows (iOS WalletView: rows slide in
+            // from the trailing edge on .snappy(0.4) while the balance block
+            // collapses; reversed on the way back). Recent activity below hides
+            // instantly, as on iOS.
             AnimatedContent(
                 targetState = switcherExpanded,
                 transitionSpec = {
@@ -260,7 +261,10 @@ fun WalletScreen(
                 // underneath and opens the chart (iOS: allowsHitTesting(false)).
                 val exiting = transition.targetState == EnterExitState.PostExit
                 Box(
-                    modifier = Modifier.pointerInput(exiting) {
+                    // The rows sit 20dp under the header, the card 12dp: on
+                    // iOS the collapsed balance block keeps its 8pt VStack
+                    // gap above the rows.
+                    modifier = Modifier.padding(top = if (expanded) 8.dp else 0.dp).pointerInput(exiting) {
                         if (exiting) {
                             awaitPointerEventScope {
                                 while (true) {
@@ -333,6 +337,7 @@ fun WalletScreen(
                 }
                 } // hit-test guard
             }
+            } // header + dashboard
         }
 
         if (!switcherExpanded) {
