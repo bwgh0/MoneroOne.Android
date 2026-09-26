@@ -21,10 +21,6 @@ val MoneroOrangePressed = Color(0xFFE65C00)
 /** Pending and in-flight states (connecting, syncing, 0-9 confirmations) use the brand orange. */
 val PendingOrange = MoneroOrange
 
-// The brand has one orange; GradientCard keeps these names.
-val GradientOrangeStart = MoneroOrange
-val GradientOrangeEnd = MoneroOrange
-
 /** True inside a dark [MoneroOneTheme]. The semantic colors below read it. */
 val LocalDarkTheme = staticCompositionLocalOf { false }
 

@@ -15,9 +15,10 @@ import androidx.compose.ui.unit.dp
 import one.monero.moneroone.R
 
 /**
- * The official flat Monero mark (vector, #FF6600 / #4C4C4C, white M on its
- * own white disc so the M stays white on dark surfaces). Every logo in the
- * app uses it except the Welcome and Add Wallet hero ([MoneroHeroLogo]).
+ * The official flat Monero mark (vector, #FF6600 / #4C4C4C). By day the M is
+ * white (drawable/monero_mark); by night it is see-through, so the dark
+ * background shows through it (drawable-night/monero_mark). Every logo in
+ * the app uses it except the glossy hero art ([MoneroHeroLogo]).
  */
 @Composable
 fun MoneroLogo(
