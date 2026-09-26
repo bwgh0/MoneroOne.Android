@@ -149,7 +149,7 @@ fun AuthGateDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text("Cancel") }
+            DismissTextButton(onClick = onCancel) { Text("Cancel") }
         }
     )
 }

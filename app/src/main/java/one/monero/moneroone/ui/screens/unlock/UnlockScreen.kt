@@ -55,6 +55,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.MoneroLogo
 import one.monero.moneroone.ui.theme.ErrorRed
@@ -304,7 +305,7 @@ fun UnlockScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
+                DismissTextButton(onClick = { showResetDialog = false }) {
                     Text("Cancel")
                 }
             }

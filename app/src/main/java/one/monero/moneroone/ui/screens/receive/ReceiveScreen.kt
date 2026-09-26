@@ -375,7 +375,7 @@ fun ReceiveScreen(
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Copy", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Copy", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
 
@@ -395,7 +395,7 @@ fun ReceiveScreen(
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, tint = MoneroOrange, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Share", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = MoneroOrange)
+                        Text("Share", style = MaterialTheme.typography.labelLarge, color = MoneroOrange)
                     }
                 }
             }

@@ -75,6 +75,7 @@ import one.monero.moneroone.core.node.validateNodeCredentials
 import one.monero.moneroone.core.wallet.DefaultNodes
 import one.monero.moneroone.core.wallet.SecurePrefs
 import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroSwitch
 import one.monero.moneroone.ui.components.MoneroTextField
@@ -755,7 +756,7 @@ private fun NodeDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            DismissTextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }

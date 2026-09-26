@@ -14,15 +14,14 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
@@ -92,16 +91,11 @@ fun SetupBiometricsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            TextButton(
+            DismissTextButton(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "Skip for Now",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(text = "Skip for Now")
             }
         } else {
             PrimaryButton(

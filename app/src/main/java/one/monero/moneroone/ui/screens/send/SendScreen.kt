@@ -104,6 +104,7 @@ import one.monero.moneroone.core.wallet.SendState
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.AuthGateDialog
 import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroTextField
@@ -1199,13 +1200,8 @@ private fun ErrorPhase(message: String, onRetry: () -> Unit, onClose: () -> Unit
                 Text("Retry")
             }
             Spacer(modifier = Modifier.height(12.dp))
-            TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    "Close",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            DismissTextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
+                Text("Close")
             }
         }
     }

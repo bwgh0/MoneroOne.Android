@@ -122,9 +122,9 @@ val Typography = Typography(
     bodyLarge = role(17f, 22f, FontWeight.Normal, -0.013f),        // body
     bodyMedium = role(15f, 20f, FontWeight.Normal, -0.009f),       // subheadline
     bodySmall = role(12f, 16f, FontWeight.Normal, 0f),             // caption
-    labelLarge = role(16f, 21f, FontWeight.SemiBold, -0.011f),     // callout, semibold
-    labelMedium = role(13f, 18f, FontWeight.Medium, -0.003f),      // footnote, medium
-    labelSmall = role(11f, 13f, FontWeight.Medium, 0.005f)         // caption2, medium
+    labelLarge = role(16f, 21f, FontWeight.SemiBold, -0.011f),     // callout, semibold (button labels)
+    labelMedium = role(13f, 18f, FontWeight.Normal, -0.003f),      // footnote
+    labelSmall = role(11f, 13f, FontWeight.Normal, 0.005f)         // caption2
 )
 
 /** Addresses and hashes: caption in mono (tokens.json `type.numerals.mono`). */

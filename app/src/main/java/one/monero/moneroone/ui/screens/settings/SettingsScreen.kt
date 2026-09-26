@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.BuildConfig
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroSwitch
 import one.monero.moneroone.ui.theme.ErrorRed
@@ -308,7 +309,7 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
+                DismissTextButton(onClick = { showDeleteDialog = false }) {
                     Text("Cancel")
                 }
             }
@@ -343,7 +344,7 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResetSyncDialog = false }) {
+                DismissTextButton(onClick = { showResetSyncDialog = false }) {
                     Text("Cancel")
                 }
             }

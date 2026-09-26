@@ -73,6 +73,7 @@ import kotlinx.coroutines.launch
 import one.monero.moneroone.core.wallet.WalletInfo
 import one.monero.moneroone.ui.components.CapsuleShape
 import one.monero.moneroone.ui.components.CellFill
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.components.PrimaryButton
@@ -305,7 +306,7 @@ fun WalletManagerRows(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deleteCandidate = null }) { Text("Cancel") }
+                DismissTextButton(onClick = { deleteCandidate = null }) { Text("Cancel") }
             }
         )
     }

@@ -54,7 +54,6 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.data.model.PriceDataPoint
 import one.monero.moneroone.data.util.calculateChartIndex
@@ -318,9 +317,8 @@ private fun PortfolioChart(
     val areaBottomColor = MoneroOrange.copy(alpha = 0.0f)
     val axisColor = MoneroTheme.colors.gray.copy(alpha = 0.5f)
     val textMeasurer = rememberTextMeasurer()
+    // Axis labels: caption2 (tokens.json type.roles).
     val labelStyle = MaterialTheme.typography.labelSmall.copy(
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Normal,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 
