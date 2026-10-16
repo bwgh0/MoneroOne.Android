@@ -32,6 +32,11 @@ object WalletCacheIds {
         return stableWalletId(seedWords.joinToString(" ") + resetSuffix)
     }
 
+    fun watchOnlyWalletId(address: String, syncResetCount: Int): String {
+        val resetSuffix = if (syncResetCount > 0) syncResetCount.toString() else ""
+        return stableWalletId("watch-only:" + address + resetSuffix)
+    }
+
     // --- Duplicate-seed detection --------------------------------------------
 
     /**

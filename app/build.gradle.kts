@@ -126,6 +126,7 @@ dependencies {
     // QR Code generation
     implementation(libs.zxing.android.embedded)
     implementation(libs.qrcode.kotlin)
+    implementation("com.sparrowwallet:hummingbird:1.7.4")
 
     // CameraX + ML Kit (for QR scanning)
     implementation(libs.androidx.camera.core)

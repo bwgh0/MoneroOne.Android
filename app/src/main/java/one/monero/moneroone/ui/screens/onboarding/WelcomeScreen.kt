@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.ReplayCircleFilled
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,7 +32,8 @@ import one.monero.moneroone.ui.components.SquatHeight
 @Composable
 fun WelcomeScreen(
     onCreateWallet: () -> Unit,
-    onRestoreWallet: () -> Unit
+    onRestoreWallet: () -> Unit,
+    onPairKeystone: () -> Unit = {}
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -97,6 +99,17 @@ fun WelcomeScreen(
             ) {
                 Icon(Icons.Filled.ReplayCircleFilled, contentDescription = null, modifier = Modifier.size(20.dp))
                 Text(text = tr("Restore Wallet"))
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            PrimaryButton(
+                onClick = onPairKeystone,
+                modifier = Modifier.fillMaxWidth(),
+                contentColor = MaterialTheme.colorScheme.onSurface
+            ) {
+                Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text(text = "Pair Keystone")
             }
 
             Spacer(modifier = Modifier.height(32.dp))

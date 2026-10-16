@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.ReplayCircleFilled
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +42,7 @@ fun AddWalletScreen(
     walletViewModel: WalletViewModel,
     onCreateWallet: () -> Unit,
     onRestoreWallet: () -> Unit,
+    onPairKeystone: () -> Unit,
     onBack: () -> Unit
 ) {
     AddWalletFlowEffect(walletViewModel)
@@ -105,6 +107,16 @@ fun AddWalletScreen(
             ) {
                 Icon(Icons.Filled.ReplayCircleFilled, contentDescription = null, modifier = Modifier.size(20.dp))
                 Text(tr("Restore Wallet"))
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            PrimaryButton(
+                onClick = onPairKeystone,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
+                Text("Pair Keystone")
             }
 
             Spacer(modifier = Modifier.height(32.dp))

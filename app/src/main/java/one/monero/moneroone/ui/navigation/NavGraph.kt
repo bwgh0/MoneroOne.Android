@@ -54,6 +54,9 @@ import one.monero.moneroone.ui.screens.transactions.TransactionDetailScreen
 import one.monero.moneroone.ui.screens.transactions.TransactionListScreen
 import one.monero.moneroone.ui.screens.unlock.UnlockScreen
 import one.monero.moneroone.ui.screens.wallet.AddWalletScreen
+import one.monero.moneroone.ui.screens.keystone.KeystonePairScreen
+import one.monero.moneroone.ui.screens.keystone.KeystoneSignScreen
+import one.monero.moneroone.ui.screens.keystone.KeystoneKeyImageSyncScreen
 import one.monero.moneroone.ui.screens.settings.BackupSeedScreen
 import one.monero.moneroone.ui.screens.settings.ChangePinScreen
 import one.monero.moneroone.ui.screens.settings.CurrencyScreen
@@ -79,6 +82,14 @@ sealed class Screen(val route: String) {
         fun createRoute(adding: Boolean = false) = "restore_wallet?adding=$adding"
     }
     data object AddWallet : Screen("add_wallet")
+    data object KeystonePair : Screen("keystone_pair?adding={adding}") {
+        fun createRoute(adding: Boolean = false) = "keystone_pair?adding=" + adding
+    }
+    data object KeystoneSign : Screen("keystone_sign?address={address}&amount={amount}&sweep={sweep}") {
+        fun createRoute(address: String, amount: Long, sweep: Boolean): String =
+            "keystone_sign?address=" + android.net.Uri.encode(address) + "&amount=" + amount + "&sweep=" + sweep
+    }
+    data object KeystoneKeyImages : Screen("keystone_key_images")
     data object SetPin : Screen("set_pin")
     data object SetupBiometrics : Screen("setup_biometrics")
     data object Unlock : Screen("unlock")
@@ -149,7 +160,7 @@ fun MoneroOneNavHost(
         paymentLinkError = when {
             result is PaymentRequestResult.Invalid -> result.error.message
             // No spend key: say so instead of opening a Send it cannot finish.
-            walletViewModel.activeWallet.value?.isViewOnly == true ->
+            walletViewModel.activeWallet.value?.isViewOnly == true && walletViewModel.activeWallet.value?.isKeystone != true ->
                 tr("This wallet is view-only and cannot send. Switch to a wallet that can send, then open the link again.")
             else -> {
                 val request = (result as PaymentRequestResult.Valid).data
@@ -292,7 +303,8 @@ fun MoneroOneNavHost(
             composable(Screen.Welcome.route) {
                 WelcomeScreen(
                     onCreateWallet = { navController.navigate(Screen.CreateWallet.createRoute(adding = false)) },
-                    onRestoreWallet = { navController.navigate(Screen.RestoreWallet.createRoute(adding = false)) }
+                    onRestoreWallet = { navController.navigate(Screen.RestoreWallet.createRoute(adding = false)) },
+                    onPairKeystone = { navController.navigate(Screen.KeystonePair.createRoute(adding = false)) }
                 )
             }
 
@@ -301,6 +313,7 @@ fun MoneroOneNavHost(
                     walletViewModel = walletViewModel,
                     onCreateWallet = { navController.navigate(Screen.CreateWallet.createRoute(adding = true)) },
                     onRestoreWallet = { navController.navigate(Screen.RestoreWallet.createRoute(adding = true)) },
+                    onPairKeystone = { navController.navigate(Screen.KeystonePair.createRoute(adding = true)) },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -350,6 +363,34 @@ fun MoneroOneNavHost(
                     flowId = backStackEntry.id,
                     isAddingWallet = adding,
                     onWalletRestored = {
+                        if (adding) {
+                            navController.popBackStack(Screen.Main.route, inclusive = false)
+                        } else {
+                            navController.navigate(Screen.SetPin.route) {
+                                popUpTo(Screen.Welcome.route) { inclusive = true }
+                            }
+                        }
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+
+            composable(
+                route = Screen.KeystonePair.route,
+                arguments = listOf(
+                    navArgument("adding") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                )
+            ) { backStackEntry ->
+                val adding = backStackEntry.arguments?.getBoolean("adding") ?: false
+                KeystonePairScreen(
+                    walletViewModel = walletViewModel,
+                    flowId = backStackEntry.id,
+                    isAddingWallet = adding,
+                    onPaired = {
                         if (adding) {
                             navController.popBackStack(Screen.Main.route, inclusive = false)
                         } else {
@@ -430,6 +471,32 @@ fun MoneroOneNavHost(
                     },
                     onBack = { navController.popBackStack() },
                     onScanQr = { navController.navigate(Screen.QRScanner.route) },
+                    onSent = {
+                        navController.navigate(Screen.Main.route) {
+                            popUpTo(Screen.Main.route) { inclusive = true }
+                        }
+                    },
+                    onKeystoneSign = { dest, atomic, sweep ->
+                        navController.navigate(Screen.KeystoneSign.createRoute(dest, atomic, sweep))
+                    }
+                )
+            }
+
+
+            composable(
+                route = Screen.KeystoneSign.route,
+                arguments = listOf(
+                    navArgument("address") { type = NavType.StringType },
+                    navArgument("amount") { type = NavType.LongType; defaultValue = 0L },
+                    navArgument("sweep") { type = NavType.BoolType; defaultValue = false }
+                )
+            ) { backStackEntry ->
+                KeystoneSignScreen(
+                    walletViewModel = walletViewModel,
+                    address = backStackEntry.arguments?.getString("address").orEmpty(),
+                    amountAtomic = backStackEntry.arguments?.getLong("amount") ?: 0L,
+                    sweepAll = backStackEntry.arguments?.getBoolean("sweep") ?: false,
+                    onBack = { navController.popBackStack() },
                     onSent = {
                         navController.navigate(Screen.Main.route) {
                             popUpTo(Screen.Main.route) { inclusive = true }
@@ -555,7 +622,16 @@ fun MoneroOneNavHost(
                 SyncSettingsScreen(
                     walletViewModel = walletViewModel,
                     onBack = { navController.popBackStack() },
-                    onNodeSettingsClick = { navController.navigate(Screen.NodeSettings.route) }
+                    onNodeSettingsClick = { navController.navigate(Screen.NodeSettings.route) },
+                    onKeystoneKeyImageSync = { navController.navigate(Screen.KeystoneKeyImages.route) }
+                )
+            }
+
+
+            composable(Screen.KeystoneKeyImages.route) {
+                KeystoneKeyImageSyncScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() }
                 )
             }
 

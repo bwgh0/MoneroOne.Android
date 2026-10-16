@@ -30,6 +30,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +41,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,13 +68,15 @@ import io.horizontalsystems.monerokit.util.RestoreHeight
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SyncSettingsScreen(
     walletViewModel: WalletViewModel,
     onBack: () -> Unit,
-    onNodeSettingsClick: () -> Unit
+    onNodeSettingsClick: () -> Unit,
+    onKeystoneKeyImageSync: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE) }
@@ -83,7 +88,13 @@ fun SyncSettingsScreen(
     }
     val (hasNotificationPermission, requestNotificationPermission) = rememberNotificationPermission()
 
+    val scope = rememberCoroutineScope()
     var showDatePicker by remember { mutableStateOf(false) }
+    var showHeightDialog by remember { mutableStateOf(false) }
+    var heightText by remember { mutableStateOf("") }
+    var showRescanSpentConfirm by remember { mutableStateOf(false) }
+    var spentRescanRunning by remember { mutableStateOf(false) }
+    var maintenanceMessage by remember { mutableStateOf<String?>(null) }
     // Restore height/date are per-wallet, from the active WalletInfo.
     val restoreHeight = activeWallet?.restoreHeight ?: 0L
     val restoreDateMillis = activeWallet?.restoreDateMillis ?: 0L
@@ -279,6 +290,107 @@ fun SyncSettingsScreen(
             }
         }
 
+        TextButton(
+            onClick = {
+                heightText = restoreHeight.toString()
+                showHeightDialog = true
+            },
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text(tr("Enter block height"), color = MoneroOrange)
+        }
+
+        if (activeWallet?.isKeystone == true) {
+            SettingsSectionHeader(tr("Hardware Wallet Maintenance"))
+
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onKeystoneKeyImageSync,
+                cornerRadius = 16.dp,
+                shadow = false
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = null,
+                        tint = MoneroOrange,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = tr("Sync Key Images with Keystone"),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = tr("Update spent/unspent status from the hardware wallet without sending."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MoneroTheme.colors.labelTertiary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    if (!spentRescanRunning) showRescanSpentConfirm = true
+                },
+                cornerRadius = 16.dp,
+                shadow = false
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (spentRescanRunning) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            tint = MoneroOrange,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = tr("Rescan Spent Outputs"),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = tr("Recheck known key images against the selected node."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            maintenanceMessage?.let { message ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         // Background Sync section: last, where iOS has its background
         // sync section (Trusted Locations)
         SettingsSectionHeader(tr("Background Sync"))
@@ -370,7 +482,15 @@ fun SyncSettingsScreen(
             AlertDialog(
                 onDismissRequest = { pendingHeight = null },
                 title = { Text(tr("Update Restore Height?")) },
-                text = { Text(tr("Scanning restarts at block %s. Earlier transactions won't be found.", formatHeight(newHeight))) },
+                text = {
+                    Text(
+                        if (activeWallet?.isKeystone == true) {
+                            tr("Scanning restarts at block %s. Earlier transactions won't be found. After the rescan finishes, sync key images with Keystone so spent outputs are accurate.", formatHeight(newHeight))
+                        } else {
+                            tr("Scanning restarts at block %s. Earlier transactions won't be found.", formatHeight(newHeight))
+                        }
+                    )
+                },
                 confirmButton = {
                     TextButton(onClick = {
                         val dateMillis = datePickerState.selectedDateMillis ?: return@TextButton
@@ -390,6 +510,86 @@ fun SyncSettingsScreen(
             )
         }
     }
+    if (showHeightDialog) {
+        AlertDialog(
+            onDismissRequest = { showHeightDialog = false },
+            title = { Text(tr("Set Restore Height")) },
+            text = {
+                Column {
+                    Text(tr("Enter the block height to start scanning from. Use an earlier height than the wallet's first transaction."))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = heightText,
+                        onValueChange = { value -> heightText = value.filter { it.isDigit() }.take(10) },
+                        label = { Text(tr("Block height")) },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val newHeight = heightText.toLongOrNull()
+                        if (newHeight != null && newHeight >= 0L) {
+                            showHeightDialog = false
+                            walletViewModel.setRestoreHeight(newHeight, 0L)
+                            walletViewModel.resetSync()
+                            maintenanceMessage = if (activeWallet?.isKeystone == true) {
+                                tr("Blockchain rescan started. Sync key images with Keystone again after it finishes.")
+                            } else {
+                                tr("Blockchain rescan started.")
+                            }
+                        }
+                    },
+                    enabled = heightText.toLongOrNull() != null
+                ) {
+                    Text(tr("Rescan"), color = MoneroOrange)
+                }
+            },
+            dismissButton = {
+                DismissTextButton(onClick = { showHeightDialog = false }) {
+                    Text(tr("Cancel"))
+                }
+            }
+        )
+    }
+
+    if (showRescanSpentConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRescanSpentConfirm = false },
+            title = { Text(tr("Rescan Spent Outputs?")) },
+            text = {
+                Text(
+                    tr("This asks the selected Monero node which of your known key images are spent. That reveals which queried outputs belong to this wallet, so use your own or a node you trust.")
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showRescanSpentConfirm = false
+                    spentRescanRunning = true
+                    maintenanceMessage = null
+                    scope.launch {
+                        try {
+                            walletViewModel.keystoneRescanSpent()
+                            maintenanceMessage = tr("Spent outputs rescanned. Balance refreshed.")
+                        } catch (t: Throwable) {
+                            maintenanceMessage = t.message ?: tr("Rescan spent failed")
+                        } finally {
+                            spentRescanRunning = false
+                        }
+                    }
+                }) {
+                    Text(tr("Rescan"), color = MoneroOrange)
+                }
+            },
+            dismissButton = {
+                DismissTextButton(onClick = { showRescanSpentConfirm = false }) {
+                    Text(tr("Cancel"))
+                }
+            }
+        )
+    }
+
 }
 
 private fun getSyncStatusText(syncState: SyncState): String {

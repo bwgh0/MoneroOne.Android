@@ -17,6 +17,8 @@ class WalletSecrets(private val prefs: SharedPreferences) {
     private fun seedKey(id: String) = "wallet.$id.seed_words"
     private fun seedTypeKey(id: String) = "wallet.$id.seed_type"
     private fun pinHashKey(id: String) = "wallet.$id.pin_hash"
+    private fun watchAddressKey(id: String) = "wallet.$id.watch_address"
+    private fun watchViewKey(id: String) = "wallet.$id.watch_view_key"
 
     fun saveSeed(id: String, words: List<String>, type: SeedType) {
         prefs.edit()
@@ -34,6 +36,19 @@ class WalletSecrets(private val prefs: SharedPreferences) {
 
     fun hasSeed(id: String): Boolean = prefs.getString(seedKey(id), null) != null
 
+    fun saveWatchOnly(id: String, address: String, privateViewKey: String) {
+        prefs.edit()
+            .putString(watchAddressKey(id), address)
+            .putString(watchViewKey(id), privateViewKey)
+            .apply()
+    }
+
+    fun loadWatchOnly(id: String): Pair<String, String>? {
+        val address = prefs.getString(watchAddressKey(id), null) ?: return null
+        val viewKey = prefs.getString(watchViewKey(id), null) ?: return null
+        return address to viewKey
+    }
+
     fun savePinHash(id: String, hash: String) {
         prefs.edit().putString(pinHashKey(id), hash).apply()
     }
@@ -45,6 +60,8 @@ class WalletSecrets(private val prefs: SharedPreferences) {
         prefs.edit()
             .remove(seedKey(id))
             .remove(seedTypeKey(id))
+            .remove(watchAddressKey(id))
+            .remove(watchViewKey(id))
             .remove(pinHashKey(id))
             .apply()
     }

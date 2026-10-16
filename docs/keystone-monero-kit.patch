@@ -1,0 +1,425 @@
+diff --git a/monerokit/src/main/cpp/monerujo.cpp b/monerokit/src/main/cpp/monerujo.cpp
+index b5df7b8..11fcffa 100644
+--- a/monerokit/src/main/cpp/monerujo.cpp
++++ b/monerokit/src/main/cpp/monerujo.cpp
+@@ -1542,8 +1542,24 @@ Java_io_horizontalsystems_monerokit_model_Wallet_createSweepUnmixableTransaction
+     return reinterpret_cast<jlong>(tx);
+ }
+ 
+-//virtual UnsignedTransaction * loadUnsignedTx(const std::string &unsigned_filename) = 0;
+-//virtual bool submitTransaction(const std::string &fileName) = 0;
++JNIEXPORT jboolean JNICALL
++Java_io_horizontalsystems_monerokit_model_Wallet_submitTransaction(
++        JNIEnv *env, jobject instance, jstring fileName) {
++    const char *_fileName = env->GetStringUTFChars(fileName, nullptr);
++    if (_fileName == nullptr) return JNI_FALSE;
++    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
++    bool success = false;
++    try {
++        success = wallet->submitTransaction(std::string(_fileName));
++    } catch (const std::exception &e) {
++        throwIllegalState(env, std::string("Signed transaction submit failed: ") + e.what());
++    } catch (...) {
++        throwIllegalState(env, "Signed transaction submit failed");
++    }
++    env->ReleaseStringUTFChars(fileName, _fileName);
++    return static_cast<jboolean>(success);
++}
++
+ 
+ JNIEXPORT void JNICALL
+ Java_io_horizontalsystems_monerokit_model_Wallet_disposeTransaction(JNIEnv *env, jobject instance,
+@@ -1598,8 +1614,42 @@ Java_io_horizontalsystems_monerokit_model_Wallet_estimateTransactionFee(JNIEnv *
+     return 0;
+ }
+ 
+-//virtual bool exportKeyImages(const std::string &filename) = 0;
+-//virtual bool importKeyImages(const std::string &filename) = 0;
++JNIEXPORT jboolean JNICALL
++Java_io_horizontalsystems_monerokit_model_Wallet_exportOutputs(
++        JNIEnv *env, jobject instance, jstring filename, jboolean all) {
++    const char *_filename = env->GetStringUTFChars(filename, nullptr);
++    if (_filename == nullptr) return JNI_FALSE;
++    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
++    bool success = false;
++    try {
++        success = wallet->exportOutputs(std::string(_filename), static_cast<bool>(all));
++    } catch (const std::exception &e) {
++        throwIllegalState(env, std::string("Output export failed: ") + e.what());
++    } catch (...) {
++        throwIllegalState(env, "Output export failed");
++    }
++    env->ReleaseStringUTFChars(filename, _filename);
++    return static_cast<jboolean>(success);
++}
++
++JNIEXPORT jboolean JNICALL
++Java_io_horizontalsystems_monerokit_model_Wallet_importKeyImages(
++        JNIEnv *env, jobject instance, jstring filename) {
++    const char *_filename = env->GetStringUTFChars(filename, nullptr);
++    if (_filename == nullptr) return JNI_FALSE;
++    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
++    bool success = false;
++    try {
++        success = wallet->importKeyImages(std::string(_filename));
++    } catch (const std::exception &e) {
++        throwIllegalState(env, std::string("Key image import failed: ") + e.what());
++    } catch (...) {
++        throwIllegalState(env, "Key image import failed");
++    }
++    env->ReleaseStringUTFChars(filename, _filename);
++    return static_cast<jboolean>(success);
++}
++
+ 
+ 
+ //virtual TransactionHistory * history() const = 0;
+@@ -1790,7 +1840,21 @@ Java_io_horizontalsystems_monerokit_model_Wallet_getLastSubaddress(JNIEnv *env,
+ //virtual bool verifySignedMessage(const std::string &message, const std::string &addres, const std::string &signature) const = 0;
+ 
+ //virtual bool parse_uri(const std::string &uri, std::string &address, std::string &payment_id, uint64_t &tvAmount, std::string &tx_description, std::string &recipient_name, std::vector<std::string> &unknown_parameters, std::string &error) = 0;
+-//virtual bool rescanSpent() = 0;
++JNIEXPORT jboolean JNICALL
++Java_io_horizontalsystems_monerokit_model_Wallet_rescanSpent(
++        JNIEnv *env, jobject instance) {
++    Monero::Wallet *wallet = getHandle<Monero::Wallet>(env, instance);
++    bool success = false;
++    try {
++        success = wallet->rescanSpent();
++    } catch (const std::exception &e) {
++        throwIllegalState(env, std::string("Rescan spent failed: ") + e.what());
++    } catch (...) {
++        throwIllegalState(env, "Rescan spent failed");
++    }
++    return static_cast<jboolean>(success);
++}
++
+ 
+ 
+ // TransactionHistory
+diff --git a/monerokit/src/main/java/io/horizontalsystems/monerokit/MoneroKit.kt b/monerokit/src/main/java/io/horizontalsystems/monerokit/MoneroKit.kt
+index f39a3db..b93a9fb 100644
+--- a/monerokit/src/main/java/io/horizontalsystems/monerokit/MoneroKit.kt
++++ b/monerokit/src/main/java/io/horizontalsystems/monerokit/MoneroKit.kt
+@@ -108,6 +108,7 @@ class MoneroKit(
+     private var savingState = AtomicBoolean(false)
+     private var synced = false
+     private var lastStoreHeight: Long = 0
++    private var lastStoreTimeMs: Long = 0
+ 
+     /**
+      * How many subaddresses account 0 must have before refresh starts: a value of N means indices 0 until
+@@ -163,6 +164,10 @@ class MoneroKit(
+     var checkedWalletFilePrimaryAddress: String? = null
+         private set
+ 
++    @Volatile
++    var checkedWalletFilePrivateViewKey: String? = null
++        private set
++
+     val lastBlockHeight: Long?
+         get() = if (walletService.getConnectionStatus() == ConnectionStatus_Connected)
+             walletService.getDaemonHeight()
+@@ -247,6 +252,7 @@ class MoneroKit(
+ 
+     private suspend fun startInternal(): Boolean {
+         checkedWalletFilePrimaryAddress = null
++        checkedWalletFilePrivateViewKey = null
+         try {
+             // A close of this same wallet may still be finishing in the background (WalletService.stop()).
+             // A stop() arriving meanwhile must not queue behind that wait: the start gives way to it.
+@@ -268,6 +274,7 @@ class MoneroKit(
+ 
+             // Read local identity before any network operation can fail and close the file.
+             checkedWalletFilePrimaryAddress = walletService.withWallet { it.getSubaddress(0, 0) }
++            checkedWalletFilePrivateViewKey = walletService.withWallet { it.secretViewKey }
+ 
+             val selectedNode = if (nodeInfo != null) {
+                 nodeInfo
+@@ -383,6 +390,28 @@ class MoneroKit(
+         return walletService.estimateFee(txData)
+     }
+ 
++    fun exportOutputs(filename: String, all: Boolean = true): Boolean =
++        walletService.exportOutputs(filename, all)
++
++    fun importKeyImages(filename: String): Boolean =
++        walletService.importKeyImages(filename)
++
++    fun rescanSpent(): Boolean =
++        walletService.rescanSpent()
++
++    fun createUnsignedTransaction(
++        amount: Long,
++        address: String,
++        filename: String,
++        sweepAll: Boolean = false
++    ): Boolean {
++        val txData = buildTxData(amount, address, null, sweepAll)
++        return walletService.createUnsignedTransaction(txData, filename)
++    }
++
++    fun submitSignedTransaction(filename: String): Boolean =
++        walletService.submitSignedTransaction(filename)
++
+     /**
+      * Account 0's subaddresses, with list position equal to addressIndex, and what each one received.
+      * Before the wallet file is open: the primary address derived from the seed, index 0 only.
+@@ -543,6 +572,9 @@ class MoneroKit(
+                     /* spendKeyString = */ ""
+                 )
+ 
++                // createWalletFromKeys may report/persist a zero restore height for
++                // view-only wallets. Set it explicitly before the keys file is closed.
++                newWallet.setRestoreHeight(creationHeight)
+                 checkAndCloseWallet(newWallet)
+             }
+         }
+@@ -570,11 +602,15 @@ class MoneroKit(
+             return false
+         }
+ 
+-        val historyAll: List<TransactionInfo?>? = wallet.history.all
+-
+-        if (historyAll != null) {
+-            _allTransactionsFlow.update {
+-                historyAll.mapNotNull { it }
++        // Reading and mapping the entire history on every sync callback creates
++        // substantial allocation/GC pressure while scanning. Only refresh the public
++        // transaction list when the listener detected a history change or at final sync.
++        if (full || wallet.isSynchronized) {
++            val historyAll: List<TransactionInfo?>? = wallet.history.all
++            if (historyAll != null) {
++                _allTransactionsFlow.update {
++                    historyAll.mapNotNull { it }
++                }
+             }
+         }
+ 
+@@ -591,12 +627,15 @@ class MoneroKit(
+             val daemonHeight: Long = walletService.getDaemonHeight()
+             val walletHeight = wallet.getBlockChainHeight()
+ 
+-            // Periodically store wallet state during sync (every 2000 blocks)
+-            if (walletHeight - lastStoreHeight >= 2000) {
++            // Persist enough progress to survive interruption without serializing a
++            // multi-megabyte wallet every couple of seconds on a fast initial scan.
++            val now = System.currentTimeMillis()
++            if (walletHeight - lastStoreHeight >= 25_000 && now - lastStoreTimeMs >= 15_000) {
+                 if (!savingState.getAndSet(true)) {
+                     walletService.storeWallet()
+                     savingState.set(false)
+                     lastStoreHeight = walletHeight
++                    lastStoreTimeMs = now
+                 }
+             }
+             val remainingBlocks = daemonHeight - walletHeight
+diff --git a/monerokit/src/main/java/io/horizontalsystems/monerokit/WalletService.kt b/monerokit/src/main/java/io/horizontalsystems/monerokit/WalletService.kt
+index 7e3e828..8bca523 100644
+--- a/monerokit/src/main/java/io/horizontalsystems/monerokit/WalletService.kt
++++ b/monerokit/src/main/java/io/horizontalsystems/monerokit/WalletService.kt
+@@ -468,10 +468,13 @@ class WalletService(private val context: Context, private val configuredProxy: S
+         // the scan start to the chain tip: the wallet would never see its history. Put the start back.
+         if (restoreHeight != null) {
+             val height = wallet.blockChainHeight
+-            if (height <= 1) {
+-                val from = restoreHeight.coerceAtLeast(0)
+-                val initFrom = wallet.restoreHeight
+-                if (initFrom != from) Timber.w("wallet at height %d: scan from %d, not %d", height, from, initFrom)
++            val from = restoreHeight.coerceAtLeast(0)
++            val initFrom = wallet.restoreHeight
++            // A partially scanned view-only cache can reopen with restoreHeight=0.
++            // If it is still below the requested scan start, enforce the caller's
++            // restore height instead of continuing an unnecessary genesis scan.
++            if (initFrom != from && (height <= 1 || height < from)) {
++                Timber.w("wallet at height %d: scan from %d, not %d", height, from, initFrom)
+                 wallet.setRestoreHeight(from)
+             }
+         }
+@@ -497,6 +500,7 @@ class WalletService(private val context: Context, private val configuredProxy: S
+     private inner class MyWalletListener : WalletListener {
+         var updated = true
+         private var lastBlockTime = 0L
++        private var lastHistoryRefreshTime = 0L
+         private var lastTxCount = 0
+ 
+         fun start() {
+@@ -524,7 +528,7 @@ class WalletService(private val context: Context, private val configuredProxy: S
+             if (wallet.isSynchronized) return
+ 
+             // don't flood with an update for every block ...
+-            if (lastBlockTime < System.currentTimeMillis() - 2000) {
++            if (lastBlockTime < System.currentTimeMillis() - 4000) {
+                 lastBlockTime = System.currentTimeMillis()
+                 // On the thread that grows the subaddress table, so the read cannot race it.
+                 knownSubaddressCount = wallet.getNumSubaddresses(0)
+@@ -587,6 +591,135 @@ class WalletService(private val context: Context, private val configuredProxy: S
+         wallet.estimateTransactionFee(txData)
+     } ?: throw IllegalStateException("Wallet is NULL")
+ 
++    fun exportOutputs(filename: String, all: Boolean = true): Boolean =
++        withSession { wallet ->
++            atRest(wallet) { wallet.exportOutputs(filename, all) }
++        } ?: throw IllegalStateException("Wallet is NULL")
++
++    /**
++     * Runs a wallet operation with background refresh stopped but daemon RPCs still
++     * available. atRest() deliberately sets wallet2 offline while draining a refresh
++     * pass; these hardware-signing operations need the daemon, so bring it online
++     * only after the refresh thread is quiescent. atRest() resumes refresh afterward.
++     */
++    private inline fun <T> atRestOnline(wallet: Wallet, block: () -> T): T =
++        atRest(wallet) {
++            wallet.setOffline(false)
++            block()
++        }
++
++    fun importKeyImages(filename: String): Boolean =
++        withSession { wallet ->
++            atRestOnline(wallet) {
++                // Monero's WalletImpl::importKeyImages refuses to run unless the
++                // daemon is marked trusted because it asks the daemon for spent/
++                // unspent status. Trust only this operation, then restore the
++                // caller's previous setting.
++                val wasTrusted = wallet.trustedDaemon()
++                try {
++                    wallet.setTrustedDaemon(true)
++                    val imported = wallet.importKeyImages(filename)
++                    if (!imported) {
++                        val reason = wallet.status.errorString
++                            .takeIf { !it.isNullOrBlank() }
++                            ?: "wallet2 rejected the key-image file"
++                        Timber.e("Keystone key-image import failed: %s", reason)
++                        throw IllegalStateException("Key image sync failed: " + reason)
++                    }
++                    Timber.i("Keystone key-image import succeeded")
++                    wallet.refreshHistory()
++                    listener?.updated = true
++                    storeCache(wallet)
++                    true
++                } finally {
++                    wallet.setTrustedDaemon(wasTrusted)
++                }
++            }
++        } ?: throw IllegalStateException("Wallet is NULL")
++
++    fun rescanSpent(): Boolean =
++        withSession { wallet ->
++            atRestOnline(wallet) {
++                val wasTrusted = wallet.trustedDaemon()
++                try {
++                    wallet.setTrustedDaemon(true)
++                    val rescanned = wallet.rescanSpent()
++                    if (!rescanned) {
++                        val reason = wallet.status.errorString
++                            .takeIf { !it.isNullOrBlank() }
++                            ?: "wallet2 could not rescan spent outputs"
++                        Timber.e("Rescan spent failed: %s", reason)
++                        throw IllegalStateException("Rescan spent failed: " + reason)
++                    }
++                    Timber.i("Rescan spent succeeded")
++                    listener?.updated = true
++                    wallet.refreshHistory()
++                    storeCache(wallet)
++                    true
++                } finally {
++                    wallet.setTrustedDaemon(wasTrusted)
++                }
++            }
++        } ?: throw IllegalStateException("Wallet is NULL")
++
++    /**
++     * A watch-only wallet creates the transaction set but saves it instead of
++     * broadcasting. wallet2 writes the unsigned transaction when commit gets a filename.
++     */
++    fun createUnsignedTransaction(txData: TxData, filename: String): Boolean =
++        withSession { wallet ->
++            atRestOnline(wallet) {
++                wallet.disposePendingTransaction()
++                txData.createPocketChange(wallet)
++                val pending = wallet.createTransaction(txData)
++                if (pending.status !== PendingTransaction.Status.Status_Ok) {
++                    val error = pending.getErrorString()
++                    wallet.disposePendingTransaction()
++                    throw IllegalStateException("Create unsigned transaction failed: " + error)
++                }
++                val saved = pending.commit(filename, true)
++                val error = if (saved) null else pending.getErrorString()
++                wallet.disposePendingTransaction()
++                if (!saved) throw IllegalStateException("Saving unsigned transaction failed: " + error)
++                Timber.i("Keystone unsigned transaction saved")
++                true
++            }
++        } ?: throw IllegalStateException("Create unsigned transaction failed: Wallet is NULL")
++
++    fun submitSignedTransaction(filename: String): Boolean =
++        withSession { wallet ->
++            atRestOnline(wallet) {
++                val submitted = wallet.submitTransaction(filename)
++                if (!submitted) {
++                    val reason = wallet.status.errorString
++                        .takeIf { !it.isNullOrBlank() }
++                        ?: "wallet2 rejected the signed transaction"
++                    Timber.e("Keystone signed transaction submit failed: %s", reason)
++                    throw IllegalStateException("Signed transaction submit failed: " + reason)
++                }
++                Timber.i("Keystone signed transaction submitted")
++
++                val wasTrusted = wallet.trustedDaemon()
++                try {
++                    wallet.setTrustedDaemon(true)
++                    if (!wallet.rescanSpent()) {
++                        Timber.w("Post-send rescan spent failed: %s", wallet.status.errorString)
++                    } else {
++                        Timber.i("Post-send rescan spent succeeded")
++                    }
++                } catch (t: Throwable) {
++                    Timber.w(t, "Post-send rescan spent failed after broadcast")
++                } finally {
++                    wallet.setTrustedDaemon(wasTrusted)
++                }
++
++                listener?.updated = true
++                wallet.refreshHistory()
++                storeCache(wallet)
++                true
++            }
++        } ?: throw IllegalStateException("Wallet is NULL")
++
+     /** Creates and commits one transaction, both on the same wallet. */
+     fun send(txData: TxData, notes: String?) {
+         if (wallet == null) throw IllegalStateException("Create Transaction failed: Wallet is NULL")
+diff --git a/monerokit/src/main/java/io/horizontalsystems/monerokit/model/Wallet.java b/monerokit/src/main/java/io/horizontalsystems/monerokit/model/Wallet.java
+index 6795d13..8c07a04 100644
+--- a/monerokit/src/main/java/io/horizontalsystems/monerokit/model/Wallet.java
++++ b/monerokit/src/main/java/io/horizontalsystems/monerokit/model/Wallet.java
+@@ -425,8 +425,7 @@ public class Wallet {
+ 
+     private native long createSweepUnmixableTransactionJ();
+ 
+-//virtual UnsignedTransaction * loadUnsignedTx(const std::string &unsigned_filename) = 0;
+-//virtual bool submitTransaction(const std::string &fileName) = 0;
++public native boolean submitTransaction(String fileName);
+ 
+     public native void disposeTransaction(PendingTransaction pendingTransaction);
+ 
+@@ -436,8 +435,8 @@ public class Wallet {
+ 
+     private native long estimateTransactionFee(String[] destinations, long[] amounts, int priority);
+ 
+-    //virtual bool exportKeyImages(const std::string &filename) = 0;
+-//virtual bool importKeyImages(const std::string &filename) = 0;
++    public native boolean exportOutputs(String filename, boolean all);
++    public native boolean importKeyImages(String filename);
+ 
+ 
+ //virtual TransactionHistory * history() const = 0;
+@@ -496,7 +495,7 @@ public class Wallet {
+ //virtual bool verifySignedMessage(const std::string &message, const std::string &addres, const std::string &signature) const = 0;
+ 
+ //virtual bool parse_uri(const std::string &uri, std::string &address, std::string &payment_id, uint64_t &tvAmount, std::string &tx_description, std::string &recipient_name, std::vector<std::string> &unknown_parameters, std::string &error) = 0;
+-//virtual bool rescanSpent() = 0;
++public native boolean rescanSpent();
+ 
+     private static final String NEW_ACCOUNT_NAME = "Untitled account"; // src/wallet/wallet2.cpp:941
+ 

@@ -509,8 +509,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
-        val seedData = secrets.loadSeed(active.id) ?: run {
-            Timber.w("openActiveWallet: no stored seed for wallet ${active.id}")
+        val watchOnly = if (active.isKeystone) secrets.loadWatchOnly(active.id) else null
+        val seedData = if (active.isKeystone) null else secrets.loadSeed(active.id)
+        if (active.isKeystone && watchOnly == null) {
+            Timber.w("openActiveWallet: missing Keystone watch-only keys")
+            _walletState.update { it.copy(error = "Could not read Keystone watch-only keys") }
+            return
+        }
+        if (!active.isKeystone && seedData == null) {
+            Timber.w("openActiveWallet: no stored seed")
             return
         }
 
@@ -519,8 +526,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             // Legacy row without an id: derive + persist BEFORE opening.
             info = mergeWalletUpdate(active.id) {
                 it.copy(
-                    derivedWalletId = it.derivedWalletId
-                        ?: WalletCacheIds.derivedWalletId(seedData.first, it.syncResetCount)
+                    derivedWalletId = it.derivedWalletId ?: if (it.isKeystone) {
+                        WalletCacheIds.watchOnlyWalletId(checkNotNull(watchOnly).first, it.syncResetCount)
+                    } else {
+                        WalletCacheIds.derivedWalletId(checkNotNull(seedData).first, it.syncResetCount)
+                    }
                 )
             } ?: return
             Timber.i("Populated missing derivedWalletId for wallet ${info.id}")
@@ -564,13 +574,19 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         try {
             _walletState.update { it.copy(syncState = SyncState.Connecting(waiting = false)) }
 
-            val (seedWords, seedType) = seedData
+            val kitSeed = if (info.isKeystone) {
+                val pair = checkNotNull(watchOnly)
+                Seed.WatchOnly(pair.first, pair.second)
+            } else {
+                val pair = checkNotNull(seedData)
+                moneroSeed(pair.first, pair.second)
+            }
             val nodeUri = getSelectedNode()
-            Timber.d("openActiveWallet: wallet=${info.id} cacheId=$cacheId node=$nodeUri seedType=$seedType")
+            Timber.d("openActiveWallet: opening source=" + if (info.isKeystone) "keystone" else "seed")
 
             val kit = WalletManager.initialize(
                 context = context,
-                seed = moneroSeed(seedWords, seedType),
+                seed = kitSeed,
                 restoreDateOrHeight = info.restoreHeight.toString(),
                 walletId = cacheId,
                 node = nodeCredentials.kitNodeString(nodeUri),
@@ -614,12 +630,12 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             // "Not connected" for good; the keys/seed are intact, so rebuild
             // the cache from the seed once (in-session heal, iOS parity).
             val startState = kit.syncStateFlow.value
-            if (!healed && startState is SyncState.NotSynced && isUnloadableCacheError(startState.error)) {
+            if (!info.isKeystone && !healed && startState is SyncState.NotSynced && isUnloadableCacheError(startState.error)) {
                 Timber.w("openActiveWallet: cache $cacheId failed to load; rebuilding it from the seed")
                 cancelKitObservers()
                 WalletManager.stopAndRelease()
                 check(!hasSeedMismatch(info.id)) { "Seed phrase doesn't match current wallet; original files preserved" }
-                retainFilesForRebuild(info, seedData.first)
+                retainFilesForRebuild(info, checkNotNull(seedData).first)
                 openActiveWallet(healed = true)
                 return
             }
@@ -909,6 +925,117 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             restoreHeight = restoreHeight?.toLongOrNull() ?: 0L,
             restoreDateMillis = restoreDateMillis ?: 0L
         )
+    }
+
+
+    suspend fun addKeystoneWallet(
+        pairing: KeystonePairing,
+        flowId: String,
+        name: String? = null
+    ): Boolean = addForScreen(flowId) {
+        walletMutationMutex.withLock {
+            val previousActive = _activeWallet.value
+            var persisted: WalletInfo? = null
+            try {
+                // Validate the address shape up front, then let wallet2's real
+                // create/open path be authoritative for this address + view-key pair.
+                withContext(Dispatchers.Default) {
+                    MoneroKit.validateAddress(pairing.primaryAddress)
+                }
+
+                val derived = WalletCacheIds.watchOnlyWalletId(pairing.primaryAddress, 0)
+                _wallets.value.firstOrNull {
+                    it.derivedWalletId == derived || it.cachedPrimaryAddress == pairing.primaryAddress
+                }?.let { throw DuplicateWalletException(it.name) }
+
+                snapshotActiveWalletCache()
+
+                // A previous failed/debug pairing can leave orphaned native cache files
+                // under this deterministic id. Delete them so stale .keys data can never
+                // override the freshly scanned Keystone pairing payload.
+                withContext(Dispatchers.IO) {
+                    MoneroKit.deleteWallet(context, derived)
+                }
+
+                val info = WalletInfo(
+                    id = UUID.randomUUID().toString(),
+                    name = name?.trim().takeUnless { it.isNullOrEmpty() } ?: "Keystone",
+                    emoji = "🔐",
+                    source = WalletSource.VIEW_ONLY,
+                    createdAt = System.currentTimeMillis(),
+                    restoreHeight = pairing.restoreHeight,
+                    restoreDateMillis = 0L,
+                    cachedPrimaryAddress = pairing.primaryAddress,
+                    derivedWalletId = derived,
+                    deviceWalletId = "keystone"
+                )
+
+                secrets.saveWatchOnly(info.id, pairing.primaryAddress, pairing.privateViewKey)
+                existingPinHash()?.let { secrets.savePinHash(info.id, it) }
+                store.addWallet(info)
+                store.setActiveWalletId(info.id)
+                _wallets.value = store.wallets()
+                _activeWallet.value = info
+                _walletSessionId.value += 1
+                persisted = info
+
+                cancelKitObservers()
+                val kit = WalletManager.initialize(
+                    context = context,
+                    seed = Seed.WatchOnly(pairing.primaryAddress, pairing.privateViewKey),
+                    restoreDateOrHeight = pairing.restoreHeight.toString(),
+                    walletId = derived,
+                    node = nodeCredentials.kitNodeString(getSelectedNode()),
+                    trustNode = false,
+                    networkType = NetworkType.NetworkType_Mainnet
+                )
+                setupKitObservers(kit)
+                refreshHasWallet()
+                _walletState.update {
+                    it.copy(
+                        isInitializing = false,
+                        balance = Balance(0, 0),
+                        transactions = emptyList(),
+                        addresses = null,
+                        error = null
+                    )
+                }
+                publishAddresses(info, kit)
+                WalletManager.start()
+
+                // startInternal captures local wallet identity immediately after opening
+                // the wallet file, before daemon setup. This remains available even when
+                // the selected node is temporarily unreachable.
+                val openedAddress = kit.checkedWalletFilePrimaryAddress
+                val openedViewKey = kit.checkedWalletFilePrivateViewKey
+                check(openedAddress == pairing.primaryAddress) {
+                    "Keystone pairing failed: wallet2 opened a different primary address. Scan the normal Monero/Feather connection QR again."
+                }
+                check(
+                    openedViewKey != null &&
+                        openedViewKey.equals(pairing.privateViewKey, ignoreCase = true)
+                ) {
+                    "Keystone pairing failed: wallet2 opened a different private view key. Scan the normal Monero/Feather connection QR again."
+                }
+
+                val startState = kit.syncStateFlow.value
+                if (startState is SyncState.NotSynced && isWalletLevelStartError(startState.error)) {
+                    throw WalletOpenException(startState.error.message ?: "Keystone wallet could not be opened")
+                }
+                publishAddresses(info, kit)
+                true
+            } catch (e: DuplicateWalletException) {
+                _walletState.update { it.copy(isInitializing = false, error = e.message) }
+                false
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to add Keystone wallet")
+                persisted?.let { rollbackFailedAdd(it, previousActive) }
+                _walletState.update {
+                    it.copy(isInitializing = false, error = e.message ?: "Failed to add Keystone wallet")
+                }
+                false
+            }
+        }
     }
 
     private suspend fun addWalletInternal(
@@ -2031,19 +2158,43 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun resetSyncLocked() {
         try {
             val active = _activeWallet.value ?: return
-            val seedData = secrets.loadSeed(active.id) ?: run {
-                Timber.w("No stored seed, cannot reset sync")
-                _walletState.update { it.copy(error = "No wallet seed to reset sync") }
-                return
-            }
 
-            // Never replace a wallet whose stored seed has not been verified against its file.
-            check(verifySeedForExport(active.id)) {
-                "Cannot reset sync until the seed matches the wallet file. Original files preserved."
+            if (active.isKeystone) {
+                val watchOnly = secrets.loadWatchOnly(active.id) ?: run {
+                    Timber.w("No stored Keystone watch-only keys, cannot reset sync")
+                    _walletState.update { it.copy(error = "Missing Keystone watch-only keys") }
+                    return
+                }
+
+                cancelKitObservers()
+                WalletManager.stopAndRelease()
+
+                val nextReset = active.syncResetCount + 1
+                val nextCacheId = WalletCacheIds.watchOnlyWalletId(watchOnly.first, nextReset)
+                checkNotNull(mergeWalletUpdate(active.id) {
+                    it.copy(
+                        syncResetCount = nextReset,
+                        derivedWalletId = nextCacheId,
+                        retainedCacheIds = (it.retainedCacheIds + listOfNotNull(it.derivedWalletId)).distinct(),
+                        cachedBalance = 0L,
+                        cachedUnlockedBalance = 0L
+                    )
+                }) { "Wallet was removed during recovery" }
+            } else {
+                val seedData = secrets.loadSeed(active.id) ?: run {
+                    Timber.w("No stored seed, cannot reset sync")
+                    _walletState.update { it.copy(error = "No wallet seed to reset sync") }
+                    return
+                }
+
+                // Never replace a wallet whose stored seed has not been verified against its file.
+                check(verifySeedForExport(active.id)) {
+                    "Cannot reset sync until the seed matches the wallet file. Original files preserved."
+                }
+                cancelKitObservers()
+                WalletManager.stopAndRelease()
+                retainFilesForRebuild(active, seedData.first)
             }
-            cancelKitObservers()
-            WalletManager.stopAndRelease()
-            retainFilesForRebuild(active, seedData.first)
             _walletState.update {
                 it.copy(
                     balance = Balance(0, 0),
@@ -2140,6 +2291,82 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             } catch (e: Exception) {
                 Timber.e(e, "Failed to stop wallet")
             }
+        }
+    }
+
+    private fun requireActiveKeystone(): Pair<WalletInfo, MoneroKit> {
+        val info = _activeWallet.value ?: error("No active wallet")
+        check(info.isKeystone) { "Active wallet is not hardware-backed." }
+        val kit = WalletManager.kit ?: error("Wallet is not connected yet")
+        check(WalletManager.currentWalletId == info.derivedWalletId) { "Active wallet changed — please retry" }
+        return info to kit
+    }
+
+    suspend fun keystoneExportOutputs(): ByteArray = withContext(Dispatchers.IO) {
+        val (info, kit) = requireActiveKeystone()
+        val file = File.createTempFile("keystone_outputs_", ".bin", context.cacheDir)
+        try {
+            check(kit.exportOutputs(file.absolutePath, true)) { "Could not export wallet outputs" }
+            check(_activeWallet.value?.id == info.id) { "Active wallet changed — please retry" }
+            file.readBytes()
+        } finally {
+            file.delete()
+        }
+    }
+
+    suspend fun keystoneRescanSpent(): Boolean = withContext(Dispatchers.IO) {
+        val (_, kit) = requireActiveKeystone()
+        check(kit.rescanSpent()) { "Rescan spent failed" }
+        true
+    }
+
+    suspend fun keystoneImportKeyImages(data: ByteArray) = withContext(Dispatchers.IO) {
+        require(data.isNotEmpty()) { "Key-image QR was empty" }
+        val (info, kit) = requireActiveKeystone()
+        Timber.i("Keystone key-image QR decoded: %d bytes", data.size)
+        val file = File.createTempFile("keystone_keyimages_", ".bin", context.cacheDir)
+        try {
+            file.writeBytes(data)
+            check(kit.importKeyImages(file.absolutePath)) { "Key image sync failed" }
+            check(_activeWallet.value?.id == info.id) { "Active wallet changed — please retry" }
+            Timber.i("Keystone key-image sync complete")
+        } finally {
+            file.delete()
+        }
+    }
+
+    suspend fun keystoneCreateUnsignedTransaction(
+        address: String,
+        amount: Long,
+        sweepAll: Boolean
+    ): ByteArray = withContext(Dispatchers.IO) {
+        MoneroKit.validateAddress(address)
+        check(sweepAll || amount > 0L) { "Invalid amount" }
+        val (info, kit) = requireActiveKeystone()
+        val file = File.createTempFile("keystone_unsigned_", ".bin", context.cacheDir)
+        try {
+            check(kit.createUnsignedTransaction(amount, address, file.absolutePath, sweepAll)) {
+                "Could not create unsigned transaction"
+            }
+            check(_activeWallet.value?.id == info.id) { "Active wallet changed — please retry" }
+            file.readBytes()
+        } finally {
+            file.delete()
+        }
+    }
+
+    suspend fun keystoneSubmitSignedTransaction(data: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        require(data.isNotEmpty()) { "Signed transaction QR was empty" }
+        val (info, kit) = requireActiveKeystone()
+        val file = File.createTempFile("keystone_signed_", ".bin", context.cacheDir)
+        try {
+            file.writeBytes(data)
+            Timber.i("Keystone signed-tx QR decoded: %d bytes", data.size)
+            val submitted = kit.submitSignedTransaction(file.absolutePath)
+            check(_activeWallet.value?.id == info.id) { "Active wallet changed — please retry" }
+            submitted
+        } finally {
+            file.delete()
         }
     }
 

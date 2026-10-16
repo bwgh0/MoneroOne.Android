@@ -151,7 +151,8 @@ fun SendScreen(
     onIncomingLink: (link: OpenSendLink, accepted: Boolean) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     onScanQr: () -> Unit,
-    onSent: () -> Unit
+    onSent: () -> Unit,
+    onKeystoneSign: (String, Long, Boolean) -> Unit = { _, _, _ -> }
 ) {
     val walletState by walletViewModel.walletState.collectAsState()
     val flow = remember { SendFlow(walletViewModel.activeWallet.value?.id) }
@@ -406,12 +407,17 @@ fun SendScreen(
             subtitle = tr("Confirm this transaction"),
             onAuthenticated = {
                 showAuthGate = false
-                walletViewModel.send(
-                    flow,
-                    address,
-                    walletViewModel.parseXmr(amount),
-                    isSweepAll = isSweepAll
-                )
+                val atomic = walletViewModel.parseXmr(amount)
+                if (walletViewModel.activeWallet.value?.isKeystone == true) {
+                    onKeystoneSign(address, atomic, isSweepAll)
+                } else {
+                    walletViewModel.send(
+                        flow,
+                        address,
+                        atomic,
+                        isSweepAll = isSweepAll
+                    )
+                }
             },
             onCancel = {
                 showAuthGate = false

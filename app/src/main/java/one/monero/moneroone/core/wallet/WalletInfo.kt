@@ -44,6 +44,9 @@ data class WalletInfo(
     val isViewOnly: Boolean
         get() = source.isViewOnly
 
+    val isKeystone: Boolean
+        get() = source == WalletSource.VIEW_ONLY && deviceWalletId == "keystone"
+
     /** Prefix scoping this wallet's entries in encrypted storage / prefs. */
     val keyPrefix: String
         get() = "wallet.$id"
