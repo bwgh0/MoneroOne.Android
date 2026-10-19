@@ -5,6 +5,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,7 +49,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +68,7 @@ import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.components.ShrinkToFitText
 import one.monero.moneroone.ui.components.rememberReduceMotion
+import one.monero.moneroone.ui.components.softTickHaptic
 import one.monero.moneroone.ui.components.successHaptic
 import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.MoneroOrange
@@ -387,6 +391,7 @@ private fun Confetti() {
 @Composable
 private fun HashPill(txHash: String, modifier: Modifier = Modifier) {
     val clipboardManager = LocalClipboardManager.current
+    val view = LocalView.current
     var copied by remember { mutableStateOf(false) }
     // Back to the copy label after 2 s, as on iOS
     LaunchedEffect(copied) {
@@ -395,32 +400,33 @@ private fun HashPill(txHash: String, modifier: Modifier = Modifier) {
             copied = false
         }
     }
+    val tint = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant
+    val label = if (copied) tr("Transaction ID copied") else tr("Copy transaction ID")
+    // As on iOS: the whole pill copies, and the icon comes before the ID.
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
             .clip(CapsuleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(role = Role.Button) {
+                clipboardManager.setText(AnnotatedString(txHash))
+                copied = true
+                softTickHaptic(view)
+            }
+            .clearAndSetSemantics { contentDescription = label; role = Role.Button }
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
+        Icon(
+            if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(14.dp)
+        )
         Text(
             text = if (copied) tr("Copied!") else truncateMiddle(txHash),
             style = MonoCaption,
-            color = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f, fill = false)
+            color = tint
         )
-        IconButton(
-            onClick = {
-                clipboardManager.setText(AnnotatedString(txHash))
-                copied = true
-            },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-                contentDescription = tr("Copy"),
-                tint = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
-            )
-        }
     }
 }
