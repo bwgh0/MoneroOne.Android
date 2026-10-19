@@ -66,9 +66,9 @@ fun TransactionDetailScreen(walletViewModel: WalletViewModel, txId: String, onBa
     val fields = transaction?.let {
         TransactionHistoryLogic.details(it, rows,
             DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it.timestamp * 1000)),
-            // A send to this wallet paid nobody: no value rows.
-            transactionFiat(it, history, price?.price, currency).takeUnless { toThisWallet },
-            price?.price?.let { live -> MoneyFormat.format(it.amount / 1e12 * live, currency, fractionDigits = 2) }?.takeUnless { toThisWallet },
+            // A send to this wallet moved only its fee: both values are the fee's.
+            amountFiat(SendNames.shownAmount(sendName, it.amount, it.fee), it.timestamp, history, price?.price, currency),
+            price?.price?.let { live -> MoneyFormat.format(SendNames.shownAmount(sendName, it.amount, it.fee) / 1e12 * live, currency, fractionDigits = 2) },
             txKey, sendName)
     }.orEmpty()
     // "Add to Contacts" (ios-18): a send to one known address that is no contact and none of your wallets.

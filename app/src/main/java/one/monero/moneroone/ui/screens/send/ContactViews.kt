@@ -76,6 +76,8 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.contacts.Contact
@@ -92,6 +94,7 @@ import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
+import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.truncateMiddle
 import one.monero.moneroone.core.locale.tr
 import timber.log.Timber
@@ -187,7 +190,31 @@ internal fun ContactRow(
                 Text(contact.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 ContactDestinationText(contact)
             }
-            if (checked) Icon(Icons.Default.Check, contentDescription = null, tint = MoneroOrange, modifier = Modifier.size(22.dp))
+            // The switcher's green check (WalletRowCheck); TalkBack hears the row as selected.
+            if (checked) Icon(Icons.Default.Check, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+/**
+ * A send to a contact's Review: the monogram in the 40 disc of the Recipient row, "Recipient", the
+ * name and the address 8…8, as [ReviewWalletRow] shows a wallet. One TalkBack element.
+ */
+@Composable
+internal fun ReviewContactRow(contact: Contact, address: String) {
+    val label = tr("Recipient")
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics { contentDescription = "$label, ${contact.name}, ${truncateMiddle(address)}" }
+    ) {
+        RecipientMonogram(Contacts.initials(contact), 40.dp)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(contact.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (address.isNotEmpty()) Text(truncateMiddle(address), style = MonoCaption, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -252,7 +279,7 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
             )
             Spacer(Modifier.height(16.dp))
             when {
-                contacts.isEmpty() -> ContactsMessage(tr("No Contacts"), tr("Contacts you save show here."))
+                contacts.isEmpty() -> ContactsEmptyCard()
                 shown.isEmpty() -> ContactsMessage(tr("No Results"), null)
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
@@ -341,6 +368,37 @@ private fun SwipeToDeleteContact(onDelete: () -> Unit, content: @Composable () -
     ) { content() }
 }
 
+/** No contacts yet (ios-10): the empty-state card, with the person glyph, on the cell fill. */
+@Composable
+private fun ContactsEmptyCard() {
+    GlassCard(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        shadow = false,
+        color = CellFill
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(32.dp).semantics(mergeDescendants = true) {},
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                Icons.Outlined.AccountCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(tr("No Contacts"), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                tr("Contacts you save show here."),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
 @Composable
 private fun ContactsMessage(title: String, detail: String?) {
     Column(
@@ -407,9 +465,10 @@ internal fun ContactEditorSheet(contact: Contact?, onDismiss: () -> Unit, prefil
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MoneroTheme.colors.bgGrouped,
+        containerColor = MoneroTheme.colors.fill,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
+            val cardColor = MoneroTheme.colors.fillElevated
             Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding()) {
                 Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                     DismissTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) { Text(tr("Cancel")) }
@@ -429,7 +488,7 @@ internal fun ContactEditorSheet(contact: Contact?, onDismiss: () -> Unit, prefil
                     Spacer(Modifier.height(16.dp))
                     RecipientMonogram(OpenAlias.initials(name.takeIf { it.isNotBlank() }, ""), 88.dp)
                     Spacer(Modifier.height(24.dp))
-                    GlassCard(Modifier.fillMaxWidth(), shadow = false, cornerRadius = 16.dp) {
+                    GlassCard(Modifier.fillMaxWidth(), shadow = false, cornerRadius = 16.dp, color = cardColor) {
                         Column {
                             MoneroTextField(
                                 value = name,
@@ -468,9 +527,9 @@ internal fun ContactEditorSheet(contact: Contact?, onDismiss: () -> Unit, prefil
                         },
                         placeholder = { Text(fieldLabel, style = MonoCaption) },
                         textStyle = MonoCaption,
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
-                        colors = moneroTextFieldColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                        // The whole address shows, over several lines (ios-14, ios-15).
+                        keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Done),
+                        colors = moneroTextFieldColors(containerColor = cardColor),
                         trailingIcon = if (destination.isNotEmpty()) {
                             {
                                 OpenAliasClearButton(onClear = {
@@ -490,7 +549,7 @@ internal fun ContactEditorSheet(contact: Contact?, onDismiss: () -> Unit, prefil
                     }
                     if (contact != null) {
                         Spacer(Modifier.height(32.dp))
-                        GlassCard(Modifier.fillMaxWidth(), shadow = false, cornerRadius = 16.dp) {
+                        GlassCard(Modifier.fillMaxWidth(), shadow = false, cornerRadius = 16.dp, color = cardColor) {
                             Text(
                                 tr("Delete Contact"),
                                 style = MaterialTheme.typography.bodyLarge,

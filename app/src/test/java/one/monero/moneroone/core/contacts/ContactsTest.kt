@@ -172,11 +172,30 @@ class ContactsTest {
 
     // ---- Follow-up 1: a send to this wallet ----
 
-    @Test fun aSendToThisWalletsDetailShowsZeroAndTheFee() {
-        val self = sent(addrWallet, amount = 500_000_000_000, fee = 30_000_000)
-        val fields = TransactionHistoryLogic.details(self, emptyList(), "date", null, null, null, SendName.ToThisWallet)
+    @Test fun aSendToThisWalletsDetailShowsTheFeeAsItsAmount() {
+        // Pending: wallet2 still books the whole amount; the detail shows only the fee, as the row does.
+        val pending = sent(addrWallet, amount = 500_000_000_000, fee = 30_000_000)
+        val fields = TransactionHistoryLogic.details(pending, emptyList(), "date", "\$0.01", "\$0.02", null, SendName.ToThisWallet)
         assertEquals("To This Wallet", fields.first { it.label == "Type" }.value)
-        assertTrue(fields.first { it.label == "Amount" }.value.let { it.startsWith("0") && !it.contains("−") })
+        assertEquals("−${one.monero.moneroone.data.util.XmrFormat.format(30_000_000)} XMR", fields.first { it.label == "Amount" }.value)
         assertTrue(fields.first { it.label == "Fee" }.value.contains("0.00003"))
+        assertEquals("\$0.01", fields.first { it.label == "Value when sent" }.value)
+        assertEquals("\$0.02", fields.first { it.label == "Value today" }.value)
+        // Confirmed: wallet2 books 0 plus the fee; the same fee shows.
+        val confirmed = sent(addrWallet, amount = 0, fee = 30_000_000)
+        val after = TransactionHistoryLogic.details(confirmed, emptyList(), "date", null, null, null, SendName.ToThisWallet)
+        assertEquals(fields.first { it.label == "Amount" }.value, after.first { it.label == "Amount" }.value)
+    }
+
+    @Test fun anOpenAliasRowShowsTheNameAsTyped() {
+        val store = one.monero.moneroone.core.openalias.OpenAliasPinStore(FakeSharedPreferences())
+        store.record("donate.getmonero.org", addrPaid, display = "donate@getmonero.org")
+        store.record("old.example.org", addrSub)
+        assertEquals(mapOf("donate.getmonero.org" to "donate@getmonero.org", "old.example.org" to "old.example.org"), store.pinnedNames())
+        val name = SendNames.recipientName(listOf(addrPaid), emptyList(), store.pinnedAddresses(), store.pinnedNames())
+        assertEquals("To donate@getmonero.org", TransactionHistoryLogic.sendNameTitle(name!!))
+        // An older pin, written before the typed form was kept, shows the lookup form.
+        val old = SendNames.recipientName(listOf(addrSub), emptyList(), store.pinnedAddresses(), store.pinnedNames())
+        assertEquals(SendName.ToOpenAlias("old.example.org"), old)
     }
 }

@@ -182,9 +182,8 @@ object TransactionHistoryLogic {
             if (!value.isNullOrBlank()) add(TransactionDetailField(label, value, secret))
         }
         field(tr("Type"), if (sendName == SendName.ToThisWallet) tr("To This Wallet") else tr(if (incoming) "Received" else "Sent"))
-        // A send to this wallet paid nobody: 0 XMR, no sign, pending and confirmed. The fee row shows what it cost.
-        if (sendName == SendName.ToThisWallet) field(tr("Amount"), "${XmrFormat.format(0L)} XMR")
-        else field(tr("Amount"), "${if (incoming) "+" else "−"}${XmrFormat.format(tx.amount)} XMR")
+        // A send to this wallet moved only its fee, pending and confirmed, as its row shows.
+        field(tr("Amount"), "${if (incoming) "+" else "−"}${XmrFormat.format(SendNames.shownAmount(sendName, tx.amount, tx.fee))} XMR")
         if (!incoming) field(tr("Fee"), feeText(tx.fee))
         field(tr(if (incoming) "Value when received" else "Value when sent"), atTime)
         field(tr("Value today"), today)

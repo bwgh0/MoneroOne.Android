@@ -171,7 +171,9 @@ object SendNames {
         destinations: List<String> = emptyList(),
         contacts: List<Contact> = emptyList(),
         /** OpenAlias pins: the query name and the address last paid for it. */
-        pins: Map<String, String> = emptyMap()
+        pins: Map<String, String> = emptyMap(),
+        /** OpenAlias pins: the query name and the name as the user typed it. */
+        pinNames: Map<String, String> = emptyMap()
     ): SendName? {
         if (walletId == null) return null
         val record = records.lastOrNull { it.txid == txid }
@@ -180,7 +182,7 @@ object SendNames {
             if (to == walletId) return SendName.ToThisWallet
             if (to != null) wallets.firstOrNull { it.id == to }?.let { return SendName.ToWallet(it) }
             if (isSendToSelf(incoming, amount, fee)) return SendName.ToThisWallet
-            return recipientName(destinations, contacts, pins)
+            return recipientName(destinations, contacts, pins, pinNames)
         }
         val from = record?.takeIf { it.toWalletId == walletId && it.fromWalletId != walletId }?.fromWalletId
             ?: return null
@@ -192,14 +194,15 @@ object SendNames {
      * OpenAlias name that is not a contact, else null. Looked up at display time, so a deleted
      * contact names nothing again.
      */
-    fun recipientName(destinations: List<String>, contacts: List<Contact>, pins: Map<String, String>): SendName? {
+    fun recipientName(destinations: List<String>, contacts: List<Contact>, pins: Map<String, String>,
+                      pinNames: Map<String, String> = emptyMap()): SendName? {
         val sentTo = destinations.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         if (sentTo.isEmpty()) return null
         sentTo.firstNotNullOfOrNull { Contacts.forAddress(it, contacts) }?.let { return SendName.ToContact(it) }
         contacts.firstOrNull { contact ->
             contact.isOpenAlias && Contacts.openAliasQuery(contact)?.let { pins[it] } in sentTo
         }?.let { return SendName.ToContact(it) }
-        return pins.entries.firstOrNull { it.value in sentTo }?.let { SendName.ToOpenAlias(it.key) }
+        return pins.entries.firstOrNull { it.value in sentTo }?.let { SendName.ToOpenAlias(pinNames[it.key] ?: it.key) }
     }
 
     /** What a row shows as its amount: a send to this wallet moved only its fee. */

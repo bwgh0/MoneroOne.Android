@@ -598,6 +598,7 @@ fun SendScreen(
                         openAliasSummary = openAliasSummary,
                         fromWallet = if (toWalletShown != null) walletViewModel.activeWallet.value else null,
                         toWallet = toWalletShown,
+                        toContact = sendContact,
                         amount = amount,
                         memo = memo,
                         isSweepAll = isSweepAll,
@@ -1381,6 +1382,8 @@ private fun ReviewPhase(
     fromWallet: WalletInfo? = null,
     /** A Transfer: the wallet it goes to, at [address]. Null keeps the Recipient row. */
     toWallet: WalletInfo? = null,
+    /** A send to a contact: Review names the contact, as it names a wallet. */
+    toContact: Contact? = null,
     amount: String,
     memo: String,
     isSweepAll: Boolean,
@@ -1487,6 +1490,10 @@ private fun ReviewPhase(
                             Spacer(modifier = Modifier.height(12.dp))
                         }
                         ReviewWalletRow(label = tr("To"), wallet = toWallet, address = address)
+                    } else if (toContact != null) {
+                        ReviewContactRow(toContact, address)
+                        // A name keeps its checks (signature, pin) under the row.
+                        openAliasSummary?.let { OpenAliasReviewNotes(it, modifier = Modifier.padding(start = 52.dp)) }
                     } else {
                     // Recipient: the transaction-list disc (40, tint 0.15, 20dp glyph).
                     // A name shows its picture, the name, the OpenAlias name and
