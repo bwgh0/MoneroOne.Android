@@ -1197,7 +1197,8 @@ private fun TransactionCard(
             ?: TransactionHistoryLogic.rowLabel(transaction, fiatMode, fiatValue, date, receivedOn),
         onClick = onClick,
         linkBadge = link != null,
-        walletBadge = name != null
+        walletBadge = name is SendName.ToWallet || name is SendName.FromWallet || name == SendName.ToThisWallet,
+        personBadge = name is SendName.ToContact
     ) {
         if (link != null) {
             LinkRowAmounts(link, one.monero.moneroone.ui.components.transactionStatus(transaction))

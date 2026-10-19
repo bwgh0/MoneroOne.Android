@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -54,6 +55,8 @@ fun ActivityRow(
     modifier: Modifier = Modifier,
     linkBadge: Boolean = false,
     walletBadge: Boolean = false,
+    /** A send to a contact: the person glyph in the badge. */
+    personBadge: Boolean = false,
     amounts: @Composable () -> Unit
 ) {
     val rowBackground = MaterialTheme.colorScheme.surfaceContainer
@@ -69,7 +72,7 @@ fun ActivityRow(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DirectionDisc(incoming = incoming, linkBadge = linkBadge, rowBackground = rowBackground, walletBadge = walletBadge)
+            DirectionDisc(incoming = incoming, linkBadge = linkBadge, rowBackground = rowBackground, walletBadge = walletBadge, personBadge = personBadge)
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -110,7 +113,7 @@ fun ActivityRow(
  * ring of [rowBackground]. [walletBadge] is the same badge with the wallet glyph.
  */
 @Composable
-fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color, walletBadge: Boolean = false) {
+fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color, walletBadge: Boolean = false, personBadge: Boolean = false) {
     val hue = if (incoming) SuccessGreen else MoneroOrange
     Box {
         Box(
@@ -127,7 +130,7 @@ fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color, w
                 modifier = Modifier.size(20.dp).rotate(45f)
             )
         }
-        if (linkBadge || walletBadge) {
+        if (linkBadge || walletBadge || personBadge) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -142,7 +145,11 @@ fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color, w
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    if (walletBadge) Icons.Default.AccountBalanceWallet else Icons.Default.Link,
+                    when {
+                        personBadge -> Icons.Default.Person
+                        walletBadge -> Icons.Default.AccountBalanceWallet
+                        else -> Icons.Default.Link
+                    },
                     contentDescription = null,
                     tint = hue,
                     modifier = Modifier.size(11.dp)

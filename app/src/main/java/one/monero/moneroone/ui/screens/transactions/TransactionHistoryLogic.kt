@@ -1,5 +1,7 @@
 package one.monero.moneroone.ui.screens.transactions
 
+import one.monero.moneroone.core.contacts.Contact
+import one.monero.moneroone.core.contacts.Contacts
 import io.horizontalsystems.monerokit.model.TransactionInfo
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.core.wallet.ReceiveAddressLogic
@@ -25,7 +27,9 @@ object TransactionHistoryLogic {
 
     /** [isLink]: whether a transaction belongs to a payment link on this device (the Links filter). */
     fun filter(transactions: List<TransactionInfo>, filter: TransactionFilter, receivingIndex: Int?, query: String,
-               addresses: List<ReceiveAddressRow>, isLink: (TransactionInfo) -> Boolean = { false }): List<TransactionInfo> = transactions.filter { tx ->
+               addresses: List<ReceiveAddressRow>, isLink: (TransactionInfo) -> Boolean = { false },
+               /** The name a row shows ("To Savings", "To Dana"): search finds it too. */
+               shownName: (TransactionInfo) -> String? = { null }): List<TransactionInfo> = transactions.filter { tx ->
         val incoming = tx.direction == TransactionInfo.Direction.Direction_In
         val kindMatches = when (filter) {
             TransactionFilter.ALL -> true
@@ -36,8 +40,11 @@ object TransactionHistoryLogic {
         }
         val addressMatches = receivingIndex == null || (incoming && tx.accountIndex == 0 && tx.addressIndex == receivingIndex)
         val row = if (incoming) addresses.firstOrNull { it.index == tx.addressIndex } else null
-        val searchable = listOfNotNull(tx.hash, tx.notes, row?.name, row?.address?.address, tx.address) + tx.transfers.orEmpty().map { it.address }
-        kindMatches && addressMatches && (query.isBlank() || searchable.any { it.contains(query.trim(), ignoreCase = true) })
+        kindMatches && addressMatches && (query.isBlank() || run {
+            val searchable = listOfNotNull(tx.hash, tx.notes, row?.name, row?.address?.address, tx.address, shownName(tx)) +
+                tx.transfers.orEmpty().mapNotNull { it.address }
+            searchable.any { it.contains(query.trim(), ignoreCase = true) }
+        })
     }.sortedWith(compareBy<TransactionInfo> { !it.isPending && it.confirmations > 0 }.thenByDescending { it.timestamp })
 
     /**
@@ -108,6 +115,8 @@ object TransactionHistoryLogic {
         is SendName.ToWallet -> tr("To %s", name.wallet.name)
         is SendName.FromWallet -> tr("From %s", name.wallet.name)
         SendName.ToThisWallet -> tr("To This Wallet")
+        is SendName.ToContact -> tr("To %s", name.contact.name)
+        is SendName.ToOpenAlias -> tr("To %s", name.name)
     }
 
     /**
@@ -116,6 +125,29 @@ object TransactionHistoryLogic {
      */
     fun namedRowLabel(name: SendName, tx: TransactionInfo, fiatMode: Boolean, fiatValue: String?, date: String, receivedOn: String?): String =
         "${sendNameTitle(name)}, ${rowAmount(tx, fiatMode, fiatValue, receivedOn, SendNames.shownAmount(name, tx.amount, tx.fee))}, $date, ${rowStatus(tx)}"
+
+    /**
+     * What "Add to Contacts" fills in on a Sent detail (ios-18): the OpenAlias name the send used,
+     * else its one destination address. Null when the destination is unknown, or is already a
+     * contact or one of your wallets (then the row is hidden).
+     */
+    fun addToContactsDestination(tx: TransactionInfo, sendName: SendName?, contacts: List<Contact>,
+                                 isWallet: (String) -> Boolean): String? {
+        if (tx.direction == TransactionInfo.Direction.Direction_In) return null
+        when (sendName) {
+            is SendName.ToOpenAlias -> return sendName.name
+            null -> Unit
+            else -> return null
+        }
+        val destinations = tx.transfers.orEmpty().mapNotNull { it.address?.trim() }.filter { it.isNotEmpty() }.distinct()
+        val address = when (destinations.size) {
+            0 -> tx.address?.trim()?.takeIf { it.isNotEmpty() }
+            1 -> destinations.single()
+            else -> null
+        } ?: return null
+        if (Contacts.forAddress(address, contacts) != null || isWallet(address)) return null
+        return address
+    }
 
     /** The status word a row shows beside its amount. */
     fun rowStatus(tx: TransactionInfo): String = when {
@@ -142,13 +174,17 @@ object TransactionHistoryLogic {
 
     /** These same fields render the screen and Copy All, so the exported values cannot drift. */
     fun details(tx: TransactionInfo, addresses: List<ReceiveAddressRow>, date: String,
-                atTime: String?, today: String?, txKey: String?): List<TransactionDetailField> = buildList {
+                atTime: String?, today: String?, txKey: String?,
+                /** A send to this wallet moved only its fee: its detail reads "To This Wallet" and shows the fee. */
+                sendName: SendName? = null): List<TransactionDetailField> = buildList {
         val incoming = tx.direction == TransactionInfo.Direction.Direction_In
         fun field(label: String, value: String?, secret: Boolean = false) {
             if (!value.isNullOrBlank()) add(TransactionDetailField(label, value, secret))
         }
-        field(tr("Type"), tr(if (incoming) "Received" else "Sent"))
-        field(tr("Amount"), "${if (incoming) "+" else "−"}${XmrFormat.format(tx.amount)} XMR")
+        field(tr("Type"), if (sendName == SendName.ToThisWallet) tr("To This Wallet") else tr(if (incoming) "Received" else "Sent"))
+        // A send to this wallet paid nobody: 0 XMR, no sign, pending and confirmed. The fee row shows what it cost.
+        if (sendName == SendName.ToThisWallet) field(tr("Amount"), "${XmrFormat.format(0L)} XMR")
+        else field(tr("Amount"), "${if (incoming) "+" else "−"}${XmrFormat.format(tx.amount)} XMR")
         if (!incoming) field(tr("Fee"), feeText(tx.fee))
         field(tr(if (incoming) "Value when received" else "Value when sent"), atTime)
         field(tr("Value today"), today)

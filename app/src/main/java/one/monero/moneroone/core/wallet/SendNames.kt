@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import one.monero.moneroone.core.contacts.Contact
+import one.monero.moneroone.core.contacts.Contacts
 import timber.log.Timber
 
 /**
@@ -123,6 +125,12 @@ sealed interface SendName {
 
     /** Sent to this wallet's own address: "To This Wallet". Only the fee left the wallet. */
     data object ToThisWallet : SendName
+
+    /** Sent to a contact's address or OpenAlias name: "To <contact>", person badge. */
+    data class ToContact(val contact: Contact) : SendName
+
+    /** Sent to an OpenAlias name that is not a contact: "To <name>". */
+    data class ToOpenAlias(val name: String) : SendName
 }
 
 /** Transfer between your wallets, and the names History shows for sends between them. */
@@ -158,7 +166,12 @@ object SendNames {
         fee: Long,
         walletId: String?,
         records: List<SendNameRecord>,
-        wallets: List<WalletInfo>
+        wallets: List<WalletInfo>,
+        /** Where the send went, as wallet2 kept it (only for sends made on this phone). */
+        destinations: List<String> = emptyList(),
+        contacts: List<Contact> = emptyList(),
+        /** OpenAlias pins: the query name and the address last paid for it. */
+        pins: Map<String, String> = emptyMap()
     ): SendName? {
         if (walletId == null) return null
         val record = records.lastOrNull { it.txid == txid }
@@ -166,11 +179,27 @@ object SendNames {
             val to = record?.takeIf { it.fromWalletId == walletId }?.toWalletId
             if (to == walletId) return SendName.ToThisWallet
             if (to != null) wallets.firstOrNull { it.id == to }?.let { return SendName.ToWallet(it) }
-            return if (isSendToSelf(incoming, amount, fee)) SendName.ToThisWallet else null
+            if (isSendToSelf(incoming, amount, fee)) return SendName.ToThisWallet
+            return recipientName(destinations, contacts, pins)
         }
         val from = record?.takeIf { it.toWalletId == walletId && it.fromWalletId != walletId }?.fromWalletId
             ?: return null
         return wallets.firstOrNull { it.id == from }?.let { SendName.FromWallet(it) }
+    }
+
+    /**
+     * A send to a contact (its address, or the address its OpenAlias name was paid at), else to an
+     * OpenAlias name that is not a contact, else null. Looked up at display time, so a deleted
+     * contact names nothing again.
+     */
+    fun recipientName(destinations: List<String>, contacts: List<Contact>, pins: Map<String, String>): SendName? {
+        val sentTo = destinations.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        if (sentTo.isEmpty()) return null
+        sentTo.firstNotNullOfOrNull { Contacts.forAddress(it, contacts) }?.let { return SendName.ToContact(it) }
+        contacts.firstOrNull { contact ->
+            contact.isOpenAlias && Contacts.openAliasQuery(contact)?.let { pins[it] } in sentTo
+        }?.let { return SendName.ToContact(it) }
+        return pins.entries.firstOrNull { it.value in sentTo }?.let { SendName.ToOpenAlias(it.key) }
     }
 
     /** What a row shows as its amount: a send to this wallet moved only its fee. */

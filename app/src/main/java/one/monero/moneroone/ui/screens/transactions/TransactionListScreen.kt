@@ -162,8 +162,10 @@ fun TransactionListScreen(
     val addressRows = remember(walletState.addresses, transactions, activeWallet?.addressLabels) {
         ReceiveAddressLogic.rows(walletState.addressesOf(activeWallet?.id)?.list.orEmpty(), transactions, activeWallet?.addressLabels.orEmpty())
     }
-    val filteredTransactions = remember(transactions, selectedFilter, searchQuery, receivingIndex, addressRows, linkIndex) {
-        TransactionHistoryLogic.filter(transactions, selectedFilter, receivingIndex, searchQuery, addressRows) { linkIndex.match(it) != null }
+    val filteredTransactions = remember(transactions, selectedFilter, searchQuery, receivingIndex, addressRows, linkIndex, sendNameOf) {
+        TransactionHistoryLogic.filter(transactions, selectedFilter, receivingIndex, searchQuery, addressRows,
+            isLink = { linkIndex.match(it) != null },
+            shownName = { tx -> sendNameOf(tx)?.let(TransactionHistoryLogic::sendNameTitle) })
     }
     // Under Links (now only, no search), the summary card leads, then Open (the links that still hold
     // money, with the received links waiting to be claimed: they have no transaction yet), then History.
@@ -452,7 +454,8 @@ private fun TransactionListItem(
             ?: TransactionHistoryLogic.rowLabel(transaction, fiatMode, fiatValue, date, receivedOn),
         onClick = onClick,
         linkBadge = link != null,
-        walletBadge = name != null
+        walletBadge = name is SendName.ToWallet || name is SendName.FromWallet || name == SendName.ToThisWallet,
+        personBadge = name is SendName.ToContact
     ) {
         if (link != null) {
             LinkRowAmounts(link, transactionStatus(transaction))

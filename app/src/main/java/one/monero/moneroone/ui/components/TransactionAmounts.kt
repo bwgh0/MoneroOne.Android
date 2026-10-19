@@ -83,8 +83,15 @@ fun rememberSendNameLookup(walletViewModel: one.monero.moneroone.core.wallet.Wal
     val records by store.records.collectAsState()
     val wallets by walletViewModel.wallets.collectAsState()
     val active by walletViewModel.activeWallet.collectAsState()
+    val contacts by androidx.compose.runtime.remember { one.monero.moneroone.core.contacts.ContactStore.get(context) }
+        .contacts.collectAsState()
+    val transactions = walletViewModel.walletState.collectAsState().value.transactions
     val walletId = active?.id
-    return androidx.compose.runtime.remember(records, wallets, walletId) {
+    // OpenAlias pins change after a send, so they are read again when the history changes.
+    val pins = androidx.compose.runtime.remember(transactions) {
+        one.monero.moneroone.core.openalias.OpenAliasPinStore.create(context.applicationContext).pinnedAddresses()
+    }
+    return androidx.compose.runtime.remember(records, wallets, walletId, contacts, pins) {
         { tx ->
             SendNames.nameFor(
                 txid = tx.hash.orEmpty(),
@@ -93,7 +100,10 @@ fun rememberSendNameLookup(walletViewModel: one.monero.moneroone.core.wallet.Wal
                 fee = tx.fee,
                 walletId = walletId,
                 records = records,
-                wallets = wallets
+                wallets = wallets,
+                destinations = tx.transfers.orEmpty().mapNotNull { it.address } + listOfNotNull(tx.address),
+                contacts = contacts,
+                pins = pins
             )
         }
     }
