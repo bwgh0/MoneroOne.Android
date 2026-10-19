@@ -55,6 +55,10 @@ class OpenAliasPinStore(
 
     fun count(network: Network = Network.MAINNET): Int = load(network).size
 
+    /** Every pin: the query name and the address last paid for it. History names sends with it. */
+    fun pinnedAddresses(network: Network = Network.MAINNET): Map<String, String> =
+        load(network).mapValues { it.value.address }
+
     private fun load(network: Network): Map<String, Entry> {
         val raw = prefs.getString(network.key, null) ?: return emptyMap()
         return try {

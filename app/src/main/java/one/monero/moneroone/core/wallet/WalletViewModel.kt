@@ -1512,6 +1512,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 // The names of sends between the removed wallets.
                 SendNameStore.get(context).wipe()
 
+                // The contacts of this phone.
+                one.monero.moneroone.core.contacts.ContactStore.get(context).wipe()
+
                 // Reset state
                 _wallets.value = emptyList()
                 _activeWallet.value = null
