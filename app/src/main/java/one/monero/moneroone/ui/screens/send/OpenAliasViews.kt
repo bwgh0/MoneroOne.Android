@@ -472,11 +472,11 @@ private fun isTestnetAddress(address: String): Boolean = try {
 
 /** The clear button in the recipient field, as on iOS: an x in a filled circle, in the secondary color. */
 @Composable
-internal fun OpenAliasClearButton(onClear: () -> Unit) {
+internal fun OpenAliasClearButton(onClear: () -> Unit, label: String = tr("Clear address")) {
     IconButton(onClick = onClear) {
         Icon(
             Icons.Filled.Cancel,
-            contentDescription = tr("Clear address"),
+            contentDescription = label,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp)
         )
