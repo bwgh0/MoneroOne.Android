@@ -2,6 +2,7 @@ package one.monero.moneroone.ui.screens.settings
 
 import one.monero.moneroone.core.locale.tr
 import android.content.Intent
+import android.os.Build
 import android.net.Uri
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
@@ -284,9 +285,16 @@ fun SettingsScreen(
                 icon = Icons.Default.Info,
                 title = tr("Contact Support"),
                 onClick = {
+                    val subject = "Monero One Android - Feedback"
+                    val body = supportMailBody(
+                        BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE,
+                        Build.VERSION.RELEASE, Build.VERSION.SDK_INT, Build.MANUFACTURER, Build.MODEL
+                    )
                     val intent = Intent(Intent.ACTION_SENDTO).apply {
-                        data = Uri.parse("mailto:android_support@monero.one")
-                        putExtra(Intent.EXTRA_SUBJECT, "Monero One Android - Feedback")
+                        // Some mail apps read the mailto query, others the extras.
+                        data = Uri.parse("mailto:android_support@monero.one?subject=${Uri.encode(subject)}&body=${Uri.encode(body)}")
+                        putExtra(Intent.EXTRA_SUBJECT, subject)
+                        putExtra(Intent.EXTRA_TEXT, body)
                     }
                     try { context.startActivity(intent) } catch (_: Exception) {}
                 },
@@ -669,3 +677,17 @@ internal fun SettingsToggleItem(
         MoneroSwitch(checked = checked, onCheckedChange = null)
     }
 }
+
+/**
+ * The Contact Support mail body: room to write, then the app and device facts
+ * that support asks for. No wallet, node or address data.
+ */
+internal fun supportMailBody(
+    versionName: String, versionCode: Int, androidRelease: String, apiLevel: Int,
+    manufacturer: String, model: String
+): String = listOf(
+    "", "", "----------",
+    "Monero One $versionName ($versionCode)",
+    "Android $androidRelease (API $apiLevel)",
+    "$manufacturer $model"
+).joinToString("\n")
