@@ -71,6 +71,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -128,6 +129,7 @@ import one.monero.moneroone.core.wallet.ReceiveAddressLogic
 import one.monero.moneroone.core.wallet.SendState
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.core.wallet.addressesOf
+import one.monero.moneroone.core.whatsnew.WhatsNewGate
 import one.monero.moneroone.ui.components.rememberChartDateFormats
 import one.monero.moneroone.ui.screens.chart.HistoryPrices
 import one.monero.moneroone.ui.screens.chart.TimeRange
@@ -199,6 +201,23 @@ fun WalletScreen(
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
     val isOnline by NetworkMonitor.isConnected.collectAsState()
+
+    // What's New after a big update: a banner under the greeting while no
+    // other banner shows there (one banner at a time), and its sheet. The
+    // banner state is read once as the home appears, so a tab switch does not
+    // slide it in again; it changes when the offline banner comes or goes.
+    val context = LocalContext.current
+    val whatsNew = remember { WhatsNewGate.create(context) }
+    val whatsNewEntry = whatsNew.entry
+    var whatsNewSheet by rememberSaveable { mutableStateOf(false) }
+    var whatsNewBanner by remember {
+        mutableStateOf(whatsNew.bannerOnHome(System.currentTimeMillis(), otherBannerShowing = !isOnline))
+    }
+    LaunchedEffect(isOnline) {
+        if (!whatsNewSheet) {
+            whatsNewBanner = whatsNew.bannerOnHome(System.currentTimeMillis(), otherBannerShowing = !isOnline)
+        }
+    }
 
     // Fiat amounts with the selected currency's symbol, the same way for now and the past.
     val fiatFormat = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
@@ -308,8 +327,16 @@ fun WalletScreen(
     val claimSheetOpen = paymentLinks?.store?.pendingOpen?.collectAsState()?.value != null
     val linkProblemShowing = paymentLinks?.store?.intakeProblem?.collectAsState()?.value != null
     ReviewPromptAfterSend(
-        isIdle = !switcherExpanded && !history.expanded && !claimSheetOpen && !linkProblemShowing && !linkAlertShowing
+        isIdle = !switcherExpanded && !history.expanded && !claimSheetOpen && !linkProblemShowing && !linkAlertShowing &&
+            !whatsNewSheet
     )
+    // A payment link that arrives closes the notes, as on iOS (closesForPaymentLink).
+    LaunchedEffect(claimSheetOpen) {
+        if (claimSheetOpen && whatsNewSheet) {
+            whatsNewSheet = false
+            whatsNewBanner = false
+        }
+    }
 
     LazyColumn(
         state = listState,
@@ -363,6 +390,31 @@ fun WalletScreen(
                         text = tr("You're offline. Some features may be unavailable."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // What's New, in the same slot and with the same motion. Opening
+            // the notes marks them seen; the banner leaves when the sheet closes.
+            AnimatedVisibility(
+                visible = whatsNewBanner && whatsNewEntry != null,
+                enter = slideInVertically(tween(BannerMs)) { -it } + fadeIn(tween(BannerMs)) +
+                    expandVertically(tween(BannerMs), expandFrom = Alignment.Top),
+                exit = slideOutVertically(tween(BannerMs)) { -it } + fadeOut(tween(BannerMs)) +
+                    shrinkVertically(tween(BannerMs), shrinkTowards = Alignment.Top)
+            ) {
+                whatsNewEntry?.let { entry ->
+                    WhatsNewBanner(
+                        version = entry.version,
+                        onOpen = {
+                            whatsNew.markSeen()
+                            whatsNewSheet = true
+                        },
+                        onClose = {
+                            whatsNew.markSeen()
+                            whatsNewBanner = false
+                        },
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 }
             }
@@ -599,6 +651,16 @@ fun WalletScreen(
         item { Spacer(modifier = Modifier.height(8.dp)) }
     }
     } // PullToRefreshBox
+
+    if (whatsNewSheet && whatsNewEntry != null) {
+        WhatsNewSheet(
+            entry = whatsNewEntry,
+            onDismiss = {
+                whatsNewSheet = false
+                whatsNewBanner = false
+            }
+        )
+    }
 }
 
 @Composable

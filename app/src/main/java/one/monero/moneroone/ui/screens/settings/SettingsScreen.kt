@@ -52,10 +52,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,11 +78,13 @@ import one.monero.moneroone.core.alert.PriceAlertManager
 import one.monero.moneroone.core.review.ReviewPromptGate
 import one.monero.moneroone.core.review.openPlayListing
 import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.core.whatsnew.WhatsNewGate
 import one.monero.moneroone.data.model.PriceAlert
 import one.monero.moneroone.paymentlinks.PaymentLinkStore
 import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroSwitch
+import one.monero.moneroone.ui.screens.wallet.WhatsNewSheet
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
@@ -110,6 +114,11 @@ fun SettingsScreen(
 
     var showRemoveAllDialog by remember { mutableStateOf(false) }
     var showResetSyncDialog by remember { mutableStateOf(false) }
+
+    // Version opens the notes of the newest big update (the What's New sheet).
+    val whatsNew = remember { WhatsNewGate.create(context) }
+    val whatsNewEntry = whatsNew.entry
+    var showWhatsNew by rememberSaveable { mutableStateOf(false) }
 
     var freshAddress by remember { mutableStateOf(walletViewModel.freshReceiveAddress) }
     val fiatMode by walletViewModel.fiatMode.collectAsState()
@@ -250,7 +259,12 @@ fun SettingsScreen(
                 icon = Icons.Default.Info,
                 title = tr("Version"),
                 value = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                onClick = null,
+                onClick = if (whatsNewEntry == null) null else {
+                    {
+                        whatsNew.markSeen()
+                        showWhatsNew = true
+                    }
+                },
                 iconColor = SettingsGray,
                 showDivider = false,
                 contentDescription = tr("Version %s, build %s", BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE)
@@ -344,6 +358,13 @@ fun SettingsScreen(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
+
+    if (showWhatsNew && whatsNewEntry != null) {
+        // A payment link that arrives closes the notes, as on iOS (closesForPaymentLink).
+        val claimPending = PaymentLinkStore.get(context).pendingOpen.collectAsState().value != null
+        LaunchedEffect(claimPending) { if (claimPending) showWhatsNew = false }
+        WhatsNewSheet(entry = whatsNewEntry, onDismiss = { showWhatsNew = false })
     }
 
     // Remove-all confirmation dialog (iOS copy). The body leaves out iOS's
