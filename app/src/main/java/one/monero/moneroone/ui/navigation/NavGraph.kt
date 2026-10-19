@@ -242,7 +242,7 @@ fun MoneroOneNavHost(
     LaunchedEffect(isLocked) {
         if (isLocked) {
             val route = navController.currentDestination?.route
-            if (route == Screen.Send.route || route == Screen.QRScanner.route) {
+            if (route == Screen.Send.route || route == Screen.QRScanner.route || route == Screen.Transfer.route) {
                 navController.popBackStack(Screen.Main.route, inclusive = false)
             }
         }
