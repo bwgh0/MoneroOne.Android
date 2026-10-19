@@ -768,6 +768,8 @@ private fun AddressPhase(
     // A wallet match wins over a contact match.
     val contact = remember(input, contacts, ownWallet) { if (ownWallet != null) null else Contacts.forInput(input, contacts) }
     var showContacts by rememberSaveable { mutableStateOf(false) }
+    // The contact picked last: its row keeps the check when the sheet opens again.
+    var pickedId by rememberSaveable { mutableStateOf<String?>(null) }
     val status = lookup.status
     val resolved = (status as? LookupStatus.Resolved)?.takeIf { kind is RecipientInput.Name }
     val resolvedSummary = resolved?.summary()
@@ -949,9 +951,10 @@ private fun AddressPhase(
         // for the address they bring. Three capsules stack at large text (iOS AX sizes).
         val linkHint = tr("Sends the money as a link anyone can claim")
         val narrow = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
-        // They step aside while the field has text (ios-12).
+        // They step aside while the field has typed text and no card (ios-11, ios-12).
         val stackButtons = LocalDensity.current.fontScale >= 1.5f
-        AnimatedVisibility(visible = linkMode || input.isEmpty(), enter = fadeIn(openAliasFadeSpec), exit = fadeOut(openAliasFadeSpec)) {
+        val buttonsShown = linkMode || input.isEmpty() || ownWallet != null || contact != null || resolvedSummary != null
+        AnimatedVisibility(visible = buttonsShown, enter = fadeIn(openAliasFadeSpec), exit = fadeOut(openAliasFadeSpec)) {
         RecipientButtons(stack = stackButtons) {
             PrimaryButton(onClick = onScanQr, contentPadding = narrow) {
                 Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -1024,9 +1027,10 @@ private fun AddressPhase(
 
     if (showContacts) {
         ContactsSheet(
-            selectedId = contact?.id,
+            selectedId = contact?.id ?: pickedId,
             onPick = { picked ->
                 showContacts = false
+                pickedId = picked.id
                 onInputChange(picked.destination, true)
             },
             onDismiss = { showContacts = false }

@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -49,7 +48,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -80,8 +78,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import one.monero.moneroone.core.contacts.Contact
 import one.monero.moneroone.core.contacts.ContactStore
 import one.monero.moneroone.core.contacts.Contacts
@@ -208,11 +204,6 @@ internal fun DeleteContactAlert(onDelete: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
-private sealed interface ContactEdit {
-    data class New(val prefill: String) : ContactEdit
-    data class Edit(val contact: Contact) : ContactEdit
-}
-
 /**
  * The Contacts sheet (android-4): title, + (New Contact), Search, the contacts A to Z. A tap
  * picks a contact; touch and hold opens Edit, Copy and Delete; a swipe left deletes.
@@ -224,8 +215,11 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
     val store = remember { ContactStore.get(context) }
     val contacts by store.contacts.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
-    var editing by remember { mutableStateOf<ContactEdit?>(null) }
-    var deleting by remember { mutableStateOf<Contact?>(null) }
+    // Saved, so a theme or font change keeps New and Edit Contact open.
+    var editingNew by rememberSaveable { mutableStateOf(false) }
+    var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var deletingId by rememberSaveable { mutableStateOf<String?>(null) }
+    val deleting = contacts.firstOrNull { it.id == deletingId }
     var menuFor by remember { mutableStateOf<String?>(null) }
     val shown = remember(query, contacts) { if (query.isBlank()) contacts else Contacts.matches(query, contacts) }
 
@@ -242,7 +236,7 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.align(Alignment.Center).semantics { heading() }
                 )
-                IconButton(onClick = { editing = ContactEdit.New("") }, modifier = Modifier.align(Alignment.CenterEnd)) {
+                IconButton(onClick = { editingNew = true }, modifier = Modifier.align(Alignment.CenterEnd)) {
                     Icon(Icons.Default.Add, contentDescription = tr("New Contact"))
                 }
             }
@@ -266,7 +260,7 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(shown, key = { it.id }) { contact ->
-                        SwipeToDeleteContact(onDelete = { deleting = contact }) {
+                        SwipeToDeleteContact(onDelete = { deletingId = contact.id }) {
                             Box {
                                 val copyLabel = tr(if (contact.isOpenAlias) "Copy OpenAlias" else "Copy Address")
                                 val editLabel = tr("Edit Contact")
@@ -277,15 +271,15 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
                                     onClick = { onPick(contact) },
                                     onLongClick = { menuFor = contact.id },
                                     actions = listOf(
-                                        CustomAccessibilityAction(editLabel) { editing = ContactEdit.Edit(contact); true },
+                                        CustomAccessibilityAction(editLabel) { editingId = contact.id; true },
                                         CustomAccessibilityAction(copyLabel) { copyDestination(context, contact); true },
-                                        CustomAccessibilityAction(deleteLabel) { deleting = contact; true }
+                                        CustomAccessibilityAction(deleteLabel) { deletingId = contact.id; true }
                                     )
                                 )
                                 DropdownMenu(expanded = menuFor == contact.id, onDismissRequest = { menuFor = null }) {
                                     DropdownMenuItem(text = { Text(editLabel) }, onClick = {
                                         menuFor = null
-                                        editing = ContactEdit.Edit(contact)
+                                        editingId = contact.id
                                     })
                                     DropdownMenuItem(text = { Text(copyLabel) }, onClick = {
                                         menuFor = null
@@ -293,7 +287,7 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
                                     })
                                     DropdownMenuItem(text = { Text(deleteLabel, color = ErrorRed) }, onClick = {
                                         menuFor = null
-                                        deleting = contact
+                                        deletingId = contact.id
                                     })
                                 }
                             }
@@ -304,18 +298,17 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
         }
     }
 
-    when (val edit = editing) {
-        is ContactEdit.New -> ContactEditorDialog(contact = null, prefill = edit.prefill, onDismiss = { editing = null })
-        is ContactEdit.Edit -> ContactEditorDialog(contact = edit.contact, onDismiss = { editing = null })
-        null -> Unit
+    if (editingNew) ContactEditorSheet(contact = null, onDismiss = { editingNew = false })
+    contacts.firstOrNull { it.id == editingId }?.let { contact ->
+        ContactEditorSheet(contact = contact, onDismiss = { editingId = null })
     }
     deleting?.let { contact ->
         DeleteContactAlert(
             onDelete = {
                 store.delete(contact.id)
-                deleting = null
+                deletingId = null
             },
-            onDismiss = { deleting = null }
+            onDismiss = { deletingId = null }
         )
     }
 }
@@ -381,13 +374,14 @@ private fun pickedName(context: Context, uri: Uri): String? = try {
  * "Choose from Contacts", and one "Address or OpenAlias" field, checked as Send's field is.
  * Edit ends with "Delete Contact" in red.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ContactEditorDialog(contact: Contact?, onDismiss: () -> Unit, prefill: String = "") {
+internal fun ContactEditorSheet(contact: Contact?, onDismiss: () -> Unit, prefill: String = "") {
     val context = LocalContext.current
     val store = remember { ContactStore.get(context) }
     var name by rememberSaveable { mutableStateOf(contact?.name.orEmpty()) }
     var destination by rememberSaveable { mutableStateOf(contact?.destination ?: prefill) }
-    var deleting by remember { mutableStateOf(false) }
+    var deleting by rememberSaveable { mutableStateOf(false) }
     val lookup = rememberOpenAliasLookup()
     LaunchedEffect(Unit) { if (destination.isNotBlank()) lookup.onInputChanged(destination, immediate = true) }
     val kind = remember(destination) { OpenAlias.classify(destination) }
@@ -409,9 +403,14 @@ internal fun ContactEditorDialog(contact: Contact?, onDismiss: () -> Unit, prefi
         if (ok) onDismiss()
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Surface(Modifier.fillMaxSize(), color = MoneroTheme.colors.bgGrouped) {
-            Column(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
+    // A sheet over the Contacts sheet, as iOS presents it, so the list keeps its place.
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MoneroTheme.colors.bgGrouped,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+            Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding()) {
                 Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                     DismissTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) { Text(tr("Cancel")) }
                     Text(
@@ -471,6 +470,7 @@ internal fun ContactEditorDialog(contact: Contact?, onDismiss: () -> Unit, prefi
                         textStyle = MonoCaption,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                        colors = moneroTextFieldColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                         trailingIcon = if (destination.isNotEmpty()) {
                             {
                                 OpenAliasClearButton(onClear = {
@@ -505,7 +505,6 @@ internal fun ContactEditorDialog(contact: Contact?, onDismiss: () -> Unit, prefi
                     Spacer(Modifier.height(32.dp))
                 }
             }
-        }
         if (deleting && contact != null) {
             DeleteContactAlert(
                 onDelete = {

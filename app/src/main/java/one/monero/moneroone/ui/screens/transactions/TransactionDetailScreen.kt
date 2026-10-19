@@ -4,7 +4,7 @@ import one.monero.moneroone.core.contacts.ContactStore
 import one.monero.moneroone.core.wallet.SendName
 import one.monero.moneroone.core.wallet.SendNames
 import one.monero.moneroone.ui.components.rememberSendNameLookup
-import one.monero.moneroone.ui.screens.send.ContactEditorDialog
+import one.monero.moneroone.ui.screens.send.ContactEditorSheet
 import androidx.compose.foundation.clickable
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -54,7 +54,7 @@ fun TransactionDetailScreen(walletViewModel: WalletViewModel, txId: String, onBa
     val sendName = transaction?.let(sendNameOf)
     val wallets by walletViewModel.wallets.collectAsState()
     val contacts by remember { ContactStore.get(context) }.contacts.collectAsState()
-    var addingContact by remember { mutableStateOf<String?>(null) }
+    var addingContact by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     val rows = remember(state.addresses, state.transactions, wallet) {
         ReceiveAddressLogic.rows(state.addressesOf(wallet?.id)?.list.orEmpty(), state.transactions, wallet?.addressLabels.orEmpty())
     }
@@ -109,7 +109,7 @@ fun TransactionDetailScreen(walletViewModel: WalletViewModel, txId: String, onBa
         }
     )
     addingContact?.let { destination ->
-        ContactEditorDialog(contact = null, prefill = destination, onDismiss = { addingContact = null })
+        ContactEditorSheet(contact = null, prefill = destination, onDismiss = { addingContact = null })
     }
 }
 
