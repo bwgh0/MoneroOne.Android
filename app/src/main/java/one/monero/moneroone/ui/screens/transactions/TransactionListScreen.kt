@@ -161,6 +161,7 @@ fun TransactionListScreen(
     val filteredTransactions = remember(transactions, selectedFilter, searchQuery, receivingIndex, addressRows, linkIndex) {
         TransactionHistoryLogic.filter(transactions, selectedFilter, receivingIndex, searchQuery, addressRows) { linkIndex.match(it) != null }
     }
+    val filteredKeys = remember(filteredTransactions) { TransactionHistoryLogic.rowKeys(filteredTransactions) }
     // Under Links (now only, no search), the summary card leads, then Open (the links that still hold
     // money, with the received links waiting to be claimed: they have no transaction yet), then History.
     // Each link's rows show once. No other filter shows the received links waiting.
@@ -406,7 +407,7 @@ fun TransactionListScreen(
                             }
                         }
                     } else {
-                        items(items = filteredTransactions, key = { it.hash }) { transaction -> transactionItem(transaction) }
+                        items(count = filteredTransactions.size, key = { filteredKeys[it] }) { transactionItem(filteredTransactions[it]) }
                     }
 
                     item { Spacer(modifier = Modifier.height(16.dp)) }
