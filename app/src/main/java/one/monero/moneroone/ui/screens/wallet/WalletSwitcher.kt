@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -56,6 +57,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -181,7 +183,9 @@ fun WalletManagerRows(
     onDelete: (WalletInfo) -> Unit,
     onRename: (WalletInfo, String, String) -> Unit,
     onMove: (movedId: String, beforeId: String?) -> Unit,
-    onAddWallet: () -> Unit
+    onAddWallet: () -> Unit,
+    /** Opens Transfer. The button shows with 2 or more wallets. */
+    onTransfer: () -> Unit = {}
 ) {
     var renameTarget by remember { mutableStateOf<WalletInfo?>(null) }
     var deleteCandidate by remember { mutableStateOf<WalletInfo?>(null) }
@@ -279,7 +283,7 @@ fun WalletManagerRows(
             }
         }
 
-        AddWalletRow(onClick = onAddWallet)
+        WalletActionsRow(showTransfer = wallets.size >= 2, onTransfer = onTransfer, onAddWallet = onAddWallet)
     }
 
     renameTarget?.let { target ->
@@ -475,6 +479,10 @@ fun WalletRowCard(
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     circleColor: Color = CellFill,
     onClick: (() -> Unit)? = null,
+    /** Below 1, a row that cannot be picked: the emoji, the name and the balance fade, the card stays. */
+    contentAlpha: Float = 1f,
+    /** In place of the address, at full strength: why a faded row cannot be picked. */
+    note: String? = null,
     trailing: @Composable RowScope.() -> Unit = {}
 ) {
     GlassCard(
@@ -491,7 +499,9 @@ fun WalletRowCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            EmojiCircle(emoji = emoji, size = 44.dp, color = circleColor)
+            Box(modifier = Modifier.alpha(contentAlpha)) {
+                EmojiCircle(emoji = emoji, size = 44.dp, color = circleColor)
+            }
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -501,7 +511,8 @@ fun WalletRowCard(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.alpha(contentAlpha)
                 )
                 balanceText?.let {
                     Spacer(modifier = Modifier.height(2.dp))
@@ -511,10 +522,20 @@ fun WalletRowCard(
                         fontWeight = FontWeight.Medium,
                         color = MoneroOrange,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.alpha(contentAlpha)
                     )
                 }
-                address?.let {
+                if (note != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else address?.let {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = truncateMiddle(it),
@@ -547,10 +568,44 @@ fun WalletRowCheck(isActive: Boolean) {
     }
 }
 
+/**
+ * The switcher's last row: Transfer and Add Wallet side by side, 12 apart, as every button pair
+ * (iOS WalletManagerRows). With one wallet there is nothing to transfer to, and Add Wallet fills the row.
+ */
 @Composable
-private fun AddWalletRow(onClick: () -> Unit) {
+private fun WalletActionsRow(showTransfer: Boolean, onTransfer: () -> Unit, onAddWallet: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        if (showTransfer) {
+            val hint = tr("Moves XMR to another of your wallets")
+            WalletActionCard(
+                icon = Icons.Default.SwapHoriz,
+                label = tr("Transfer"),
+                onClick = onTransfer,
+                // TalkBack reads the visible "Transfer"; the action label explains it.
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { onClick(label = hint) { onTransfer(); true } }
+            )
+        }
+        WalletActionCard(
+            icon = Icons.Default.Add,
+            label = tr("Add Wallet"),
+            onClick = onAddWallet,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/** A switcher action: the 40 brand disc at 15% with its glyph, then the label (callout semibold, brand), on a card. */
+@Composable
+private fun WalletActionCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     GlassCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         onClick = onClick
     ) {
         Row(
@@ -567,7 +622,7 @@ private fun AddWalletRow(onClick: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Add,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = MoneroOrange,
                     modifier = Modifier.size(20.dp)
@@ -576,9 +631,11 @@ private fun AddWalletRow(onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(12.dp))
             // A button label, as on iOS: callout semibold in brand.
             Text(
-                text = tr("Add Wallet"),
+                text = label,
                 style = MaterialTheme.typography.labelLarge,
-                color = MoneroOrange
+                color = MoneroOrange,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

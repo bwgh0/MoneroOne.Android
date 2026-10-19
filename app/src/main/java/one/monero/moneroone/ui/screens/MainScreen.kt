@@ -210,6 +210,9 @@ fun MainScreen(
                         onAddWalletClick = {
                             navController.navigate("add_wallet")
                         },
+                        onTransferClick = {
+                            navController.navigate(Screen.Transfer.route)
+                        },
                         linkAlertShowing = linkAlertShowing
                     )
                     1 -> ChartScreen(

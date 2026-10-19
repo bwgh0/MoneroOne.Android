@@ -125,6 +125,8 @@ import one.monero.moneroone.ui.components.ActivityRow
 import one.monero.moneroone.paymentlinks.rememberDaemonHeight
 import one.monero.moneroone.paymentlinks.rememberPaymentLinkIndex
 import one.monero.moneroone.core.wallet.ReceiveAddressLogic
+import one.monero.moneroone.core.wallet.SendName
+import one.monero.moneroone.core.wallet.SendNames
 import one.monero.moneroone.core.wallet.SendState
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.core.wallet.addressesOf
@@ -180,6 +182,8 @@ fun WalletScreen(
     historyPrices: HistoryPrices,
     onFetchHistoryRange: (TimeRange) -> Unit,
     onAddWalletClick: () -> Unit = {},
+    /** Opens Transfer, from the wallet switcher. */
+    onTransferClick: () -> Unit = {},
     /** Checks open sent links so the balance card's line stays true. */
     paymentLinks: PaymentLinksViewModel? = null,
     /** Opens Activity with the Links filter on. */
@@ -196,6 +200,7 @@ fun WalletScreen(
     val activeWallet by walletViewModel.activeWallet.collectAsState()
     val walletSessionId by walletViewModel.walletSessionId.collectAsState()
     val linkIndex = rememberPaymentLinkIndex()
+    val sendNameOf = one.monero.moneroone.ui.components.rememberSendNameLookup(walletViewModel)
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
     val isOnline by NetworkMonitor.isConnected.collectAsState()
@@ -430,6 +435,10 @@ fun WalletScreen(
                         onAddWallet = {
                             switcherExpanded = false
                             onAddWalletClick()
+                        },
+                        onTransfer = {
+                            switcherExpanded = false
+                            onTransferClick()
                         }
                     )
                 } else {
@@ -589,7 +598,8 @@ fun WalletScreen(
                     fiatMode = fiatMode,
                     fiatValue = one.monero.moneroone.ui.components.transactionFiat(transaction, priceHistory, currentPrice?.price, selectedCurrency),
                     fiatOf = { one.monero.moneroone.ui.components.amountFiat(it, transaction.timestamp, priceHistory, currentPrice?.price, selectedCurrency) },
-                    receivedOn = TransactionHistoryLogic.receivedOnName(transaction, addressRows)
+                    receivedOn = TransactionHistoryLogic.receivedOnName(transaction, addressRows),
+                    sendName = sendNameOf(transaction)
                 )
             }
         }
@@ -1167,23 +1177,32 @@ private fun TransactionCard(
     /** An amount's value at the time of [transaction]. */
     fiatOf: (Long) -> String?,
     /** The subaddress an incoming payment arrived on, spoken only; null for sends and the main address. */
-    receivedOn: String?
+    receivedOn: String?,
+    /** A send between your wallets: "To Savings", "From Daily", "To This Wallet". */
+    sendName: SendName? = null
 ) {
     val isIncoming = transaction.direction == TransactionInfo.Direction.Direction_In
     val date = formatRelativeTime(transaction.timestamp * 1000)
     val link = linkRowText(transaction, linkIndex, date, fiatMode, fiatOf, TransactionHistoryLogic.rowStatus(transaction))
+    // A payment link row keeps its name; a send between your wallets names the other wallet.
+    val name = if (link == null) sendName else null
+    val shownAmount = SendNames.shownAmount(name, transaction.amount, transaction.fee)
+    val shownFiat = if (shownAmount == transaction.amount) fiatValue else fiatOf(shownAmount)
     ActivityRow(
         incoming = isIncoming,
-        title = link?.title ?: if (isIncoming) tr("Received") else tr("Sent"),
+        title = link?.title ?: name?.let { TransactionHistoryLogic.sendNameTitle(it) } ?: if (isIncoming) tr("Received") else tr("Sent"),
         subtitle = date,
-        spoken = link?.spoken ?: TransactionHistoryLogic.rowLabel(transaction, fiatMode, fiatValue, date, receivedOn),
+        spoken = link?.spoken
+            ?: name?.let { TransactionHistoryLogic.namedRowLabel(it, transaction, fiatMode, shownFiat, date, receivedOn) }
+            ?: TransactionHistoryLogic.rowLabel(transaction, fiatMode, fiatValue, date, receivedOn),
         onClick = onClick,
-        linkBadge = link != null
+        linkBadge = link != null,
+        walletBadge = name != null
     ) {
         if (link != null) {
             LinkRowAmounts(link, one.monero.moneroone.ui.components.transactionStatus(transaction))
         } else {
-            one.monero.moneroone.ui.components.TransactionAmounts(transaction = transaction, fiatMode = fiatMode, fiatValue = fiatValue)
+            one.monero.moneroone.ui.components.TransactionAmounts(transaction = transaction, fiatMode = fiatMode, fiatValue = shownFiat, amount = shownAmount)
         }
     }
 }
