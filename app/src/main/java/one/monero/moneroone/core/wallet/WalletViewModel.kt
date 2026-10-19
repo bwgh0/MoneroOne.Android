@@ -1407,6 +1407,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
         secrets.deleteWalletSecrets(id)
         store.removeWallet(id)
+        // Its rows elsewhere go back to "Sent" and "Received".
+        SendNameStore.get(context).removeWallet(id)
         prefs.edit()
             .remove("wallet.$id.selected_address_index")
             .remove(removed.keyPrefix + RESTORED_FROM_SEED_SUFFIX)
@@ -1506,6 +1508,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
                 // OpenAlias pins record which names were paid.
                 OpenAliasPinStore.create(context).clearAll()
+
+                // The names of sends between the removed wallets.
+                SendNameStore.get(context).wipe()
 
                 // Reset state
                 _wallets.value = emptyList()
@@ -2254,9 +2259,16 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     /**
      * Sends what the Send screen asks for. The kit saves [SendRequest.memo] as a local note, as iOS does.
      * [prepared]: the transfer the review built and showed; only that transfer may go out.
+     * [beforeCommit]: as in the send below (a send to one of your wallets saves its name there).
      */
-    fun send(flow: SendFlow, request: SendRequest, prepared: PreparedSend? = null) = send(
+    fun send(
+        flow: SendFlow,
+        request: SendRequest,
+        prepared: PreparedSend? = null,
+        beforeCommit: ((SignedTransaction) -> Unit)? = null
+    ) = send(
         flow, request.address, request.amount, memo = request.memo, isSweepAll = request.sweepAll,
+        beforeCommit = beforeCommit,
         prepared = prepared?.signed,
         preparedMatches = prepared?.matches(request.address, request.amount, request.sweepAll) ?: true
     )
