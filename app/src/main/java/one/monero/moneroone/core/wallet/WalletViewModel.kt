@@ -2255,10 +2255,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * Sends what the Send screen asks for. The kit saves [SendRequest.memo] as a local note, as iOS does.
      * [prepared]: the transfer the review built and showed; only that transfer may go out.
      */
-    fun send(flow: SendFlow, request: SendRequest, prepared: PreparedSend? = null) = send(
+    fun send(flow: SendFlow, request: SendRequest, prepared: PreparedSend? = null, playChime: Boolean = true) = send(
         flow, request.address, request.amount, memo = request.memo, isSweepAll = request.sweepAll,
         prepared = prepared?.signed,
-        preparedMatches = prepared?.matches(request.address, request.amount, request.sweepAll) ?: true
+        preparedMatches = prepared?.matches(request.address, request.amount, request.sweepAll) ?: true,
+        playChime = playChime
     )
 
     /**
@@ -2277,7 +2278,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         isSweepAll: Boolean = false,
         beforeCommit: ((SignedTransaction) -> Unit)? = null,
         prepared: SignedTransaction? = null,
-        preparedMatches: Boolean = true
+        preparedMatches: Boolean = true,
+        /** False when the screen plays the chime itself (the Sent screen plays it as its circle closes). */
+        playChime: Boolean = true
     ) {
         val operation = sendCoordinator.begin(flow, _activeWallet.value?.id, isSweepAll || amount > 0L)
             ?: return
@@ -2304,7 +2307,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                         else -> kit.sendPrepared(prepared, memo, beforeCommit = beforeCommit)
                     }
                 }
-                one.monero.moneroone.core.util.SoundFeedback.sendComplete(context)
+                if (playChime) one.monero.moneroone.core.util.SoundFeedback.sendComplete(context)
                 // MoneroKit.send() doesn't return txHash, we'll show success without it
                 // The transaction will appear in the transactions list after sync
             } catch (e: Exception) {

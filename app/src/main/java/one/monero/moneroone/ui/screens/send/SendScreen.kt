@@ -289,6 +289,8 @@ fun SendScreen(
     // A prefilled address or name (from a scan) is classified at once, like a paste.
     LaunchedEffect(Unit) { if (recipientInput.isNotEmpty()) openAlias.onInputChanged(recipientInput, immediate = true) }
     var amount by rememberSaveable { mutableStateOf(prefilledAmount ?: "") }
+    // What the recipient gets, kept for the Sending and Sent amount (a sweep sends the balance less the fee).
+    var sentAtomic by rememberSaveable { mutableLongStateOf(0L) }
     var isSweepAll by rememberSaveable { mutableStateOf(false) }
     var memo by rememberSaveable { mutableStateOf("") }
     // A link's note: this phone only, never in the link or the tx memo.
@@ -458,6 +460,8 @@ fun SendScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
+            // Sending and Sent are one screen: the amount stays put while the spinner becomes the check.
+            contentKey = { if (!linkMode && (it == SendPhase.SENDING || it == SendPhase.SUCCESS)) "status" else it },
             label = "sendPhase"
         ) { currentPhase ->
             when (currentPhase) {
@@ -586,13 +590,26 @@ fun SendScreen(
                     }
                 )
                 }
-                SendPhase.SENDING -> SendingPhase()
-                SendPhase.SUCCESS -> {
+                SendPhase.SENDING, SendPhase.SUCCESS -> {
                     val draft = linkDraft
-                    if (linkMode && draft != null) {
+                    if (linkMode && draft != null && currentPhase == SendPhase.SUCCESS) {
                         PaymentLinkReadyPhase(draft.link, walletViewModel.formatXmr(draft.amount), onDone = onSent)
+                    } else if (linkMode) {
+                        SendingPhase()
                     } else {
-                        SuccessPhase(
+                        val fiatMode by walletViewModel.fiatMode.collectAsState()
+                        val currentPrice by walletViewModel.currentPrice.collectAsState()
+                        val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+                        val sent = sentAtomic
+                        val xmr = walletViewModel.formatXmr(sent)
+                        val fiat = currentPrice?.price?.let { "${selectedCurrency.symbol}${"%.2f".format(sent / 1_000_000_000_000.0 * it)}" }
+                        SendStatusPhase(
+                            success = currentPhase == SendPhase.SUCCESS,
+                            amount = when {
+                                sent <= 0L -> null
+                                fiatMode && fiat != null -> SentAmount(fiat, null, "$xmr XMR")
+                                else -> SentAmount(xmr, "XMR", fiat?.let { "≈ $it" })
+                            },
                             txHash = (sendState as? SendState.Success)?.txHash ?: "",
                             onDone = onSent
                         )
@@ -675,10 +692,13 @@ fun SendScreen(
                             return@launch
                         }
                         // The transfer the review built goes out as it is: its fee is the one the review showed.
+                        sentAtomic = prepared.sentAmount
+                        // The Sent screen plays the chime when its circle closes.
                         walletViewModel.send(
                             flow,
                             SendRequest.of(address, walletViewModel.parseXmr(amount), memo, isSweepAll),
-                            prepared = prepared
+                            prepared = prepared,
+                            playChime = false
                         )
                     }
                 }
@@ -1687,134 +1707,6 @@ private fun SendingPhase() {
 }
 
 @Composable
-private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
-    val clipboardManager = LocalClipboardManager.current
-    var copied by remember { mutableStateOf(false) }
-    // Back to the copy label after 2 s, as on iOS
-    LaunchedEffect(copied) {
-        if (copied) {
-            delay(2000)
-            copied = false
-        }
-    }
-
-    // Animated checkmark
-    var showCheck by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { delay(200); showCheck = true }
-    val checkScale by animateFloatAsState(
-        if (showCheck) 1f else 0.3f,
-        spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-        label = "checkScale"
-    )
-    val checkAlpha by animateFloatAsState(if (showCheck) 1f else 0f, tween(300), label = "checkAlpha")
-
-    // Expanding ring
-    val ringScale by animateFloatAsState(
-        if (showCheck) 2f else 1f,
-        tween(800, easing = LinearEasing),
-        label = "ringScale"
-    )
-    val ringAlpha by animateFloatAsState(if (showCheck) 0f else 1f, tween(800), label = "ringAlpha")
-
-    // Read the adaptive green here: drawBehind is not a composable scope.
-    val successGreen = SuccessGreen
-    Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 32.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                // Expanding ring
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer { scaleX = ringScale; scaleY = ringScale; alpha = ringAlpha }
-                        .drawBehind {
-                            drawCircle(
-                                color = successGreen,
-                                style = Stroke(width = 3.dp.toPx())
-                            )
-                        }
-                )
-                // Checkmark
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .graphicsLayer { scaleX = checkScale; scaleY = checkScale; alpha = checkAlpha }
-                        .clip(CircleShape)
-                        .background(SuccessGreen.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = tr("Success"), tint = SuccessGreen, modifier = Modifier.size(80.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            Text(tr("Sent!"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = SuccessGreen)
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                tr("Your transaction has been submitted to the network"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            if (txHash.isNotBlank()) {
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Text(tr("Transaction ID"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(CapsuleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                ) {
-                    Text(
-                        text = if (copied) tr("Copied!") else truncateMiddle(txHash),
-                        style = MonoCaption,
-                        color = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(txHash))
-                            copied = true
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-                            contentDescription = tr("Copy"),
-                            tint = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            PrimaryButton(
-                onClick = onDone,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(tr("Done"))
-            }
-        }
-    }
-}
-
-@Composable
 private fun ErrorPhase(message: String, onRetry: () -> Unit, onClose: () -> Unit, canRetry: Boolean = true) {
     Box(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
@@ -1906,7 +1798,7 @@ private const val SpinnerOuterTrim = 0.7f
 private const val SpinnerInnerTrim = 0.4f
 
 @Composable
-private fun GradientSpinner() {
+internal fun GradientSpinner() {
     val infiniteTransition = rememberInfiniteTransition(label = "spinner")
     val orange = MoneroOrange  // read in the drawBehind lambdas, which are not composable
 
