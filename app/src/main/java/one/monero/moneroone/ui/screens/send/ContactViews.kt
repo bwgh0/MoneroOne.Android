@@ -167,9 +167,11 @@ internal fun ContactRow(
     modifier: Modifier = Modifier,
     checked: Boolean = false,
     onLongClick: (() -> Unit)? = null,
-    actions: List<CustomAccessibilityAction> = emptyList()
+    actions: List<CustomAccessibilityAction> = emptyList(),
+    /** The card fill: the surface on Send, fillElevated on the Contacts sheet (android-4). */
+    color: Color = MaterialTheme.colorScheme.surfaceContainer
 ) {
-    GlassCard(modifier = modifier.fillMaxWidth()) {
+    GlassCard(modifier = modifier.fillMaxWidth(), color = color) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -295,6 +297,7 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
                                 ContactRow(
                                     contact = contact,
                                     checked = contact.id == selectedId,
+                                    color = MoneroTheme.colors.fillElevated,
                                     onClick = { onPick(contact) },
                                     onLongClick = { menuFor = contact.id },
                                     actions = listOf(
@@ -465,10 +468,10 @@ internal fun ContactEditorSheet(contact: Contact?, onDismiss: () -> Unit, prefil
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MoneroTheme.colors.fill,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
-            val cardColor = MoneroTheme.colors.fillElevated
+            val cardColor = CellFill
             Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding()) {
                 Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
                     DismissTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) { Text(tr("Cancel")) }
