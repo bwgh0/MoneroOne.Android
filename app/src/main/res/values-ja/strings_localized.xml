@@ -18,6 +18,7 @@
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$s km"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"半径%1$s km"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s / %2$s語"</string>
+    <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"承認数 %s/10"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%1$s（%2$s宛）"</string>
     <string name="l10n_s_open_af891b0e" formatted="false">"未受取%s件"</string>
     <string name="l10n_s_to_claim_4a220b89" formatted="false">"%1$sを受け取れます"</string>

@@ -21,6 +21,7 @@ internal val localizedStrings: Map<String, Int> = mapOf(
     "%s km" to R.string.l10n_s_km_7ae04f84,
     "%s km radius" to R.string.l10n_s_km_radius_0ce6b318,
     "%s of %s words" to R.string.l10n_s_of_s_words_262b50ac,
+    "%s of 10 confirmations" to R.string.l10n_s_of_10_confirmations_b16ca550,
     "%s on %s" to R.string.l10n_s_on_s_745fc552,
     "%s open" to R.string.l10n_s_open_af891b0e,
     "%s to claim" to R.string.l10n_s_to_claim_4a220b89,

@@ -18,6 +18,7 @@
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$s км"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"Радиус %1$s км"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s из %2$s слов"</string>
+    <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"%s из 10 подтверждений"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%1$s на «%2$s»"</string>
     <string name="l10n_s_open_af891b0e" formatted="false">"открытых: %s"</string>
     <string name="l10n_s_to_claim_4a220b89" formatted="false">"%1$s можно забрать"</string>
