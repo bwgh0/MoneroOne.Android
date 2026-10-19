@@ -854,6 +854,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         ).also { added ->
             // Kept until now so that a failed add can be retried with the same words.
             if (added) createFlowSeed.discard(flowId)
+            // Its first payment gets the bigger Money arrives moment.
+            if (added) _activeWallet.value?.id?.let { MoneyArrivesStore.get(context).markCreatedInApp(it) }
         }
     }
 
@@ -2139,6 +2141,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun resetSyncLocked() {
         try {
             val active = _activeWallet.value ?: return
+            // The rescan finds every payment again: the next synced look takes them as seen.
+            MoneyArrivesStore.get(context).resetBaseline(active.id)
             val seedData = secrets.loadSeed(active.id) ?: run {
                 Timber.w("No stored seed, cannot reset sync")
                 _walletState.update { it.copy(error = "No wallet seed to reset sync") }
