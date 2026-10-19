@@ -1,6 +1,5 @@
 package one.monero.moneroone.core.openalias
 
-import io.horizontalsystems.monerokit.util.NetCipherHelper
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +18,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import one.monero.moneroone.BuildConfig
+import one.monero.moneroone.core.network.TorConfig
+import one.monero.moneroone.core.network.TorNetwork
 import timber.log.Timber
 import java.io.BufferedInputStream
 import java.io.Closeable
@@ -406,7 +407,7 @@ internal object DnsDebug {
     }
 }
 
-/** The Tor SOCKS proxy, from NetCipherHelper. */
+/** The Tor SOCKS proxy of the app's Tor setting. */
 data class TorProxy(val host: String, val port: Int)
 
 sealed class TorState {
@@ -417,20 +418,23 @@ sealed class TorState {
 }
 
 object OpenAliasTor {
-    /** Tor is on when NetCipherHelper says so. An exception (no instance yet) means off. */
-    fun current(): TorState {
-        val on = try {
-            NetCipherHelper.isTor()
-        } catch (e: Throwable) {
-            false
+    /**
+     * The app's Tor setting ([TorNetwork]), the one every other connection uses. A setting that is not
+     * loaded yet, or a proxy that does not parse, gives On(null): the lookup fails, it never goes direct.
+     */
+    fun current(route: () -> TorConfig = { TorNetwork.route }): TorState {
+        val config = try {
+            route()
+        } catch (e: Exception) {
+            return TorState.On(null)
         }
-        if (!on) return TorState.Off
-        val proxy = try {
-            NetCipherHelper.getProxy()
-        } catch (e: Throwable) {
+        if (!config.enabled) return TorState.Off
+        val endpoint = try {
+            config.endpoint()
+        } catch (e: Exception) {
             null
         }
-        return TorState.On(parseProxy(proxy))
+        return TorState.On(endpoint?.let { TorProxy(it.host, it.port) })
     }
 
     /** Parses `host:port`, split at the last ':'. Null when it fails. */
@@ -510,6 +514,41 @@ class OkHttpDohTransport(private val client: OkHttpClient) : DohTransport {
 }
 
 /**
+ * The DoH transport on the app's Tor route: [TorNetwork.save] cancels its calls, and no request starts
+ * once the saved route is not the one the lookup began on.
+ */
+class RoutedDohTransport private constructor(
+    private val route: TorConfig,
+    private val client: OkHttpClient,
+) : DohTransport {
+    private val inner = OkHttpDohTransport(client)
+
+    override fun post(server: String, query: ByteArray): DohReply {
+        TorNetwork.ensureRoute(route)
+        return inner.post(server, query)
+    }
+
+    override fun cancelAll() {
+        TorNetwork.untrack(client)
+        inner.cancelAll()
+    }
+
+    companion object {
+        /** Throws when the saved route is no longer the one [proxy] came from. */
+        fun open(proxy: TorProxy?): RoutedDohTransport {
+            val route = TorNetwork.route
+            if (route.endpoint()?.let { TorProxy(it.host, it.port) } != proxy) {
+                throw IOException("Connection settings changed")
+            }
+            val timeout = if (proxy == null) OpenAliasConfig.DOH_TIMEOUT_DIRECT_MS else OpenAliasConfig.DOH_TIMEOUT_TOR_MS
+            val client = buildDohClient(timeout, proxy)
+            TorNetwork.track(client)
+            return RoutedDohTransport(route, client)
+        }
+    }
+}
+
+/**
  * Looks up OpenAlias names (spec section 3.3): a new [DnsBridge] per lookup,
  * the kit's DNSSEC-validating TXT lookup through it, then the answer mapping.
  * Never calls the wallet2 resolver.
@@ -518,10 +557,7 @@ class OpenAliasResolver(
     private val kitLookup: (name: String, port: Int, timeoutMs: Int) -> String =
         { name, port, timeoutMs -> KitOpenAlias.lookupTxt(name, port, timeoutMs) },
     private val torState: () -> TorState = OpenAliasTor::current,
-    private val transportFactory: (TorProxy?) -> DohTransport = { proxy ->
-        val timeout = if (proxy == null) OpenAliasConfig.DOH_TIMEOUT_DIRECT_MS else OpenAliasConfig.DOH_TIMEOUT_TOR_MS
-        OkHttpDohTransport(buildDohClient(timeout, proxy))
-    },
+    private val transportFactory: (TorProxy?) -> DohTransport = RoutedDohTransport::open,
     private val servers: List<String> = OpenAliasConfig.DOH_SERVERS,
 ) {
     /** Cancelling the caller stops the bridge at once; the kit call then ends within about a second. */
@@ -546,7 +582,8 @@ class OpenAliasResolver(
             }
             val bridge = DnsBridge(transport, servers, trace = trace)
             val port = bridge.start()
-                ?: return@withContext OpenAliasOutcome.Failed(OpenAliasFailure.NETWORK).also { debugLog(it, startedAt, null) }
+                ?: return@withContext OpenAliasOutcome.Failed(OpenAliasFailure.NETWORK)
+                    .also { transport.cancelAll(); debugLog(it, startedAt, null) }
             val timeoutMs = if (torOn) OpenAliasConfig.KIT_TIMEOUT_TOR_MS else OpenAliasConfig.KIT_TIMEOUT_DIRECT_MS
             val json = try {
                 coroutineScope {
