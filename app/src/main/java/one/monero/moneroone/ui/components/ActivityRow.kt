@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.Icon
@@ -27,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -40,7 +43,9 @@ import one.monero.moneroone.ui.theme.SuccessGreen
  * One Activity row (Recent Activity and All Transactions): the direction disc
  * (green ↙ in, orange ↗ out), the title over the date, the [amounts] and a
  * chevron, on a card. A payment link row adds the [linkBadge] to the disc.
- * TalkBack reads [spoken] for the whole row.
+ * A transaction row passes its [confirmations]: the disc shows the
+ * confirmation ring from 0 to 9 (see [ConfirmationRing]). TalkBack reads
+ * [spoken] for the whole row, then "n of 10 confirmations" while the ring shows.
  */
 @Composable
 fun ActivityRow(
@@ -51,9 +56,15 @@ fun ActivityRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     linkBadge: Boolean = false,
+    confirmations: Long? = null,
+    failed: Boolean = false,
     amounts: @Composable () -> Unit
 ) {
     val rowBackground = MaterialTheme.colorScheme.surfaceContainer
+    val ring = rememberDiscRing(confirmations, failed)
+    val label = if (ConfirmationRing.shows(confirmations, failed)) {
+        spoken + ", " + ConfirmationRing.spoken(confirmations ?: 0L)
+    } else spoken
     GlassCard(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
@@ -62,11 +73,11 @@ fun ActivityRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clearAndSetSemantics { contentDescription = spoken }
+                .clearAndSetSemantics { contentDescription = label }
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DirectionDisc(incoming = incoming, linkBadge = linkBadge, rowBackground = rowBackground)
+            DirectionDisc(incoming = incoming, linkBadge = linkBadge, rowBackground = rowBackground, ring = ring)
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -104,11 +115,15 @@ fun ActivityRow(
  * The 40 direction disc at 15% of its hue. With [linkBadge], an 18 badge sits
  * on its bottom-right corner (4 past the disc): the link glyph in the hue on
  * the hue's 15% tint, opaque over [rowBackground], cut out of the disc by a 2
- * ring of [rowBackground].
+ * ring of [rowBackground]. With a [ring], the confirmation ring sits on the
+ * disc's rim, under the badge; at 10 the disc turns green and shows a check
+ * for a moment.
  */
 @Composable
-fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color) {
-    val hue = if (incoming) SuccessGreen else MoneroOrange
+internal fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color, ring: DiscRingState? = null) {
+    val ownHue = if (incoming) SuccessGreen else MoneroOrange
+    val green = SuccessGreen
+    val hue = if (ring != null) lerp(ownHue, green, ring.discGreen.value) else ownHue
     Box {
         Box(
             modifier = Modifier
@@ -121,9 +136,33 @@ fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color) {
                 imageVector = if (incoming) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
                 contentDescription = null,
                 tint = hue,
-                modifier = Modifier.size(20.dp).rotate(45f)
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer {
+                        if (ring != null) {
+                            alpha = ring.arrowAlpha.value
+                            scaleX = ring.arrowScale.value
+                            scaleY = ring.arrowScale.value
+                        }
+                    }
+                    .rotate(45f)
             )
+            if (ring != null && ring.ringOn) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = hue,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer {
+                            alpha = ring.checkAlpha.value
+                            scaleX = ring.checkScale.value
+                            scaleY = ring.checkScale.value
+                        }
+                )
+            }
         }
+        if (ring != null && ring.ringOn) DiscRing(ring)
         if (linkBadge) {
             Box(
                 modifier = Modifier
@@ -135,10 +174,10 @@ fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color) {
                     .background(rowBackground)
                     .padding(BadgeRing)
                     .clip(CircleShape)
-                    .background(hue.copy(alpha = 0.15f).compositeOver(rowBackground)),
+                    .background(ownHue.copy(alpha = 0.15f).compositeOver(rowBackground)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Link, contentDescription = null, tint = hue, modifier = Modifier.size(11.dp))
+                Icon(Icons.Default.Link, contentDescription = null, tint = ownHue, modifier = Modifier.size(11.dp))
             }
         }
     }

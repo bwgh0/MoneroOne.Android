@@ -1178,7 +1178,9 @@ private fun TransactionCard(
         subtitle = date,
         spoken = link?.spoken ?: TransactionHistoryLogic.rowLabel(transaction, fiatMode, fiatValue, date, receivedOn),
         onClick = onClick,
-        linkBadge = link != null
+        linkBadge = link != null,
+        confirmations = transaction.confirmations,
+        failed = transaction.isFailed
     ) {
         if (link != null) {
             LinkRowAmounts(link, one.monero.moneroone.ui.components.transactionStatus(transaction))

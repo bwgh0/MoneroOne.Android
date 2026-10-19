@@ -264,14 +264,21 @@ fun TransactionStatusIndicator(
     status: TransactionStatus,
     modifier: Modifier = Modifier
 ) {
-    val (text, color) = when (status) {
-        TransactionStatus.Pending -> tr("Pending") to PendingOrange
-        TransactionStatus.Locked -> tr("Locked") to MoneroOrange
-        TransactionStatus.Confirmed -> tr("Confirmed") to SuccessGreen
-        TransactionStatus.Failed -> tr("Failed") to ErrorRed
+    // A new status word cross-fades in (the confirmation ring's beat).
+    androidx.compose.animation.Crossfade(
+        targetState = status,
+        animationSpec = Motion.crossFade(),
+        modifier = modifier,
+        label = "status"
+    ) { shown ->
+        val (text, color) = when (shown) {
+            TransactionStatus.Pending -> tr("Pending") to PendingOrange
+            TransactionStatus.Locked -> tr("Locked") to MoneroOrange
+            TransactionStatus.Confirmed -> tr("Confirmed") to SuccessGreen
+            TransactionStatus.Failed -> tr("Failed") to ErrorRed
+        }
+        StatusLabel(text = text, dotColor = color)
     }
-
-    StatusLabel(text = text, dotColor = color, modifier = modifier)
 }
 
 /** A row's status spot: an 8 dot and a caption2 word, in the dot's hue unless [textColor] says (yellow keeps the label color). */
