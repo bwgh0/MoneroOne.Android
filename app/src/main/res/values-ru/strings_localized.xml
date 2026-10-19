@@ -440,6 +440,7 @@
     <string name="l10n_enter_a_valid_address_first_68b6e98a" formatted="false">"Сначала введите действительный адрес"</string>
     <string name="l10n_enter_a_valid_amount_first_d298322a" formatted="false">"Сначала введите корректную сумму"</string>
     <string name="l10n_enter_a_valid_seed_phrase_to_continue_d20106e0" formatted="false">"Введите действительную мнемоническую фразу, чтобы продолжить"</string>
+    <string name="l10n_enter_an_openalias_name_in_place_of_an_address_checked__f40197ef" formatted="false">"Введите имя OpenAlias вместо адреса, проверенное через DNSSEC."</string>
     <string name="l10n_enter_an_optional_amount_to_embed_in_the_qr_code_195afecf" formatted="false">"Введите сумму (необязательно), чтобы добавить её в QR-код"</string>
     <string name="l10n_enter_and_confirm_your_pin_to_continue_0a1c754d" formatted="false">"Введите и подтвердите PIN-код, чтобы продолжить"</string>
     <string name="l10n_enter_code_shown_on_trezor_4a6647ac" formatted="false">"Введите код с экрана Trezor"</string>
@@ -482,6 +483,7 @@
     <string name="l10n_filter_transactions_00d87315" formatted="false">"Фильтр транзакций"</string>
     <string name="l10n_first_payment_to_this_name_check_the_address_with_the_r_5e52f2f6" formatted="false">"Первый платёж на это имя. Сверьте адрес с получателем."</string>
     <string name="l10n_first_time_sync_can_take_a_few_minutes_2b7fc90b" formatted="false">"Первая синхронизация может занять несколько минут."</string>
+    <string name="l10n_fixes_for_custom_node_logins_19731e0d" formatted="false">"Исправления входа на пользовательские узлы."</string>
     <string name="l10n_forgot_pin_74ad27db" formatted="false">"Забыли PIN-код"</string>
     <string name="l10n_forgot_pin_9c7eb279" formatted="false">"Забыли PIN-код?"</string>
     <string name="l10n_forgot_your_pin_7428917f" formatted="false">"Забыли PIN-код?"</string>
@@ -491,6 +493,7 @@
     <string name="l10n_from_beginning_full_scan_17265d0d" formatted="false">"Сканирование с самого начала"</string>
     <string name="l10n_full_wallet_you_can_send_and_receive_adca402c" formatted="false">"Полный кошелёк — можно отправлять и получать."</string>
     <string name="l10n_funding_transaction_c2006a3f" formatted="false">"Транзакция пополнения"</string>
+    <string name="l10n_general_stability_improvements_and_bug_fixes_d6cabb44" formatted="false">"Общее повышение стабильности и исправления ошибок."</string>
     <string name="l10n_generating_49286f33" formatted="false">"Загрузка..."</string>
     <string name="l10n_get_notified_on_price_changes_1a5ab92c" formatted="false">"Просмотр ценовых оповещений и управление ими"</string>
     <string name="l10n_get_notified_when_xmr_crosses_a_price_you_set_92aed39f" formatted="false">"Получайте уведомление, когда XMR достигнет заданной вами цены."</string>
@@ -640,6 +643,8 @@
     <string name="l10n_new_pin_length_483a5a20" formatted="false">"Длина нового PIN-кода"</string>
     <string name="l10n_new_price_alert_70e1b4c1" formatted="false">"Новое оповещение"</string>
     <string name="l10n_new_address_after_each_payment_d82479d9" formatted="false">"Новый адрес после каждого платежа"</string>
+    <string name="l10n_new_seed_phrase_entry_0dd2e324" formatted="false">"Новый ввод мнемонической фразы"</string>
+    <string name="l10n_new_wallets_are_created_faster_1212ea81" formatted="false">"Новые кошельки создаются быстрее."</string>
     <string name="l10n_next_transaction_37f49104" formatted="false">"Следующая транзакция"</string>
     <string name="l10n_no_monero_address_for_this_name_79d0651c" formatted="false">"Для этого имени нет адреса Monero"</string>
     <string name="l10n_no_price_alerts_cfb97a21" formatted="false">"Нет ценовых оповещений"</string>
@@ -705,6 +710,7 @@
     <string name="l10n_on_its_way_c5d0f5f4" formatted="false">"В пути"</string>
     <string name="l10n_on_its_way_to_s_6b81fd4f" formatted="false">"В пути: %1$s"</string>
     <string name="l10n_once_a_monero_transaction_is_confirmed_it_cannot_be_rev_74305ca5" formatted="false">"Подтверждённую транзакцию Monero нельзя отозвать, отменить или изменить. Всегда проверяйте адреса перед отправкой."</string>
+    <string name="l10n_one_box_per_word_paste_a_whole_phrase_at_once_and_a_che_0ed05a9b" formatted="false">"Отдельное поле для каждого слова, вставка всей фразы сразу и проверка контрольной суммы."</string>
     <string name="l10n_only_finds_transactions_after_this_date_1d9e9bdd" formatted="false">"Находит только транзакции после этой даты."</string>
     <string name="l10n_only_for_nodes_that_need_a_login_ce0e5d51" formatted="false">"Только для узлов, которым нужен вход."</string>
     <string name="l10n_only_sync_when_inside_a_trusted_zone_2a854510" formatted="false">"Синхронизировать только в доверенной зоне"</string>
@@ -730,6 +736,7 @@
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"Открывает список кошельков, чтобы выбрать, куда поступят деньги"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"Открывает список кошельков, где можно переключать, переименовывать и добавлять кошельки"</string>
     <string name="l10n_optic_id_650eb5d4" formatted="false">"Optic ID"</string>
+    <string name="l10n_other_improvements_411df298" formatted="false">"Другие улучшения"</string>
     <string name="l10n_other_wallets_show_their_last_known_balance_e3e5aca7" formatted="false">"Для других кошельков показан последний известный баланс."</string>
     <string name="l10n_outgoing_transactions_may_be_out_of_date_179823e2" formatted="false">"Исходящие транзакции могут быть неактуальны"</string>
     <string name="l10n_outside_trusted_zones_7a2e6d43" formatted="false">"Вне доверенных зон"</string>
@@ -894,8 +901,10 @@
     <string name="l10n_retry_transaction_d11152ea" formatted="false">"Повторить транзакцию"</string>
     <string name="l10n_return_to_current_balance_and_activity_29fbc524" formatted="false">"Вернуться к текущему балансу и активности"</string>
     <string name="l10n_review_aff0766a" formatted="false">"Проверка"</string>
+    <string name="l10n_review_shows_the_exact_network_fee_you_pay_7a483ffb" formatted="false">"На экране проверки видна точная комиссия сети, которую вы платите."</string>
     <string name="l10n_review_the_transaction_details_on_the_device_screen_e6d8886c" formatted="false">"Проверьте данные транзакции на экране устройства."</string>
     <string name="l10n_romanian_leu_b988a3b0" formatted="false">"Румынский лей"</string>
+    <string name="l10n_rounded_qr_codes_4bdb3d47" formatted="false">"Скруглённые QR-коды."</string>
     <string name="l10n_route_traffic_through_socks5_proxy_9704e8d1" formatted="false">"Направлять трафик через прокси SOCKS5"</string>
     <string name="l10n_russian_ruble_e43aeba8" formatted="false">"Российский рубль"</string>
     <string name="l10n_same_address_as_your_last_payment_0c07a4bf" formatted="false">"Тот же адрес, что и при прошлом платеже"</string>
@@ -940,6 +949,7 @@
     <string name="l10n_send_monero_3552baef" formatted="false">"Отправить Monero"</string>
     <string name="l10n_send_monero_disabled_for_view_only_wallet_68072655" formatted="false">"Отправить Monero, недоступно в кошельке только для просмотра"</string>
     <string name="l10n_send_xmr_1cab3308" formatted="false">"Отправить XMR"</string>
+    <string name="l10n_send_xmr_as_a_link_443b6e40" formatted="false">"Отправка XMR по ссылке"</string>
     <string name="l10n_send_xmr_disabled_for_view_only_wallet_eddacbd6" formatted="false">"Отправить XMR, недоступно в кошельке только для просмотра"</string>
     <string name="l10n_send_all_funds_instead_474acbb3" formatted="false">"Все средства"</string>
     <string name="l10n_send_failed_s_ddac2789" formatted="false">"Ошибка отправки: %1$s"</string>
@@ -949,6 +959,7 @@
     <string name="l10n_send_me_s_xmr_at_this_address_s_f46bae9e" formatted="false">"Отправьте мне %1$s XMR на этот адрес:\n\n%2$s"</string>
     <string name="l10n_send_me_monero_xmr_at_this_address_s_b252c9ed" formatted="false">"Отправьте мне Monero (XMR) на этот адрес:\n\n%1$s"</string>
     <string name="l10n_send_to_s_eb35ff2a" formatted="false">"Отправка на %1$s"</string>
+    <string name="l10n_send_to_a_name_ae1d1417" formatted="false">"Отправка на имя"</string>
     <string name="l10n_send_transaction_7bc085c4" formatted="false">"Отправить транзакцию"</string>
     <string name="l10n_send_with_a_link_86a321a8" formatted="false">"Отправить по ссылке"</string>
     <string name="l10n_send_with_a_link_5d2460f7" formatted="false">"Отправить по ссылке"</string>
@@ -1208,6 +1219,7 @@
     <string name="l10n_verifying_pairing_code_6b4e7eb9" formatted="false">"Проверка кода сопряжения…"</string>
     <string name="l10n_verifying_63bbd08c" formatted="false">"Проверка…"</string>
     <string name="l10n_version_dd167905" formatted="false">"Версия"</string>
+    <string name="l10n_version_s_e2350a80" formatted="false">"Версия %1$s"</string>
     <string name="l10n_version_s_build_s_7f509f52" formatted="false">"Версия %1$s, сборка %2$s"</string>
     <string name="l10n_view_key_076f1396" formatted="false">"Ключ просмотра"</string>
     <string name="l10n_view_and_manage_price_alerts_352c75ae" formatted="false">"Просмотр ценовых оповещений и управление ими"</string>
@@ -1250,10 +1262,13 @@
     <string name="l10n_watch_only_balances_and_transactions_no_sending_cfc95d78" formatted="false">"Только наблюдение — баланс и транзакции, без отправки."</string>
     <string name="l10n_we_use_low_power_location_monitoring_to_minimize_batter_806fe472" formatted="false">"Мы используем энергоэффективное отслеживание геопозиции, чтобы снизить расход заряда. При включённой функции расход аккумулятора может немного вырасти."</string>
     <string name="l10n_website_b5a229ac" formatted="false">"Веб-сайт"</string>
+    <string name="l10n_what_s_new_in_monero_one_2b1cb131" formatted="false">"Что нового в Monero One"</string>
+    <string name="l10n_what_s_new_in_monero_one_s_8bf529e8" formatted="false">"Что нового в Monero One %1$s"</string>
     <string name="l10n_when_did_you_create_this_wallet_a5111f6f" formatted="false">"Когда вы создали этот кошелёк?"</string>
     <string name="l10n_when_was_the_trezor_wallet_created_3b52de95" formatted="false">"Когда был создан кошелёк Trezor?"</string>
     <string name="l10n_when_was_the_wallet_created_77559160" formatted="false">"Когда был создан кошелёк?"</string>
     <string name="l10n_when_you_re_inside_a_trusted_zone_your_wallet_checks_fo_77346de8" formatted="false">"Когда вы находитесь в доверенной зоне, кошелёк проверяет новые транзакции в оптимальное время."</string>
+    <string name="l10n_whoever_opens_it_claims_the_funds_in_monero_one_in_send_989ec286" formatted="false">"Тот, кто её откроет, получит средства в Monero One. В разделе «Отправить» выберите «Ссылка»."</string>
     <string name="l10n_widget_7dd7a28c" formatted="false">"Виджет"</string>
     <string name="l10n_will_scan_from_the_beginning_29785ed9" formatted="false">"Сканирование с самого начала"</string>
     <string name="l10n_will_scan_from_the_beginning_slower_ce4e8589" formatted="false">"Сканирование с самого начала (медленнее)"</string>

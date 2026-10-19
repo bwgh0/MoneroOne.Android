@@ -440,6 +440,7 @@
     <string name="l10n_enter_a_valid_address_first_68b6e98a" formatted="false">"請先輸入有效的位址"</string>
     <string name="l10n_enter_a_valid_amount_first_d298322a" formatted="false">"請先輸入有效的金額"</string>
     <string name="l10n_enter_a_valid_seed_phrase_to_continue_d20106e0" formatted="false">"請輸入有效的助記詞以繼續"</string>
+    <string name="l10n_enter_an_openalias_name_in_place_of_an_address_checked__f40197ef" formatted="false">"輸入 OpenAlias 名稱代替位址，並經 DNSSEC 驗證。"</string>
     <string name="l10n_enter_an_optional_amount_to_embed_in_the_qr_code_195afecf" formatted="false">"輸入要嵌入 QR Code 的金額（選填）"</string>
     <string name="l10n_enter_and_confirm_your_pin_to_continue_0a1c754d" formatted="false">"請輸入並確認 PIN 碼以繼續"</string>
     <string name="l10n_enter_code_shown_on_trezor_4a6647ac" formatted="false">"輸入 Trezor 上顯示的代碼"</string>
@@ -482,6 +483,7 @@
     <string name="l10n_filter_transactions_00d87315" formatted="false">"篩選交易"</string>
     <string name="l10n_first_payment_to_this_name_check_the_address_with_the_r_5e52f2f6" formatted="false">"首次向此名稱付款。請與收款人核對位址。"</string>
     <string name="l10n_first_time_sync_can_take_a_few_minutes_2b7fc90b" formatted="false">"首次同步可能需要幾分鐘。"</string>
+    <string name="l10n_fixes_for_custom_node_logins_19731e0d" formatted="false">"修正了自訂節點登入問題。"</string>
     <string name="l10n_forgot_pin_74ad27db" formatted="false">"忘記 PIN 碼"</string>
     <string name="l10n_forgot_pin_9c7eb279" formatted="false">"忘記 PIN 碼？"</string>
     <string name="l10n_forgot_your_pin_7428917f" formatted="false">"忘記 PIN 碼了嗎？"</string>
@@ -491,6 +493,7 @@
     <string name="l10n_from_beginning_full_scan_17265d0d" formatted="false">"將從頭開始掃描"</string>
     <string name="l10n_full_wallet_you_can_send_and_receive_adca402c" formatted="false">"完整錢包：可以傳送和收款。"</string>
     <string name="l10n_funding_transaction_c2006a3f" formatted="false">"注資交易"</string>
+    <string name="l10n_general_stability_improvements_and_bug_fixes_d6cabb44" formatted="false">"一般穩定性改進與錯誤修正。"</string>
     <string name="l10n_generating_49286f33" formatted="false">"正在載入⋯"</string>
     <string name="l10n_get_notified_on_price_changes_1a5ab92c" formatted="false">"檢視和管理價格提醒"</string>
     <string name="l10n_get_notified_when_xmr_crosses_a_price_you_set_92aed39f" formatted="false">"當 XMR 達到你設定的價格時收到通知。"</string>
@@ -640,6 +643,8 @@
     <string name="l10n_new_pin_length_483a5a20" formatted="false">"新 PIN 碼長度"</string>
     <string name="l10n_new_price_alert_70e1b4c1" formatted="false">"新提醒"</string>
     <string name="l10n_new_address_after_each_payment_d82479d9" formatted="false">"每次收款後使用新位址"</string>
+    <string name="l10n_new_seed_phrase_entry_0dd2e324" formatted="false">"全新的助記詞輸入"</string>
+    <string name="l10n_new_wallets_are_created_faster_1212ea81" formatted="false">"新錢包建立更快。"</string>
     <string name="l10n_next_transaction_37f49104" formatted="false">"下一筆交易"</string>
     <string name="l10n_no_monero_address_for_this_name_79d0651c" formatted="false">"此名稱沒有 Monero 位址"</string>
     <string name="l10n_no_price_alerts_cfb97a21" formatted="false">"沒有價格提醒"</string>
@@ -705,6 +710,7 @@
     <string name="l10n_on_its_way_c5d0f5f4" formatted="false">"轉帳中"</string>
     <string name="l10n_on_its_way_to_s_6b81fd4f" formatted="false">"正在轉入 %1$s"</string>
     <string name="l10n_once_a_monero_transaction_is_confirmed_it_cannot_be_rev_74305ca5" formatted="false">"Monero 交易一經確認，就無法撤銷、取消或修改。傳送前請務必核對位址。"</string>
+    <string name="l10n_one_box_per_word_paste_a_whole_phrase_at_once_and_a_che_0ed05a9b" formatted="false">"每個單字一個輸入框，可一次貼上整個助記詞，並進行校驗和檢查。"</string>
     <string name="l10n_only_finds_transactions_after_this_date_1d9e9bdd" formatted="false">"僅尋找此日期之後的交易。"</string>
     <string name="l10n_only_for_nodes_that_need_a_login_ce0e5d51" formatted="false">"僅適用於需要登入的節點。"</string>
     <string name="l10n_only_sync_when_inside_a_trusted_zone_2a854510" formatted="false">"僅在受信任區域內同步"</string>
@@ -730,6 +736,7 @@
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"開啟錢包列表，選擇款項轉入哪個錢包"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"開啟錢包列表，你可以在其中切換、重新命名或新增錢包"</string>
     <string name="l10n_optic_id_650eb5d4" formatted="false">"Optic ID"</string>
+    <string name="l10n_other_improvements_411df298" formatted="false">"其他改進"</string>
     <string name="l10n_other_wallets_show_their_last_known_balance_e3e5aca7" formatted="false">"其他錢包顯示最後已知的餘額。"</string>
     <string name="l10n_outgoing_transactions_may_be_out_of_date_179823e2" formatted="false">"已傳送的交易可能不是最新"</string>
     <string name="l10n_outside_trusted_zones_7a2e6d43" formatted="false">"位於受信任區域外"</string>
@@ -894,8 +901,10 @@
     <string name="l10n_retry_transaction_d11152ea" formatted="false">"重試交易"</string>
     <string name="l10n_return_to_current_balance_and_activity_29fbc524" formatted="false">"返回目前餘額與活動"</string>
     <string name="l10n_review_aff0766a" formatted="false">"核對"</string>
+    <string name="l10n_review_shows_the_exact_network_fee_you_pay_7a483ffb" formatted="false">"核對頁面顯示你實際支付的網路手續費。"</string>
     <string name="l10n_review_the_transaction_details_on_the_device_screen_e6d8886c" formatted="false">"在裝置螢幕上核對交易詳細資料。"</string>
     <string name="l10n_romanian_leu_b988a3b0" formatted="false">"羅馬尼亞列伊"</string>
+    <string name="l10n_rounded_qr_codes_4bdb3d47" formatted="false">"圓角 QR 碼。"</string>
     <string name="l10n_route_traffic_through_socks5_proxy_9704e8d1" formatted="false">"透過 SOCKS5 代理伺服器傳送流量"</string>
     <string name="l10n_russian_ruble_e43aeba8" formatted="false">"俄羅斯盧布"</string>
     <string name="l10n_same_address_as_your_last_payment_0c07a4bf" formatted="false">"與你上次付款的位址相同"</string>
@@ -940,6 +949,7 @@
     <string name="l10n_send_monero_3552baef" formatted="false">"傳送 Monero"</string>
     <string name="l10n_send_monero_disabled_for_view_only_wallet_68072655" formatted="false">"傳送 Monero，唯讀錢包無法使用"</string>
     <string name="l10n_send_xmr_1cab3308" formatted="false">"傳送 XMR"</string>
+    <string name="l10n_send_xmr_as_a_link_443b6e40" formatted="false">"以連結傳送 XMR"</string>
     <string name="l10n_send_xmr_disabled_for_view_only_wallet_eddacbd6" formatted="false">"傳送 XMR，唯讀錢包無法使用"</string>
     <string name="l10n_send_all_funds_instead_474acbb3" formatted="false">"全部資金"</string>
     <string name="l10n_send_failed_s_ddac2789" formatted="false">"傳送失敗：%1$s"</string>
@@ -949,6 +959,7 @@
     <string name="l10n_send_me_s_xmr_at_this_address_s_f46bae9e" formatted="false">"請傳送 %1$s XMR 到此位址：\n\n%2$s"</string>
     <string name="l10n_send_me_monero_xmr_at_this_address_s_b252c9ed" formatted="false">"請傳送 Monero (XMR) 到此位址：\n\n%1$s"</string>
     <string name="l10n_send_to_s_eb35ff2a" formatted="false">"傳送至 %1$s"</string>
+    <string name="l10n_send_to_a_name_ae1d1417" formatted="false">"傳送到名稱"</string>
     <string name="l10n_send_transaction_7bc085c4" formatted="false">"傳送交易"</string>
     <string name="l10n_send_with_a_link_86a321a8" formatted="false">"透過連結傳送"</string>
     <string name="l10n_send_with_a_link_5d2460f7" formatted="false">"透過連結傳送"</string>
@@ -1208,6 +1219,7 @@
     <string name="l10n_verifying_pairing_code_6b4e7eb9" formatted="false">"正在驗證配對碼⋯"</string>
     <string name="l10n_verifying_63bbd08c" formatted="false">"正在驗證⋯"</string>
     <string name="l10n_version_dd167905" formatted="false">"版本"</string>
+    <string name="l10n_version_s_e2350a80" formatted="false">"版本 %1$s"</string>
     <string name="l10n_version_s_build_s_7f509f52" formatted="false">"版本 %1$s，建置版本 %2$s"</string>
     <string name="l10n_view_key_076f1396" formatted="false">"檢視金鑰"</string>
     <string name="l10n_view_and_manage_price_alerts_352c75ae" formatted="false">"檢視和管理價格提醒"</string>
@@ -1250,10 +1262,13 @@
     <string name="l10n_watch_only_balances_and_transactions_no_sending_cfc95d78" formatted="false">"僅觀察：可查看餘額和交易，無法傳送。"</string>
     <string name="l10n_we_use_low_power_location_monitoring_to_minimize_batter_806fe472" formatted="false">"我們使用低耗電的位置監控，盡量減少耗電。啟用後，你可能會發現電池用量略微增加。"</string>
     <string name="l10n_website_b5a229ac" formatted="false">"網站"</string>
+    <string name="l10n_what_s_new_in_monero_one_2b1cb131" formatted="false">"Monero One 新功能"</string>
+    <string name="l10n_what_s_new_in_monero_one_s_8bf529e8" formatted="false">"Monero One %1$s 新功能"</string>
     <string name="l10n_when_did_you_create_this_wallet_a5111f6f" formatted="false">"你是什麼時候建立這個錢包的？"</string>
     <string name="l10n_when_was_the_trezor_wallet_created_3b52de95" formatted="false">"這個 Trezor 錢包是什麼時候建立的？"</string>
     <string name="l10n_when_was_the_wallet_created_77559160" formatted="false">"錢包是什麼時候建立的？"</string>
     <string name="l10n_when_you_re_inside_a_trusted_zone_your_wallet_checks_fo_77346de8" formatted="false">"當你位於受信任區域內時，錢包會在最佳時機檢查新交易。"</string>
+    <string name="l10n_whoever_opens_it_claims_the_funds_in_monero_one_in_send_989ec286" formatted="false">"開啟連結的人可在 Monero One 中領取資金。在「傳送」中選擇「連結」。"</string>
     <string name="l10n_widget_7dd7a28c" formatted="false">"小工具"</string>
     <string name="l10n_will_scan_from_the_beginning_29785ed9" formatted="false">"將從頭開始掃描"</string>
     <string name="l10n_will_scan_from_the_beginning_slower_ce4e8589" formatted="false">"將從頭開始掃描（較慢）"</string>

@@ -440,6 +440,7 @@
     <string name="l10n_enter_a_valid_address_first_68b6e98a" formatted="false">"Enter a valid address first"</string>
     <string name="l10n_enter_a_valid_amount_first_d298322a" formatted="false">"Enter a valid amount first"</string>
     <string name="l10n_enter_a_valid_seed_phrase_to_continue_d20106e0" formatted="false">"Enter a valid seed phrase to continue"</string>
+    <string name="l10n_enter_an_openalias_name_in_place_of_an_address_checked__f40197ef" formatted="false">"Enter an OpenAlias name in place of an address, checked with DNSSEC."</string>
     <string name="l10n_enter_an_optional_amount_to_embed_in_the_qr_code_195afecf" formatted="false">"Enter an optional amount to embed in the QR code"</string>
     <string name="l10n_enter_and_confirm_your_pin_to_continue_0a1c754d" formatted="false">"Enter and confirm your PIN to continue"</string>
     <string name="l10n_enter_code_shown_on_trezor_4a6647ac" formatted="false">"Enter code shown on Trezor"</string>
@@ -482,6 +483,7 @@
     <string name="l10n_filter_transactions_00d87315" formatted="false">"Filter transactions"</string>
     <string name="l10n_first_payment_to_this_name_check_the_address_with_the_r_5e52f2f6" formatted="false">"First payment to this name. Check the address with the recipient."</string>
     <string name="l10n_first_time_sync_can_take_a_few_minutes_2b7fc90b" formatted="false">"First-time sync can take a few minutes."</string>
+    <string name="l10n_fixes_for_custom_node_logins_19731e0d" formatted="false">"Fixes for custom node logins."</string>
     <string name="l10n_forgot_pin_74ad27db" formatted="false">"Forgot PIN"</string>
     <string name="l10n_forgot_pin_9c7eb279" formatted="false">"Forgot PIN?"</string>
     <string name="l10n_forgot_your_pin_7428917f" formatted="false">"Forgot Your PIN?"</string>
@@ -491,6 +493,7 @@
     <string name="l10n_from_beginning_full_scan_17265d0d" formatted="false">"From beginning (full scan)"</string>
     <string name="l10n_full_wallet_you_can_send_and_receive_adca402c" formatted="false">"Full wallet — you can send and receive."</string>
     <string name="l10n_funding_transaction_c2006a3f" formatted="false">"Funding transaction"</string>
+    <string name="l10n_general_stability_improvements_and_bug_fixes_d6cabb44" formatted="false">"General stability improvements and bug fixes."</string>
     <string name="l10n_generating_49286f33" formatted="false">"Generating..."</string>
     <string name="l10n_get_notified_on_price_changes_1a5ab92c" formatted="false">"Get notified on price changes"</string>
     <string name="l10n_get_notified_when_xmr_crosses_a_price_you_set_92aed39f" formatted="false">"Get notified when XMR crosses a price you set."</string>
@@ -640,6 +643,8 @@
     <string name="l10n_new_pin_length_483a5a20" formatted="false">"New PIN Length"</string>
     <string name="l10n_new_price_alert_70e1b4c1" formatted="false">"New Price Alert"</string>
     <string name="l10n_new_address_after_each_payment_d82479d9" formatted="false">"New address after each payment"</string>
+    <string name="l10n_new_seed_phrase_entry_0dd2e324" formatted="false">"New seed phrase entry"</string>
+    <string name="l10n_new_wallets_are_created_faster_1212ea81" formatted="false">"New wallets are created faster."</string>
     <string name="l10n_next_transaction_37f49104" formatted="false">"Next transaction"</string>
     <string name="l10n_no_monero_address_for_this_name_79d0651c" formatted="false">"No Monero address for this name"</string>
     <string name="l10n_no_price_alerts_cfb97a21" formatted="false">"No Price Alerts"</string>
@@ -705,6 +710,7 @@
     <string name="l10n_on_its_way_c5d0f5f4" formatted="false">"On its way"</string>
     <string name="l10n_on_its_way_to_s_6b81fd4f" formatted="false">"On its way to %s"</string>
     <string name="l10n_once_a_monero_transaction_is_confirmed_it_cannot_be_rev_74305ca5" formatted="false">"Once a Monero transaction is confirmed, it cannot be reversed, canceled, or modified. Always verify addresses before sending."</string>
+    <string name="l10n_one_box_per_word_paste_a_whole_phrase_at_once_and_a_che_0ed05a9b" formatted="false">"One box per word, paste a whole phrase at once, and a checksum check."</string>
     <string name="l10n_only_finds_transactions_after_this_date_1d9e9bdd" formatted="false">"Only finds transactions after this date."</string>
     <string name="l10n_only_for_nodes_that_need_a_login_ce0e5d51" formatted="false">"Only for nodes that need a login."</string>
     <string name="l10n_only_sync_when_inside_a_trusted_zone_2a854510" formatted="false">"Only sync when inside a trusted zone"</string>
@@ -730,6 +736,7 @@
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"Opens the wallet list to choose where the money goes"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"Opens the wallet list, where you can switch, rename or add wallets"</string>
     <string name="l10n_optic_id_650eb5d4" formatted="false">"Optic ID"</string>
+    <string name="l10n_other_improvements_411df298" formatted="false">"Other Improvements"</string>
     <string name="l10n_other_wallets_show_their_last_known_balance_e3e5aca7" formatted="false">"Other wallets show their last known balance."</string>
     <string name="l10n_outgoing_transactions_may_be_out_of_date_179823e2" formatted="false">"Outgoing transactions may be out of date"</string>
     <string name="l10n_outside_trusted_zones_7a2e6d43" formatted="false">"Outside Trusted Zones"</string>
@@ -894,8 +901,10 @@
     <string name="l10n_retry_transaction_d11152ea" formatted="false">"Retry transaction"</string>
     <string name="l10n_return_to_current_balance_and_activity_29fbc524" formatted="false">"Return to current balance and activity"</string>
     <string name="l10n_review_aff0766a" formatted="false">"Review"</string>
+    <string name="l10n_review_shows_the_exact_network_fee_you_pay_7a483ffb" formatted="false">"Review shows the exact network fee you pay."</string>
     <string name="l10n_review_the_transaction_details_on_the_device_screen_e6d8886c" formatted="false">"Review the transaction details on the device screen."</string>
     <string name="l10n_romanian_leu_b988a3b0" formatted="false">"Romanian Leu"</string>
+    <string name="l10n_rounded_qr_codes_4bdb3d47" formatted="false">"Rounded QR codes."</string>
     <string name="l10n_route_traffic_through_socks5_proxy_9704e8d1" formatted="false">"Route traffic through SOCKS5 proxy"</string>
     <string name="l10n_russian_ruble_e43aeba8" formatted="false">"Russian Ruble"</string>
     <string name="l10n_same_address_as_your_last_payment_0c07a4bf" formatted="false">"Same address as your last payment"</string>
@@ -940,6 +949,7 @@
     <string name="l10n_send_monero_3552baef" formatted="false">"Send Monero"</string>
     <string name="l10n_send_monero_disabled_for_view_only_wallet_68072655" formatted="false">"Send Monero, disabled for view-only wallet"</string>
     <string name="l10n_send_xmr_1cab3308" formatted="false">"Send XMR"</string>
+    <string name="l10n_send_xmr_as_a_link_443b6e40" formatted="false">"Send XMR as a link"</string>
     <string name="l10n_send_xmr_disabled_for_view_only_wallet_eddacbd6" formatted="false">"Send XMR, disabled for view-only wallet"</string>
     <string name="l10n_send_all_funds_instead_474acbb3" formatted="false">"Send all funds instead"</string>
     <string name="l10n_send_failed_s_ddac2789" formatted="false">"Send failed: %s"</string>
@@ -949,6 +959,7 @@
     <string name="l10n_send_me_s_xmr_at_this_address_s_f46bae9e" formatted="false">"Send me %s XMR at this address:\n\n%s"</string>
     <string name="l10n_send_me_monero_xmr_at_this_address_s_b252c9ed" formatted="false">"Send me Monero (XMR) at this address:\n\n%s"</string>
     <string name="l10n_send_to_s_eb35ff2a" formatted="false">"Send to %s"</string>
+    <string name="l10n_send_to_a_name_ae1d1417" formatted="false">"Send to a name"</string>
     <string name="l10n_send_transaction_7bc085c4" formatted="false">"Send transaction"</string>
     <string name="l10n_send_with_a_link_86a321a8" formatted="false">"Send with a Link"</string>
     <string name="l10n_send_with_a_link_5d2460f7" formatted="false">"Send with a link"</string>
@@ -1208,6 +1219,7 @@
     <string name="l10n_verifying_pairing_code_6b4e7eb9" formatted="false">"Verifying pairing code…"</string>
     <string name="l10n_verifying_63bbd08c" formatted="false">"Verifying…"</string>
     <string name="l10n_version_dd167905" formatted="false">"Version"</string>
+    <string name="l10n_version_s_e2350a80" formatted="false">"Version %s"</string>
     <string name="l10n_version_s_build_s_7f509f52" formatted="false">"Version %s, build %s"</string>
     <string name="l10n_view_key_076f1396" formatted="false">"View Key"</string>
     <string name="l10n_view_and_manage_price_alerts_352c75ae" formatted="false">"View and manage price alerts"</string>
@@ -1250,10 +1262,13 @@
     <string name="l10n_watch_only_balances_and_transactions_no_sending_cfc95d78" formatted="false">"Watch-only — balances and transactions, no sending."</string>
     <string name="l10n_we_use_low_power_location_monitoring_to_minimize_batter_806fe472" formatted="false">"We use low-power location monitoring to minimize battery drain. You may notice slightly higher battery usage when enabled."</string>
     <string name="l10n_website_b5a229ac" formatted="false">"Website"</string>
+    <string name="l10n_what_s_new_in_monero_one_2b1cb131" formatted="false">"What\'s New in Monero One"</string>
+    <string name="l10n_what_s_new_in_monero_one_s_8bf529e8" formatted="false">"What\'s New in Monero One %s"</string>
     <string name="l10n_when_did_you_create_this_wallet_a5111f6f" formatted="false">"When did you create this wallet?"</string>
     <string name="l10n_when_was_the_trezor_wallet_created_3b52de95" formatted="false">"When was the Trezor wallet created?"</string>
     <string name="l10n_when_was_the_wallet_created_77559160" formatted="false">"When was the wallet created?"</string>
     <string name="l10n_when_you_re_inside_a_trusted_zone_your_wallet_checks_fo_77346de8" formatted="false">"When you\'re inside a trusted zone, your wallet checks for new transactions at optimal times."</string>
+    <string name="l10n_whoever_opens_it_claims_the_funds_in_monero_one_in_send_989ec286" formatted="false">"Whoever opens it claims the funds in Monero One. In Send, choose Link."</string>
     <string name="l10n_widget_7dd7a28c" formatted="false">"Widget"</string>
     <string name="l10n_will_scan_from_the_beginning_29785ed9" formatted="false">"Will scan from the beginning"</string>
     <string name="l10n_will_scan_from_the_beginning_slower_ce4e8589" formatted="false">"Will scan from the beginning (slower)"</string>
