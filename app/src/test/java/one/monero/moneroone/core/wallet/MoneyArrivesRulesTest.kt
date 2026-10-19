@@ -115,4 +115,44 @@ class MoneyArrivesRulesTest {
         assertNull(look.arrival)
         assertEquals(51L, look.baseline.height)
     }
+
+    @Test
+    fun aSendWhileAPaymentWaitsShowsAtOnceAndTheRollEqualsThePlusAmount() {
+        val hold = HeroHold()
+        val old = incoming("a", 10_000, 100, confirmations = 40)
+        val baseline = MoneyArrivesRules.baselineOf(listOf(old))
+        val h0 = listOf(old)
+        assertEquals(10_000L, hold.hero(h0, h0, 10_000, emptyList(), syncing = false, lastShown = null))
+        // A new block: the kit publishes the history first, the balance after it.
+        val pay = incoming("p", 2_000, 140)
+        val h1 = listOf(old, pay)
+        val waiting = h1.filter { MoneyArrivesRules.isNew(it, baseline) }
+        assertEquals(10_000L, hold.hero(h1, h1, 10_000, waiting, syncing = false, lastShown = null))
+        assertFalse(hold.allCounted)
+        assertEquals(10_000L, hold.hero(h1, h1, 12_000, waiting, syncing = false, lastShown = null))
+        assertTrue(hold.allCounted)
+        // A send of 1 000 with a fee of 100 while the payment waits: the hero drops at once.
+        val h2 = h1 + outgoing("s", 1_000, 0)
+        val before = hold.hero(h2, h2, 10_900, waiting, syncing = false, lastShown = null)
+        assertEquals(8_900L, before)
+        // The moment: the hero rolls from its held value to the real balance.
+        val arrival = MoneyArrivesRules.look(baseline, h2, createdInApp = false, firstPaymentShown = true).arrival!!
+        assertEquals(arrival.total, 10_900L - before)
+    }
+
+    @Test
+    fun aPaymentFoundInACatchUpSyncHoldsTheLastShownValueUntilSynced() {
+        val hold = HeroHold()
+        val old = incoming("a", 10_000, 100, confirmations = 40)
+        val baseline = MoneyArrivesRules.baselineOf(listOf(old))
+        val h0 = listOf(old)
+        // Cold launch: the cached balance, then the sync finds a payment.
+        assertEquals(10_000L, hold.hero(h0, h0, 10_000, emptyList(), syncing = true, lastShown = 10_000))
+        val h1 = listOf(old, incoming("p", 2_000, 140))
+        val waiting = h1.filter { MoneyArrivesRules.isNew(it, baseline) }
+        assertEquals(10_000L, hold.hero(h1, h1, 12_000, waiting, syncing = true, lastShown = 10_000))
+        // Synced: the balance minus the waiting payment, the same value, so no tick up and down.
+        assertEquals(10_000L, hold.hero(h1, h1, 12_000, waiting, syncing = false, lastShown = 10_000))
+        assertTrue(hold.allCounted)
+    }
 }

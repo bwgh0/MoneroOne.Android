@@ -100,6 +100,58 @@ object MoneyArrivesRules {
     private fun ArrivalTx.isMinedIncoming() = incoming && !failed && confirmations >= 1L
 }
 
+/**
+ * The balance card's hero while new payments wait for their moment (iOS rules).
+ * - During a sync, with a baseline: the last shown value, so a payment found in a
+ *   catch-up sync does not tick the hero up and back down before its moment.
+ * - Else the real balance minus the waiting payments: a send shows at once, and
+ *   the moment's roll equals its +amount. The kit publishes the history before
+ *   the balance (it stores the wallet in between), so a waiting payment counts
+ *   only once the balance moved from its value before the history showed it.
+ * - With nothing waiting, while an incoming payment is in the pool, a rise holds
+ *   at the balance of the last history update (a balance published first).
+ */
+class HeroHold {
+    private var history: Any? = null
+    private var historyBalance = 0L
+    private val before = HashMap<String, Long>()
+
+    /** True when the balance holds every waiting payment: the moment can play. */
+    var allCounted = true
+        private set
+
+    /**
+     * [history] is the list instance the screen shows (a new instance per update).
+     * [lastShown] is the hero's last value from an earlier look, kept across launches.
+     */
+    fun hero(
+        history: Any,
+        txs: List<ArrivalTx>,
+        balance: Long,
+        waiting: List<ArrivalTx>,
+        syncing: Boolean,
+        lastShown: Long?
+    ): Long {
+        if (history !== this.history) {
+            val first = this.history == null
+            waiting.forEach { if (it.hash !in before) before[it.hash] = if (first) ANY else historyBalance }
+            before.keys.retainAll(waiting.mapTo(HashSet()) { it.hash })
+            this.history = history
+            historyBalance = balance
+        }
+        val counted = waiting.filter { before[it.hash].let { b -> b == null || b == ANY || b != balance } }
+        allCounted = counted.size == waiting.size
+        if (syncing && lastShown != null) return lastShown
+        if (waiting.isEmpty() && balance > historyBalance && txs.any(MoneyArrivesRules::inPool)) return historyBalance
+        return balance - counted.sumOf { it.amount }
+    }
+
+    private companion object {
+        /** A payment already waiting at the first look: the balance holds it. */
+        const val ANY = Long.MIN_VALUE
+    }
+}
+
 /** The per-wallet Money arrives state: the baseline, "made in this app" and "first payment shown". */
 class MoneyArrivesStore private constructor(private val prefs: SharedPreferences) {
 

@@ -5,13 +5,12 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import one.monero.moneroone.core.wallet.HeroHold
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -41,8 +40,10 @@ import one.monero.moneroone.ui.components.successHaptic
 /** The balance card's Money arrives values (moment 2). */
 @Stable
 internal class ArrivalPlay {
-    /** The hero shows this balance until the roll; null shows the real balance. */
-    var held by mutableStateOf<Long?>(null)
+    /** The amount the hero leaves out until the roll; null leaves out nothing. */
+    var withheld by mutableStateOf<Long?>(null)
+    /** Counts the baseline saves, so the hold reads the saved baseline. */
+    var baselineVersion by mutableStateOf(0)
     /** The green +amount in the caption slot, while it shows. */
     var plus by mutableStateOf<Arrival?>(null)
     val plusAlpha = Animatable(0f)
@@ -56,11 +57,8 @@ internal class ArrivalPlay {
     /** The payments the last moment showed. */
     var playedHashes: List<String>? = null
     var running = false
-    /** Set during composition: the value to hold in the frame the new balance shows, before the play starts. */
-    var frameHold: Long? = null
-
-    /** The balance the hero holds now, or null for the real one. */
-    val hold: Long? get() = held ?: frameHold
+    /** Set during composition: the balance the hero shows now, or null for the real one. */
+    var hold: Long? = null
 
     /**
      * Every payment: the caption fades out and the +amount arrives (0); the
@@ -69,9 +67,9 @@ internal class ArrivalPlay {
      * +amount leaves at 650 and the balance turns green; success haptic (800);
      * caption (900); one shine (1000 to 2200); the green goes from 2000.
      */
-    suspend fun run(arrival: Arrival, from: Long, reduceMotion: Boolean, view: View) = coroutineScope {
+    suspend fun run(arrival: Arrival, reduceMotion: Boolean, view: View) = coroutineScope {
         running = true
-        held = from
+        withheld = arrival.total
         plus = arrival
         plusAlpha.snapTo(0f)
         plusRise.snapTo(if (reduceMotion) 0f else Motion.ARRIVE_RISE_DP)
@@ -81,8 +79,7 @@ internal class ArrivalPlay {
         delay(if (arrival.big) 650L else 550L)
         launch { plusAlpha.animateTo(0f, tween(250, easing = Motion.EaseIn)) }
         if (!reduceMotion) launch { plusRise.animateTo(-Motion.ARRIVE_RISE_DP, tween(250, easing = Motion.EaseIn)) }
-        held = null
-        frameHold = null
+        withheld = null
         if (arrival.big) {
             launch { heroGreen.animateTo(1f, Motion.crossFade()) }
             delay(150)
@@ -133,58 +130,58 @@ internal fun rememberMoneyArrives(
     val scope = rememberCoroutineScope()
     val reduceMotion = rememberReduceMotion()
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
-    val canLook = walletId != null && synced && idle && lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     val reclaims = remember(transactions) { transactions.filter(isReclaim).mapTo(HashSet()) { it.hash } }
+    val txs = remember(transactions) { transactions.map(ArrivalTx::of) }
+    val baseline = remember(walletId, transactions, play.baselineVersion) { walletId?.let { store.baseline(it) } }
+    val waiting = remember(txs, baseline, play.running) {
+        if (baseline == null || play.running) emptyList()
+        else txs.filter { MoneyArrivesRules.isNew(it, baseline, reclaims) }
+    }
+    val heroHold = remember(walletId, sessionId) { HeroHold() }
+    val lastShown = walletId?.let { store.lastBalance(it) }
+    val hero = heroHold.hero(transactions, txs, balance, waiting, syncing = !synced && baseline != null, lastShown = lastShown)
+    play.hold = when (val out = play.withheld) {
+        null -> hero.takeIf { it != balance }
+        else -> balance - out
+    }
+    // The hero's value at a look, kept across launches: a catch-up sync holds it.
+    LaunchedEffect(walletId, hero, synced, play.running) {
+        if (walletId != null && synced && !play.running && play.withheld == null) store.saveBalance(walletId, hero)
+    }
+
+    val canLook = walletId != null && synced && idle && heroHold.allCounted &&
+        lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     val look = remember(walletId, transactions, canLook) {
         if (!canLook || walletId == null) null
         else MoneyArrivesRules.look(
             baseline = store.baseline(walletId),
-            txs = transactions.map(ArrivalTx::of),
+            txs = txs,
             createdInApp = store.createdInApp(walletId),
             firstPaymentShown = store.firstPaymentShown(walletId),
             claimHashes = transactions.filter(isClaim).mapTo(HashSet()) { it.hash },
             reclaimHashes = reclaims
         )
     }
-    // The hero holds the balance of the last look while payments wait for their moment: during
-    // a catch-up sync, on another tab, or while a sheet is open. The play then rolls it up.
-    val lastShown = remember(sessionId) { longArrayOf(balance) }
-    val waiting = remember(walletId, transactions, play.running, play.playedHashes) {
-        val baseline = walletId?.let { store.baseline(it) }
-        baseline != null && !play.running &&
-            transactions.any { MoneyArrivesRules.isNew(ArrivalTx.of(it), baseline, reclaims) }
-    }
-    // The balance can publish before the history at a new block: while a payment is in the
-    // pool, a rise holds at the last balance until the history shows the payment mined.
-    val last = walletId?.let { store.lastBalance(it) }
-    val poolRise = last != null && balance > last && !play.running &&
-        transactions.any { MoneyArrivesRules.inPool(ArrivalTx.of(it)) }
-    play.frameHold = if ((waiting || poolRise) && play.held == null) last ?: lastShown[0] else null
-    SideEffect { if (play.held == null && !waiting && !poolRise) lastShown[0] = balance }
-    // The last balance the hero showed for real, kept across launches for the hold above.
-    val currentBalance by rememberUpdatedState(balance)
-    LaunchedEffect(walletId, balance, waiting, poolRise, synced) {
-        if (walletId != null && synced && !waiting && !poolRise && !play.running && play.held == null) {
-            store.saveBalance(walletId, balance)
-        }
-    }
     LaunchedEffect(look) {
         val found = look ?: return@LaunchedEffect
         val id = walletId ?: return@LaunchedEffect
         val arrival = found.arrival
         if (arrival == null) {
-            if (store.baseline(id) != found.baseline) store.save(id, found.baseline, firstPaymentShown = false)
+            if (store.baseline(id) != found.baseline) {
+                store.save(id, found.baseline, firstPaymentShown = false)
+                play.baselineVersion++
+            }
             return@LaunchedEffect
         }
         if (play.running || play.playedHashes == arrival.hashes) return@LaunchedEffect
         play.playedHashes = arrival.hashes
-        val from = store.lastBalance(id) ?: lastShown[0]
+        // Set now, before the saved baseline ends the wait: the hero keeps the amount out.
+        play.running = true
+        play.withheld = arrival.total
         // Saved first: the moment plays once even when the app stops during it.
         store.save(id, found.baseline, firstPaymentShown = true)
-        scope.launch {
-            play.run(arrival, from, reduceMotion, view)
-            store.saveBalance(id, currentBalance)
-        }
+        play.baselineVersion++
+        scope.launch { play.run(arrival, reduceMotion, view) }
     }
     return play
 }
