@@ -77,4 +77,13 @@ class SendCoordinatorTest {
         assertNull(coordinator.begin(SendFlow("wallet-a"), "wallet-a", false))
         assertNotNull(coordinator.begin(SendFlow("wallet-a"), "wallet-a", true))
     }
+
+    @Test
+    fun `success carries the txid for the Sent screen`() {
+        val coordinator = SendCoordinator()
+        val flow = SendFlow("wallet-a")
+        val operation = coordinator.begin(flow, "wallet-a", true)!!
+        coordinator.finish(operation, txHash = "abc123")
+        assertEquals(SendState.Success(flow, "abc123"), coordinator.state.value)
+    }
 }

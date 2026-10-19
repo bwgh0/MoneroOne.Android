@@ -2290,6 +2290,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             ?: return
         viewModelScope.launch {
             var error: String? = null
+            var txHash = ""
+            // The txid of the signed transaction, kept for the Sent screen. The caller's check runs first:
+            // when it throws, nothing is broadcast.
+            val signedCheck: (SignedTransaction) -> Unit = { signed ->
+                beforeCommit?.invoke(signed)
+                txHash = signed.txids.firstOrNull().orEmpty()
+            }
             try {
                 // Null kit (switch/reset/node-change teardown window) must be a
                 // LOUD failure — a silent no-op here reported Success for a
@@ -2305,20 +2312,18 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 withContext(Dispatchers.IO) {
                     // The kit saves the memo as a local note, as iOS does.
                     when {
-                        prepared == null -> kit.send(amount, address, memo, sweepAll = isSweepAll, beforeCommit = beforeCommit)
+                        prepared == null -> kit.send(amount, address, memo, sweepAll = isSweepAll, beforeCommit = signedCheck)
                         // Only the transfer the review showed may go out.
                         !preparedMatches -> throw PreparedTransactionLostException()
-                        else -> kit.sendPrepared(prepared, memo, beforeCommit = beforeCommit)
+                        else -> kit.sendPrepared(prepared, memo, beforeCommit = signedCheck)
                     }
                 }
                 if (playChime) one.monero.moneroone.core.util.SoundFeedback.sendComplete(context)
-                // MoneroKit.send() doesn't return txHash, we'll show success without it
-                // The transaction will appear in the transactions list after sync
             } catch (e: Exception) {
                 Timber.e(e, "Failed to send transaction")
                 error = e.message ?: "Transaction failed"
             } finally {
-                sendCoordinator.finish(operation, error)
+                sendCoordinator.finish(operation, error, txHash)
             }
         }
     }
