@@ -320,7 +320,8 @@ fun WalletScreen(
         idle = !switcherExpanded && asOf == null && !claimSheetOpen && !linkProblemShowing && !linkAlertShowing,
         balance = walletState.balance.all,
         transactions = walletState.transactions,
-        isClaim = { linkIndex.match(it)?.kind == one.monero.moneroone.paymentlinks.LinkActivityKind.CLAIM }
+        isClaim = { linkIndex.match(it)?.kind == one.monero.moneroone.paymentlinks.LinkActivityKind.CLAIM },
+        isReclaim = { linkIndex.match(it)?.kind == one.monero.moneroone.paymentlinks.LinkActivityKind.RECLAIM }
     )
 
     LazyColumn(
@@ -461,6 +462,7 @@ fun WalletScreen(
                                 history = history,
                                 historicalPoint = historicalPoint,
                                 arrival = arrivals,
+                                heldBalance = arrivals.hold,
                                 openLinks = { isPast ->
                                     // Kept in place, hidden, while History shows the past.
                                     AnimatedVisibility(
@@ -669,8 +671,10 @@ internal fun BalanceCard(
     history: BalanceHistoryState,
     /** The past moment picked on the chart; null is now. */
     historicalPoint: PortfolioPoint?,
-    /** Money arrives: holds the hero until its roll and shows the +amount. */
+    /** Money arrives: the +amount, the green and the shine. */
     arrival: ArrivalPlay? = null,
+    /** Money arrives: the balance the hero shows until the moment rolls it; null shows [balance]. */
+    heldBalance: Long? = null,
     /** The open payment links line, last in the card; told when History shows the past. */
     openLinks: @Composable (isPast: Boolean) -> Unit = {},
     historyChart: @Composable (isActive: Boolean) -> Unit
@@ -678,7 +682,7 @@ internal fun BalanceCard(
     val dates = rememberChartDateFormats()
     val isPast = historicalPoint != null
     // Money arrives holds the old value until the moment rolls it.
-    val liveBalance = arrival?.heroBalance(balance) ?: balance
+    val liveBalance = heldBalance ?: balance
     val holding = liveBalance != balance
     val shownBalance = historicalPoint?.balance ?: liveBalance
     // A past amount takes the price sampled at that same moment.

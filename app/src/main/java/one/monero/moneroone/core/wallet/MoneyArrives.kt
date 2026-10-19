@@ -53,25 +53,32 @@ object MoneyArrivesRules {
         txs: List<ArrivalTx>,
         createdInApp: Boolean,
         firstPaymentShown: Boolean,
-        claimHashes: Set<String> = emptySet()
+        claimHashes: Set<String> = emptySet(),
+        reclaimHashes: Set<String> = emptySet()
     ): ArrivalLook {
-        if (baseline == null) return ArrivalLook(null, baselineOf(txs))
-        val arrivals = txs.filter {
-            it.isMinedIncoming() && it.blockHeight >= baseline.height && it.hash !in baseline.recent
+        // A baseline above the chain the wallet sees (a reset chain) resets like no baseline.
+        if (baseline == null || baseline.height > (chainTop(txs) ?: Long.MAX_VALUE) + 1) {
+            return ArrivalLook(null, baselineOf(txs))
         }
-        if (arrivals.isEmpty()) return ArrivalLook(null, baseline)
+        val arrivals = txs.filter { isNew(it, baseline, reclaimHashes) }
         val hashes = arrivals.map { it.hash }
         val newSet = hashes.toSet()
         // The first payment: a wallet made in this app, nothing else in its history
         // (a payment still in the pool does not count), and no claimed payment link.
         val historyEmpty = txs.none { it.hash !in newSet && !(it.incoming && !it.failed && it.confirmations == 0L) }
         val big = createdInApp && !firstPaymentShown && historyEmpty && newSet.none { it in claimHashes }
+        // A reclaim of our own link never plays, but it is seen.
         val next = ArrivalBaseline(
             height = maxOf(baseline.height, (txs.filter { it.isMinedIncoming() }.maxOfOrNull { it.blockHeight } ?: -1L) + 1),
             recent = (baseline.recent + hashes).distinct().takeLast(RECENT_LIMIT)
         )
+        if (arrivals.isEmpty()) return ArrivalLook(null, next)
         return ArrivalLook(Arrival(arrivals.sumOf { it.amount }, hashes, big), next)
     }
+
+    /** The top block the wallet sees, from its mined payments; null with none. */
+    fun chainTop(txs: List<ArrivalTx>): Long? =
+        txs.filter { it.confirmations >= 1L && it.blockHeight > 0L }.maxOfOrNull { it.blockHeight + it.confirmations - 1 }
 
     /** Everything mined is seen. */
     fun baselineOf(txs: List<ArrivalTx>): ArrivalBaseline {
@@ -81,6 +88,14 @@ object MoneyArrivesRules {
             recent = mined.sortedBy { it.blockHeight }.map { it.hash }.takeLast(RECENT_LIMIT)
         )
     }
+
+    /** A payment the wallet has not shown yet: incoming, not failed, mined, above the [baseline]. */
+    fun isNew(tx: ArrivalTx, baseline: ArrivalBaseline, reclaimHashes: Set<String> = emptySet()): Boolean =
+        tx.isMinedIncoming() && tx.blockHeight >= baseline.height && tx.hash !in baseline.recent &&
+            tx.hash !in reclaimHashes
+
+    /** An incoming payment still in the pool: the balance rises when it is mined. */
+    fun inPool(tx: ArrivalTx): Boolean = tx.incoming && !tx.failed && tx.confirmations == 0L
 
     private fun ArrivalTx.isMinedIncoming() = incoming && !failed && confirmations >= 1L
 }
@@ -102,9 +117,17 @@ class MoneyArrivesStore private constructor(private val prefs: SharedPreferences
             .apply()
     }
 
+    /** The balance the last look saw: the hero holds it until the moment rolls it. */
+    fun lastBalance(walletId: String): Long? =
+        if (prefs.contains(balanceKey(walletId))) prefs.getLong(balanceKey(walletId), 0L) else null
+
+    fun saveBalance(walletId: String, balance: Long) {
+        if (lastBalance(walletId) != balance) prefs.edit().putLong(balanceKey(walletId), balance).apply()
+    }
+
     /** Reset Sync: the next synced look takes everything as seen, with no play. */
     fun resetBaseline(walletId: String) {
-        prefs.edit().remove(heightKey(walletId)).remove(recentKey(walletId)).apply()
+        prefs.edit().remove(heightKey(walletId)).remove(recentKey(walletId)).remove(balanceKey(walletId)).apply()
     }
 
     fun markCreatedInApp(walletId: String) {
@@ -117,7 +140,7 @@ class MoneyArrivesStore private constructor(private val prefs: SharedPreferences
 
     fun forget(walletId: String) {
         prefs.edit()
-            .remove(heightKey(walletId)).remove(recentKey(walletId))
+            .remove(heightKey(walletId)).remove(recentKey(walletId)).remove(balanceKey(walletId))
             .remove(createdKey(walletId)).remove(firstKey(walletId))
             .apply()
     }
@@ -126,6 +149,7 @@ class MoneyArrivesStore private constructor(private val prefs: SharedPreferences
     private fun recentKey(id: String) = "recent_$id"
     private fun createdKey(id: String) = "created_$id"
     private fun firstKey(id: String) = "first_shown_$id"
+    private fun balanceKey(id: String) = "balance_$id"
 
     companion object {
         @Volatile private var instance: MoneyArrivesStore? = null

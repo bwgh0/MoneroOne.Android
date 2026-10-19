@@ -96,4 +96,23 @@ class MoneyArrivesRulesTest {
         assertEquals(MoneyArrivesRules.RECENT_LIMIT, baseline.recent.size)
         assertEquals(180L, baseline.height)
     }
+
+    @Test
+    fun aReclaimOfOurOwnLinkNeverPlaysButIsSeen() {
+        val baseline = MoneyArrivesRules.baselineOf(listOf(incoming("a", 5, 100, confirmations = 40)))
+        val txs = listOf(incoming("a", 5, 100, confirmations = 41), incoming("r", 3, 140))
+        val look = MoneyArrivesRules.look(baseline, txs, true, false, reclaimHashes = setOf("r"))
+        assertNull(look.arrival)
+        assertEquals(141L, look.baseline.height)
+    }
+
+    @Test
+    fun aBaselineAboveTheChainTopResetsWithNoPlay() {
+        // A reset chain: the wallet now sees only blocks up to 60.
+        val baseline = ArrivalBaseline(500, listOf("old"))
+        val txs = listOf(incoming("n", 2, 50, confirmations = 11))
+        val look = MoneyArrivesRules.look(baseline, txs, false, true)
+        assertNull(look.arrival)
+        assertEquals(51L, look.baseline.height)
+    }
 }
