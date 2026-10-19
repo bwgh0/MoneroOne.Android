@@ -105,16 +105,25 @@ object MoneyArrivesRules {
  * - During a sync, with a baseline: the last shown value, so a payment found in a
  *   catch-up sync does not tick the hero up and back down before its moment.
  * - Else the real balance minus the waiting payments: a send shows at once, and
- *   the moment's roll equals its +amount. The kit publishes the history before
- *   the balance (it stores the wallet in between), so a waiting payment counts
- *   only once the balance moved from its value before the history showed it.
+ *   the moment's roll equals its +amount.
  * - With nothing waiting, while an incoming payment is in the pool, a rise holds
  *   at the balance of the last history update (a balance published first).
+ *
+ * The kit publishes each scan's history before its balance (MoneroKit.onRefreshed,
+ * which stores the wallet in between), and the last history of a catch-up before
+ * Synced. So a payment that a history shows counts once the balance moves (or moved
+ * in the same frame as that history), and the moment waits for that. A payment the
+ * balance has not counted 3 s after its history counts then ([FALLBACK_MS], one per
+ * history). This gives the iOS results: one +amount per catch-up, and no tick up
+ * and back at a new block.
  */
 class HeroHold {
     private var history: Any? = null
     private var historyBalance = 0L
+    private var lastBalance: Long? = null
+    /** Per waiting payment: the balance when its history came, or [COUNTED]. */
     private val before = HashMap<String, Long>()
+    private var fallbacks = 0
 
     /** True when the balance holds every waiting payment: the moment can play. */
     var allCounted = true
@@ -123,6 +132,7 @@ class HeroHold {
     /**
      * [history] is the list instance the screen shows (a new instance per update).
      * [lastShown] is the hero's last value from an earlier look, kept across launches.
+     * [fallbacks] goes up when a history's payments waited [FALLBACK_MS]: they count.
      */
     fun hero(
         history: Any,
@@ -130,25 +140,35 @@ class HeroHold {
         balance: Long,
         waiting: List<ArrivalTx>,
         syncing: Boolean,
-        lastShown: Long?
+        lastShown: Long?,
+        fallbacks: Int = 0
     ): Long {
         if (history !== this.history) {
-            val first = this.history == null
-            waiting.forEach { if (it.hash !in before) before[it.hash] = if (first) ANY else historyBalance }
+            // The first history, or a balance that moved with it: the balance holds its payments.
+            val movedWith = this.history == null || lastBalance != balance
+            waiting.forEach { if (it.hash !in before) before[it.hash] = if (movedWith) COUNTED else balance }
             before.keys.retainAll(waiting.mapTo(HashSet()) { it.hash })
             this.history = history
             historyBalance = balance
         }
-        val counted = waiting.filter { before[it.hash].let { b -> b == null || b == ANY || b != balance } }
+        lastBalance = balance
+        if (fallbacks != this.fallbacks) {
+            this.fallbacks = fallbacks
+            before.replaceAll { _, _ -> COUNTED }
+        }
+        // Counted once the balance moves, and counted for good.
+        before.replaceAll { _, b -> if (b != balance) COUNTED else b }
+        val counted = waiting.filter { (before[it.hash] ?: COUNTED) == COUNTED }
         allCounted = counted.size == waiting.size
         if (syncing && lastShown != null) return lastShown
         if (waiting.isEmpty() && balance > historyBalance && txs.any(MoneyArrivesRules::inPool)) return historyBalance
         return balance - counted.sumOf { it.amount }
     }
 
-    private companion object {
-        /** A payment already waiting at the first look: the balance holds it. */
-        const val ANY = Long.MIN_VALUE
+    companion object {
+        /** How long a history's payments wait for the balance before they count anyway. */
+        const val FALLBACK_MS = 3_000L
+        private const val COUNTED = Long.MIN_VALUE
     }
 }
 

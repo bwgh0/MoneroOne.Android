@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -148,8 +149,18 @@ internal fun rememberMoneyArrives(
         else txs.filter { MoneyArrivesRules.isNew(it, baseline, reclaims) }
     }
     val heroHold = remember(walletId, sessionId) { HeroHold() }
+    // Goes up when a history's payments waited 3 s for the balance (the effect below): they count.
+    var fallbacks by remember(walletId, sessionId) { mutableIntStateOf(0) }
     val lastShown = walletId?.let { store.lastBalance(it) }
-    val hero = heroHold.hero(transactions, txs, balance, waiting, syncing = !synced && baseline != null, lastShown = lastShown)
+    val hero = heroHold.hero(
+        transactions, txs, balance, waiting,
+        syncing = !synced && baseline != null, lastShown = lastShown, fallbacks = fallbacks
+    )
+    LaunchedEffect(transactions, heroHold.allCounted) {
+        if (heroHold.allCounted) return@LaunchedEffect
+        delay(HeroHold.FALLBACK_MS)
+        fallbacks++
+    }
     play.hold = when (val out = play.withheld) {
         null -> hero.takeIf { it != balance }
         else -> balance - out
