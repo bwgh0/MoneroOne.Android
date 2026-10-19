@@ -4,6 +4,8 @@ import io.horizontalsystems.monerokit.model.TransactionInfo
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.core.wallet.ReceiveAddressLogic
 import one.monero.moneroone.core.wallet.ReceiveAddressRow
+import one.monero.moneroone.core.wallet.SendName
+import one.monero.moneroone.core.wallet.SendNames
 import one.monero.moneroone.data.util.XmrFormat
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -92,14 +94,28 @@ object TransactionHistoryLogic {
     }
 
     /** The amount part of [rowLabel]: "1.2345 XMR on Savings, worth $150.23 at the time". */
-    fun rowAmount(tx: TransactionInfo, fiatMode: Boolean, fiatValue: String?, receivedOn: String?): String {
+    fun rowAmount(tx: TransactionInfo, fiatMode: Boolean, fiatValue: String?, receivedOn: String?, amount: Long = tx.amount): String {
         val on = receivedOn?.let { tr(" on %s", it) }.orEmpty()
         return if (fiatMode && fiatValue != null) {
-            tr("%s at the time, %s XMR", fiatValue, XmrFormat.compact(tx.amount)) + on
+            tr("%s at the time, %s XMR", fiatValue, XmrFormat.compact(amount)) + on
         } else {
-            "${XmrFormat.format(tx.amount)} XMR" + on + fiatValue?.let { tr(", worth %s at the time", it) }.orEmpty()
+            "${XmrFormat.format(amount)} XMR" + on + fiatValue?.let { tr(", worth %s at the time", it) }.orEmpty()
         }
     }
+
+    /** The title of a send between your wallets, in place of "Sent" or "Received". */
+    fun sendNameTitle(name: SendName): String = when (name) {
+        is SendName.ToWallet -> tr("To %s", name.wallet.name)
+        is SendName.FromWallet -> tr("From %s", name.wallet.name)
+        SendName.ToThisWallet -> tr("To This Wallet")
+    }
+
+    /**
+     * [rowLabel] for a named row: "To Savings, 1.2345 XMR, …". [fiatValue] is the value of
+     * [SendNames.shownAmount], the fee alone for a send to this wallet.
+     */
+    fun namedRowLabel(name: SendName, tx: TransactionInfo, fiatMode: Boolean, fiatValue: String?, date: String, receivedOn: String?): String =
+        "${sendNameTitle(name)}, ${rowAmount(tx, fiatMode, fiatValue, receivedOn, SendNames.shownAmount(name, tx.amount, tx.fee))}, $date, ${rowStatus(tx)}"
 
     /** The status word a row shows beside its amount. */
     fun rowStatus(tx: TransactionInfo): String = when {
