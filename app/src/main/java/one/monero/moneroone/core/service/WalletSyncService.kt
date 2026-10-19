@@ -21,6 +21,7 @@ import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletManager
 import one.monero.moneroone.core.wallet.WalletStore
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicInteger
 
 class WalletSyncService : Service() {
 
@@ -31,10 +32,18 @@ class WalletSyncService : Service() {
         const val NOTIFICATION_ID = 1
         private const val ACTION_STOP = "one.monero.moneroone.STOP_SYNC"
 
+        /**
+         * Foreground starts sent whose onStartCommand has not run yet. A service
+         * stopped before it calls startForeground crashes the app
+         * (ForegroundServiceDidNotStartInTimeException).
+         */
+        private val pendingStarts = AtomicInteger(0)
+
         fun start(context: Context) {
             val intent = Intent(context, WalletSyncService::class.java)
             try {
                 context.startForegroundService(intent)
+                pendingStarts.incrementAndGet()
             } catch (e: IllegalStateException) {
                 // Android 12+ throws ForegroundServiceStartNotAllowedException
                 // when the app may not start a foreground service now.
@@ -44,6 +53,17 @@ class WalletSyncService : Service() {
 
         fun stop(context: Context) {
             val intent = Intent(context, WalletSyncService::class.java)
+            if (pendingStarts.get() > 0) {
+                // The app came back before the service ran (a quick trip to the
+                // background). stopService now would crash the app; a stop action
+                // runs after the pending start has called startForeground.
+                try {
+                    context.startService(intent.setAction(ACTION_STOP))
+                    return
+                } catch (e: IllegalStateException) {
+                    Timber.w(e, "WalletSyncService: stop action not allowed")
+                }
+            }
             context.stopService(intent)
         }
     }
@@ -57,27 +77,32 @@ class WalletSyncService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            // From the notification's Stop button or from stop(): a plain start,
+            // not a foreground one. stopSelf(startId) leaves a later start alone.
             Timber.d("WalletSyncService: stop action received")
             stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
-        }
-
-        // A null intent is a system restart after the process died. The new
-        // process has no open wallet, and Android 12+ forbids a foreground
-        // start from the background, so stop instead of crashing.
-        if (intent == null) {
-            Timber.d("WalletSyncService: restart without a wallet, stopping")
             stopSelf(startId)
             return START_NOT_STICKY
         }
+        if (intent != null) pendingStarts.updateAndGet { (it - 1).coerceAtLeast(0) }
 
-        try {
+        // Every branch calls startForeground before it stops: a foreground start
+        // that stops first crashes the app (ForegroundServiceDidNotStartInTimeException).
+        val inForeground = try {
             startForeground(NOTIFICATION_ID, buildNotification(WalletManager.syncStateFlow.value))
+            true
         } catch (e: IllegalStateException) {
             // ForegroundServiceStartNotAllowedException (Android 12+): a start
             // from the background, or the Android 15+ dataSync time limit is used up.
             Timber.w(e, "WalletSyncService: foreground start not allowed, stopping")
+            false
+        }
+
+        // A null intent is a system restart after the process died. The new
+        // process has no open wallet, so stop.
+        if (intent == null || !inForeground) {
+            if (intent == null) Timber.d("WalletSyncService: restart without a wallet, stopping")
+            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf(startId)
             return START_NOT_STICKY
         }
