@@ -82,9 +82,10 @@ object WhatsNewNotes {
  *   sheet (from the banner or Settings > Version) and the 30-day limit set it.
  * - `shownAt` + `shownFor`: when the banner for that version first showed.
  *
- * With no `seen` yet, [launched] decides at launch: no wallet files mean a fresh
- * install, so the newest entry counts as seen and no banner shows; wallet files
- * from an older version mean an update, so the banner waits for the home.
+ * [launched] runs at every launch: no wallet files mean nobody used the older
+ * version (a fresh install, or one that never made a wallet), so the newest
+ * entry counts as seen and no banner shows; wallet files mean an update, so an
+ * unseen entry's banner waits for the home.
  */
 class WhatsNewGate(
     private val prefs: SharedPreferences,
@@ -105,12 +106,12 @@ class WhatsNewGate(
         }
 
     /**
-     * At each launch, before onboarding can create a wallet. With no seen
-     * version yet, no wallet files mean a fresh install: the newest entry
-     * counts as seen. Wallet files mean an update: the banner waits.
+     * At each launch, before onboarding can create a wallet. No wallet files:
+     * the newest entry counts as seen. Wallet files: nothing changes, and an
+     * unseen entry's banner waits for the home.
      */
     fun launched(hadWalletFiles: Boolean) {
-        if (prefs.contains(SEEN_KEY) || hadWalletFiles) return
+        if (hadWalletFiles) return
         entry?.let(::markSeen)
     }
 

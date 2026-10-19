@@ -143,6 +143,20 @@ class WhatsNewGateTest {
     }
 
     @Test
+    fun `an update with no wallet files marks the new entry seen`() {
+        // 1.1 installed fresh, and no wallet made before the 1.2 update.
+        gate("1.1.0").launched(hadWalletFiles = false)
+        val later = gate("1.2.0")
+        later.launched(hadWalletFiles = false)
+        assertEquals("1.2", prefs.getString(WhatsNewGate.SEEN_KEY, null))
+        assertFalse(later.isPending)
+
+        // The first wallet, made after the update, brings no banner.
+        gate("1.2.0").launched(hadWalletFiles = true)
+        assertFalse(gate("1.2.0").bannerOnHome(start, otherBannerShowing = false))
+    }
+
+    @Test
     fun `an older app never lowers the seen version`() {
         gate("1.2.0").apply { launched(hadWalletFiles = false) }
         gate("1.1.0").markSeen()
