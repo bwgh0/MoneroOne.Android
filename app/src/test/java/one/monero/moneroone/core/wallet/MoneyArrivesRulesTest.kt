@@ -204,6 +204,45 @@ class MoneyArrivesRulesTest {
     }
 
     @Test
+    fun aPoolPaymentTheBalanceHoldsCountsAtOnceWhenMined() {
+        // wallet2's balance takes in a pool payment. When the payment is mined, the balance does not move again.
+        val hold = HeroHold()
+        val old = incoming("a", 10_000, 100, confirmations = 40)
+        val baseline = MoneyArrivesRules.baselineOf(listOf(old))
+        val h0 = listOf(old)
+        hold.hero(h0, h0, 10_000, emptyList(), syncing = false, lastShown = 10_000)
+        // In the pool: the history first, then the balance with the payment. The hero holds.
+        val h1 = h0 + incoming("p", 2_000, 0, confirmations = 0)
+        assertEquals(10_000L, hold.hero(h1, h1, 10_000, emptyList(), syncing = false, lastShown = 10_000))
+        assertEquals(10_000L, hold.hero(h1, h1, 12_000, emptyList(), syncing = false, lastShown = 10_000))
+        // Mined: a new history and the same balance. The payment counts at once, so the hero still holds.
+        val h2 = h0 + incoming("p", 2_000, 150)
+        val waiting = h2.filter { MoneyArrivesRules.isNew(it, baseline) }
+        assertEquals(10_000L, hold.hero(h2, h2, 12_000, waiting, syncing = false, lastShown = 10_000))
+        assertTrue(hold.allCounted)
+    }
+
+    @Test
+    fun aBalanceBeforeItsHistoryNeverRaisesTheHeroBeforeTheMoment() {
+        val hold = HeroHold()
+        val old = incoming("a", 10_000, 100, confirmations = 40)
+        val baseline = MoneyArrivesRules.baselineOf(listOf(old))
+        val h0 = listOf(old)
+        hold.hero(h0, h0, 10_000, emptyList(), syncing = false, lastShown = 10_000)
+        // A catch-up publishes the balance first, then the history.
+        assertEquals(10_000L, hold.hero(h0, h0, 12_000, emptyList(), syncing = true, lastShown = 10_000))
+        val h1 = h0 + incoming("p", 2_000, 150, confirmations = 2)
+        val waiting = h1.filter { MoneyArrivesRules.isNew(it, baseline) }
+        assertEquals(10_000L, hold.hero(h1, h1, 12_000, waiting, syncing = true, lastShown = 10_000))
+        // Synced: the payment has not counted, and the hero does not rise.
+        assertEquals(10_000L, hold.hero(h1, h1, 12_000, waiting, syncing = false, lastShown = 10_000))
+        assertFalse(hold.allCounted)
+        // The fallback counts it. The hero stays, and the moment can play.
+        assertEquals(10_000L, hold.hero(h1, h1, 12_000, waiting, syncing = false, lastShown = 10_000, fallbacks = 1))
+        assertTrue(hold.allCounted)
+    }
+
+    @Test
     fun aPaymentTheBalanceDoesNotCountCountsAfterTheFallback() {
         val hold = HeroHold()
         val old = incoming("a", 10_000, 100, confirmations = 40)

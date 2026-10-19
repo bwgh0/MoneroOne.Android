@@ -116,6 +116,9 @@ object MoneyArrivesRules {
  * balance has not counted 3 s after its history counts then ([FALLBACK_MS], one per
  * history). This gives the iOS results: one +amount per catch-up, and no tick up
  * and back at a new block.
+ *
+ * wallet2's balance takes in a pool payment, so the balance does not move when that
+ * payment is mined. A payment the pool hold covered counts at once when it waits.
  */
 class HeroHold {
     private var history: Any? = null
@@ -123,6 +126,8 @@ class HeroHold {
     private var lastBalance: Long? = null
     /** Per waiting payment: the balance when its history came, or [COUNTED]. */
     private val before = HashMap<String, Long>()
+    /** Pool payments that the balance already holds (the pool hold covered them). */
+    private val pooled = HashSet<String>()
     private var fallbacks = 0
 
     /** True when the balance holds every waiting payment: the moment can play. */
@@ -146,8 +151,11 @@ class HeroHold {
         if (history !== this.history) {
             // The first history, or a balance that moved with it: the balance holds its payments.
             val movedWith = this.history == null || lastBalance != balance
-            waiting.forEach { if (it.hash !in before) before[it.hash] = if (movedWith) COUNTED else balance }
+            waiting.forEach {
+                if (it.hash !in before) before[it.hash] = if (movedWith || it.hash in pooled) COUNTED else balance
+            }
             before.keys.retainAll(waiting.mapTo(HashSet()) { it.hash })
+            pooled.retainAll(txs.filter(MoneyArrivesRules::inPool).mapTo(HashSet()) { it.hash })
             this.history = history
             historyBalance = balance
         }
@@ -161,8 +169,13 @@ class HeroHold {
         val counted = waiting.filter { (before[it.hash] ?: COUNTED) == COUNTED }
         allCounted = counted.size == waiting.size
         if (syncing && lastShown != null) return lastShown
-        if (waiting.isEmpty() && balance > historyBalance && txs.any(MoneyArrivesRules::inPool)) return historyBalance
-        return balance - counted.sumOf { it.amount }
+        if (waiting.isEmpty() && balance > historyBalance && txs.any(MoneyArrivesRules::inPool)) {
+            txs.filter(MoneyArrivesRules::inPool).mapTo(pooled) { it.hash }
+            return historyBalance
+        }
+        val shown = balance - counted.sumOf { it.amount }
+        // A payment that the balance may hold but has not counted: the hero does not rise before its moment.
+        return if (!allCounted && lastShown != null) minOf(shown, lastShown) else shown
     }
 
     companion object {

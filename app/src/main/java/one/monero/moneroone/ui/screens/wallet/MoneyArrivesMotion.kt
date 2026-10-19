@@ -156,7 +156,8 @@ internal fun rememberMoneyArrives(
         transactions, txs, balance, waiting,
         syncing = !synced && baseline != null, lastShown = lastShown, fallbacks = fallbacks
     )
-    LaunchedEffect(transactions, heroHold.allCounted) {
+    // Keyed on the waiting payments: a history published again with the same payments keeps the 3 s.
+    LaunchedEffect(waiting.map { it.hash }, heroHold.allCounted) {
         if (heroHold.allCounted) return@LaunchedEffect
         delay(HeroHold.FALLBACK_MS)
         fallbacks++
