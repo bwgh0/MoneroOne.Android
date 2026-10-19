@@ -10,6 +10,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import one.monero.moneroone.core.wallet.HeroHold
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -208,3 +218,27 @@ internal fun Modifier.heroShine(progress: () -> Float): Modifier = this
             blendMode = BlendMode.SrcAtop
         )
     }
+
+/**
+ * TalkBack reads "Received <amount>" once per moment: a polite live region, as
+ * in the address picker. It holds the words for 3 s, then is empty again, so
+ * TalkBack does not stop on it later. It shows no text.
+ */
+@Composable
+internal fun ArrivalAnnouncement(play: ArrivalPlay, words: (Arrival) -> String, modifier: Modifier = Modifier) {
+    val currentWords by rememberUpdatedState(words)
+    var text by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(play) {
+        snapshotFlow { play.plus }.filterNotNull().distinctUntilChanged().collectLatest { arrival ->
+            text = currentWords(arrival)
+            delay(3_000L)
+            text = null
+        }
+    }
+    Box(
+        modifier = modifier.semantics {
+            liveRegion = LiveRegionMode.Polite
+            text?.let { contentDescription = it }
+        }
+    )
+}

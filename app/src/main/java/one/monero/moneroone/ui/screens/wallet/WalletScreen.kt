@@ -846,6 +846,12 @@ internal fun BalanceCard(
                     // The other currency below the amount; Money arrives shows the +amount in its place.
                     val plus = arrival?.plus
                     if (caption != null || plus != null) Box {
+                        // TalkBack: "Received <amount>" once per moment, in the Fiat Mode currency.
+                        if (arrival != null) ArrivalAnnouncement(
+                            play = arrival,
+                            words = { tr("Received") + " " + (liveFiat(it.total)?.takeIf { fiatMode } ?: "${formatXmr(it.total)} XMR") },
+                            modifier = Modifier.matchParentSize()
+                        )
                         if (caption != null) {
                             RollingText(
                                 text = caption,
