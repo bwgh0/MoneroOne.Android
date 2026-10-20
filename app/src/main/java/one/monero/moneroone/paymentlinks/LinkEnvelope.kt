@@ -42,7 +42,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -132,19 +132,25 @@ internal class EnvelopeMotion {
     var landed by mutableStateOf(false)
         private set
     private var enteredAt = 0L
+    private val entered = CompletableDeferred<Unit>()
 
-    /** The heroEntrance (scale 0.4 to 1 and fade), once. Reduce Motion: no scale, it is there. */
-    fun enter(scope: CoroutineScope, reduceMotion: Boolean) {
-        if (enteredAt != 0L) return
-        enteredAt = SystemClock.uptimeMillis()
-        scope.launch { if (reduceMotion) entrance.snapTo(1f) else entrance.animateTo(1f, heroEntrance()) }
+    /**
+     * The heroEntrance (scale 0.4 to 1 and fade). Reduce Motion: no scale, it is there. Called
+     * again after a cancel, it goes on from where it stopped.
+     */
+    suspend fun enter(reduceMotion: Boolean) {
+        if (enteredAt == 0L) {
+            enteredAt = SystemClock.uptimeMillis()
+            entered.complete(Unit)
+        }
+        if (reduceMotion) entrance.snapTo(1f) else entrance.animateTo(1f, heroEntrance())
     }
 
     /** The opening, once: at t0 the crack and a soft tick, the success haptic when the card lands. */
     suspend fun open(view: View, reduceMotion: Boolean) = coroutineScope {
         if (opened) return@coroutineScope
-        val start = if (enteredAt != 0L) enteredAt else SystemClock.uptimeMillis()
-        val wait = start + CRACK_AFTER_ENTRANCE_MS - SystemClock.uptimeMillis()
+        entered.await()
+        val wait = enteredAt + CRACK_AFTER_ENTRANCE_MS - SystemClock.uptimeMillis()
         if (wait > 0) delay(wait)
         opened = true
         if (reduceMotion) {

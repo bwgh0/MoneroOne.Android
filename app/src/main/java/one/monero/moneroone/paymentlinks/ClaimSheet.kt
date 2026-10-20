@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +72,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.core.wallet.addressesOf
@@ -90,6 +93,9 @@ import one.monero.moneroone.ui.screens.wallet.WalletRowCheck
 
 /** SwiftUI's default ease-in-out (0.35 s), the plain cross-fade iOS uses between states. */
 private val CrossFade = tween<Float>(350, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f))
+
+/** The envelope's entrance waits for the sheet to come to rest, at most this long. */
+private const val SHEET_REST_TIMEOUT_MS = 800L
 
 /** What the claim sheet shows. */
 private sealed interface ClaimUi {
@@ -291,12 +297,14 @@ private fun ClaimSheet(
         BackHandler(enabled = showList) { choosing = false }
         // The envelope enters once the sheet is at rest, then opens for a link that holds money.
         val view = LocalView.current
-        val settled = sheetState.currentValue == SheetValue.Expanded
-        LaunchedEffect(motion, settled) { if (settled) motion.enter(this, reduceMotion) }
-        LaunchedEffect(motion, settled, opens) {
-            if (settled) {
-                if (opens) motion.open(view, reduceMotion) else motion.seal()
+        LaunchedEffect(motion) {
+            withTimeoutOrNull(SHEET_REST_TIMEOUT_MS) {
+                snapshotFlow { sheetState.currentValue }.first { it == SheetValue.Expanded }
             }
+            motion.enter(reduceMotion)
+        }
+        LaunchedEffect(motion, opens) {
+            if (opens) motion.open(view, reduceMotion) else motion.seal()
         }
         // The list slides in from the trailing edge and the sheet's height follows (iOS pushes it).
         AnimatedContent(

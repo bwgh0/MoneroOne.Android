@@ -184,12 +184,16 @@ private val White = Color.White
 private fun blur(cssRadius: Float): BlurMaskFilter =
     BlurMaskFilter(max(0.5f, (cssRadius / 2f - 0.5f) / 0.57735f), BlurMaskFilter.Blur.NORMAL)
 
-/** Gray noise around 50%, one value per pixel: the paper's grain (the mockup's feTurbulence). */
-private fun noise(width: Int, height: Int, seed: Long, spread: Double): Bitmap {
+/**
+ * Gray noise around 50%, one value per pixel: the paper's grain (the mockup's feTurbulence). As
+ * [shade], black with the gray's darkness as its alpha: drawn over the paper at alpha a, it gives
+ * the paper times (1 - a + a * gray), the CSS multiply (PorterDuff MULTIPLY also multiplies alpha).
+ */
+private fun noise(width: Int, height: Int, seed: Long, spread: Double, shade: Boolean = false): Bitmap {
     val random = Random(seed)
     val pixels = IntArray(width * height) {
         val v = (128 + random.nextGaussian() * spread * 255).roundToInt().coerceIn(0, 255)
-        (0xFF shl 24) or (v shl 16) or (v shl 8) or v
+        if (shade) (255 - v) shl 24 else (0xFF shl 24) or (v shl 16) or (v shl 8) or v
     }
     return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
 }
@@ -459,11 +463,15 @@ internal class EnvelopeArt private constructor(
             return bitmap to canvas
         }
 
-        /** Overlay grain at [alpha] over [width] x [height] units, one noise value per pixel. */
+        /**
+         * Grain at [alpha] over [width] x [height] units, one noise value per pixel: OVERLAY on the
+         * dark paper, MULTIPLY (as a shade, see [noise]) on the ivory card.
+         */
         private fun grain(canvas: Canvas, width: Float, height: Float, scale: Float, seed: Long, alpha: Float, mode: PorterDuff.Mode, spread: Double) {
-            val bitmap = noise(max(1, ceil(width * scale).toInt()), max(1, ceil(height * scale).toInt()), seed, spread)
+            val multiply = mode == PorterDuff.Mode.MULTIPLY
+            val bitmap = noise(max(1, ceil(width * scale).toInt()), max(1, ceil(height * scale).toInt()), seed, spread, shade = multiply)
             val paint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
-                xfermode = PorterDuffXfermode(mode)
+                if (!multiply) xfermode = PorterDuffXfermode(mode)
                 this.alpha = (alpha * 255).roundToInt()
             }
             canvas.drawBitmap(bitmap, null, RectF(0f, 0f, width, height), paint)
