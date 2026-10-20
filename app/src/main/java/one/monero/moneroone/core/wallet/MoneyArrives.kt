@@ -57,7 +57,9 @@ object MoneyArrivesRules {
         reclaimHashes: Set<String> = emptySet()
     ): ArrivalLook {
         // A baseline above the chain the wallet sees (a reset chain) resets like no baseline.
-        if (baseline == null || baseline.height > (chainTop(txs) ?: Long.MAX_VALUE) + 1) {
+        // With no mined payment the wallet sees no chain top, and the baseline stays.
+        val top = chainTop(txs)
+        if (baseline == null || (top != null && baseline.height > top + 1)) {
             return ArrivalLook(null, baselineOf(txs))
         }
         val arrivals = txs.filter { isNew(it, baseline, reclaimHashes) }
@@ -112,9 +114,10 @@ object MoneyArrivesRules {
  * The kit publishes each scan's history before its balance (MoneroKit.onRefreshed,
  * which stores the wallet in between), and the last history of a catch-up before
  * Synced. So a payment that a history shows counts once the balance moves (or moved
- * in the same frame as that history), and the moment waits for that. A payment the
- * balance has not counted 3 s after its history counts then ([FALLBACK_MS], one per
- * history). This gives the iOS results: one +amount per catch-up, and no tick up
+ * in the same frame as that history, or rose by it before that history came: the VM
+ * maps a history off the main thread, so a balance can land first), and the moment
+ * waits for that. A payment the balance has not counted 3 s after its history counts
+ * then ([FALLBACK_MS], one per history). This gives the iOS results: one +amount per catch-up, and no tick up
  * and back at a new block.
  *
  * wallet2's balance takes in a pool payment, so the balance does not move when that
@@ -149,11 +152,12 @@ class HeroHold {
         fallbacks: Int = 0
     ): Long {
         if (history !== this.history) {
-            // The first history, or a balance that moved with it: the balance holds its payments.
-            val movedWith = this.history == null || lastBalance != balance
-            waiting.forEach {
-                if (it.hash !in before) before[it.hash] = if (movedWith || it.hash in pooled) COUNTED else balance
-            }
+            val fresh = waiting.filter { it.hash !in before }
+            // The first history, a balance that moved with it, or a balance that rose by its new
+            // payments before it came (the VM maps a history off the main thread): the balance holds them.
+            val movedWith = this.history == null || lastBalance != balance ||
+                balance - historyBalance >= fresh.sumOf { it.amount }
+            fresh.forEach { before[it.hash] = if (movedWith || it.hash in pooled) COUNTED else balance }
             before.keys.retainAll(waiting.mapTo(HashSet()) { it.hash })
             pooled.retainAll(txs.filter(MoneyArrivesRules::inPool).mapTo(HashSet()) { it.hash })
             this.history = history

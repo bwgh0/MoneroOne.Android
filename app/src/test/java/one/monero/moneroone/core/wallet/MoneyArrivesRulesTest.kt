@@ -117,6 +117,16 @@ class MoneyArrivesRulesTest {
     }
 
     @Test
+    fun aHistoryWithNoMinedPaymentKeepsTheBaseline() {
+        // No chain top (only a pool payment): no reset, so the old payments never play again.
+        val baseline = ArrivalBaseline(500, listOf("old"))
+        val txs = listOf(incoming("p", 2, 0, confirmations = 0))
+        val look = MoneyArrivesRules.look(baseline, txs, false, true)
+        assertNull(look.arrival)
+        assertEquals(baseline, look.baseline)
+    }
+
+    @Test
     fun aSendWhileAPaymentWaitsShowsAtOnceAndTheRollEqualsThePlusAmount() {
         val hold = HeroHold()
         val old = incoming("a", 10_000, 100, confirmations = 40)
@@ -223,22 +233,37 @@ class MoneyArrivesRulesTest {
     }
 
     @Test
-    fun aBalanceBeforeItsHistoryNeverRaisesTheHeroBeforeTheMoment() {
+    fun aBalanceBeforeItsHistoryCountsThePaymentAtOnce() {
         val hold = HeroHold()
         val old = incoming("a", 10_000, 100, confirmations = 40)
         val baseline = MoneyArrivesRules.baselineOf(listOf(old))
         val h0 = listOf(old)
         hold.hero(h0, h0, 10_000, emptyList(), syncing = false, lastShown = 10_000)
-        // A catch-up publishes the balance first, then the history.
+        // The balance lands first, in its own frame (the VM maps the history off the main thread).
         assertEquals(10_000L, hold.hero(h0, h0, 12_000, emptyList(), syncing = true, lastShown = 10_000))
         val h1 = h0 + incoming("p", 2_000, 150, confirmations = 2)
         val waiting = h1.filter { MoneyArrivesRules.isNew(it, baseline) }
         assertEquals(10_000L, hold.hero(h1, h1, 12_000, waiting, syncing = true, lastShown = 10_000))
-        // Synced: the payment has not counted, and the hero does not rise.
+        // The balance already holds the payment: it counts with no 3 s wait, and the hero does not rise.
+        assertTrue(hold.allCounted)
         assertEquals(10_000L, hold.hero(h1, h1, 12_000, waiting, syncing = false, lastShown = 10_000))
+        assertTrue(hold.allCounted)
+    }
+
+    @Test
+    fun aBalanceThatRoseLessThanItsPaymentWaitsForTheFallback() {
+        val hold = HeroHold()
+        val old = incoming("a", 10_000, 100, confirmations = 40)
+        val baseline = MoneyArrivesRules.baselineOf(listOf(old))
+        val h0 = listOf(old)
+        hold.hero(h0, h0, 10_000, emptyList(), syncing = false, lastShown = 10_000)
+        hold.hero(h0, h0, 11_000, emptyList(), syncing = true, lastShown = 10_000)
+        val h1 = h0 + incoming("p", 2_000, 150)
+        val waiting = h1.filter { MoneyArrivesRules.isNew(it, baseline) }
+        // A rise of 1,000 does not show that the 2,000 payment is in the balance.
+        hold.hero(h1, h1, 11_000, waiting, syncing = false, lastShown = 10_000)
         assertFalse(hold.allCounted)
-        // The fallback counts it. The hero stays, and the moment can play.
-        assertEquals(10_000L, hold.hero(h1, h1, 12_000, waiting, syncing = false, lastShown = 10_000, fallbacks = 1))
+        hold.hero(h1, h1, 11_000, waiting, syncing = false, lastShown = 10_000, fallbacks = 1)
         assertTrue(hold.allCounted)
     }
 
