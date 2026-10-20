@@ -68,8 +68,11 @@ internal class ArrivalPlay {
     /** The payments the last moment showed. */
     var playedHashes: List<String>? = null
     var running = false
-    /** Set during composition: the balance the hero shows now, or null for the real one. */
-    var hold: Long? = null
+    /**
+     * Set during composition: the balance the hero shows now, or null for the real one.
+     * State, so the balance card (a lazy list item) reads each change, also the release at the roll.
+     */
+    var hold by mutableStateOf<Long?>(null)
 
     /**
      * Every payment: the caption fades out and the +amount arrives (0); the
