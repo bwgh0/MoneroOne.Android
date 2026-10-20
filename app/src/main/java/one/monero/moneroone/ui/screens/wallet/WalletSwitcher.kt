@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
@@ -84,7 +86,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.key
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.border
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.draw.alpha
@@ -107,6 +108,7 @@ import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.components.PrimaryButton
+import one.monero.moneroone.ui.components.ShrinkToFitText
 import one.monero.moneroone.ui.components.cardShadow
 import one.monero.moneroone.ui.components.moneroTextFieldColors
 import one.monero.moneroone.ui.components.Motion
@@ -185,8 +187,9 @@ fun WalletSwitcherButton(
  * ring, then Add Wallet. Inline in WalletScreen, not a sheet.
  *
  * Gestures per row: tap = switch (or close when it is the active one),
- * pencil = rename, swipe left = delete (inactive rows), long-press + drag =
- * reorder, persisted through [onMove].
+ * pencil = rename, swipe left = delete (inactive rows), drag the handle on the
+ * left = reorder, persisted through [onMove]. Balances follow Fiat Mode through
+ * [liveBalanceText] and [formatBalance].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -194,7 +197,8 @@ fun WalletManagerRows(
     wallets: List<WalletInfo>,
     activeWallet: WalletInfo?,
     liveBalanceText: String,
-    formatXmr: (Long) -> String,
+    /** A wallet's balance as the row shows it, unit included ("1.0000 XMR", or fiat in Fiat Mode). */
+    formatBalance: (Long) -> String,
     onSwitch: (WalletInfo) -> Unit,
     onDelete: (WalletInfo) -> Unit,
     onRename: (WalletInfo, String, String) -> Unit,
@@ -217,7 +221,6 @@ fun WalletManagerRows(
     var draggingId by remember { mutableStateOf<String?>(null) }
     var settlingId by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
-    var suppressClick by remember { mutableStateOf(false) }
     val heights = remember { HashMap<String, Float>() }
     val motions = remember { HashMap<String, RowMotion>() }
     // The order of the drop, shown until the store's new list arrives, so the rows never
@@ -275,8 +278,15 @@ fun WalletManagerRows(
             })
         }
     }
+    fun startDrag(id: String) {
+        if (draggingId != null) return
+        // A row still springing into place is picked up where it is.
+        dragOffset = motionOf(id).offset
+        snapRow(id, 0f)
+        draggingId = id
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
     fun endDrag(commit: Boolean) {
-        scope.launch { delay(300); suppressClick = false }
         val list = latestShown
         val id = draggingId ?: return
         val from = list.indexOfFirst { it.id == id }
@@ -316,7 +326,7 @@ fun WalletManagerRows(
                     wallet = wallet,
                     isActive = isActive,
                     isLifted = isDragging,
-                    balanceText = if (isActive) liveBalanceText else "${formatXmr(wallet.cachedBalance ?: 0L)} XMR",
+                    balanceText = if (isActive) liveBalanceText else formatBalance(wallet.cachedBalance ?: 0L),
                     modifier = Modifier
                         .onSizeChanged { heights[wallet.id] = it.height.toFloat() }
                         .zIndex(if (isDragging || settlingId == wallet.id) 1f else 0f)
@@ -327,27 +337,16 @@ fun WalletManagerRows(
                             scaleY = s
                             shadowElevation = 14.dp.toPx() * lift
                             shape = RoundedCornerShape(20.dp)
-                        }
-                        .pointerInput(wallet.id) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = {
-                                    // A row still springing into place is picked up where it is.
-                                    dragOffset = motion.offset
-                                    snapRow(wallet.id, 0f)
-                                    draggingId = wallet.id
-                                    suppressClick = true
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                },
-                                onDrag = { change, delta ->
-                                    change.consume()
-                                    dragOffset += delta.y
-                                    updateShifts()
-                                },
-                                onDragEnd = { endDrag(commit = true) },
-                                onDragCancel = { endDrag(commit = false) }
-                            )
                         },
-                    onClick = { if (!suppressClick) onSwitch(wallet) },
+                    onClick = { onSwitch(wallet) },
+                    onReorderStart = { startDrag(wallet.id) },
+                    onReorderDrag = { dy ->
+                        if (draggingId == wallet.id) {
+                            dragOffset += dy
+                            updateShifts()
+                        }
+                    },
+                    onReorderEnd = { commit -> if (draggingId == wallet.id) endDrag(commit) },
                     onRenameRequest = { renameTarget = wallet },
                     onMoveUp = if (index > 0) ({ onMove(wallet.id, shown[index - 1].id) }) else null,
                     onMoveDown = if (index < shown.lastIndex) ({ onMove(wallet.id, shown.getOrNull(index + 2)?.id) }) else null,
@@ -461,6 +460,9 @@ private fun WalletRow(
     modifier: Modifier = Modifier,
     isLifted: Boolean = false,
     onClick: () -> Unit,
+    onReorderStart: () -> Unit,
+    onReorderDrag: (Float) -> Unit,
+    onReorderEnd: (commit: Boolean) -> Unit,
     onRenameRequest: () -> Unit,
     onMoveUp: (() -> Unit)?,
     onMoveDown: (() -> Unit)?,
@@ -595,7 +597,9 @@ private fun WalletRow(
                 } else {
                     onClick()
                 }
-            }
+            },
+            // Room for the drag handle, which sits on top of the card (below).
+            leading = { Spacer(Modifier.width(HandleSlot)) }
         ) {
             IconButton(onClick = onRenameRequest) {
                 Icon(
@@ -607,8 +611,69 @@ private fun WalletRow(
             }
             WalletRowCheck(isActive)
         }
+
+        // The drag handle: a touch here lifts the row at once and moves it with the finger.
+        // It sits over the card's leading edge, outside the card's cleared semantics, so
+        // TalkBack reads it on its own.
+        val start by rememberUpdatedState(onReorderStart)
+        val drag by rememberUpdatedState(onReorderDrag)
+        val end by rememberUpdatedState(onReorderEnd)
+        Box(Modifier.matchParentSize()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset { IntOffset(swipe.offset.roundToInt(), 0) }
+                    .fillMaxHeight()
+                    .width(16.dp + HandleSlot)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = tr("Reorder")
+                        customActions = buildList {
+                            onMoveUp?.let { add(CustomAccessibilityAction(tr("Move up")) { it(); true }) }
+                            onMoveDown?.let { add(CustomAccessibilityAction(tr("Move down")) { it(); true }) }
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            down.consume()
+                            start()
+                            var ended = false
+                            try {
+                                while (true) {
+                                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) {
+                                        change.consume()
+                                        ended = true
+                                        end(true)
+                                        break
+                                    }
+                                    val dy = change.positionChange().y
+                                    change.consume()
+                                    if (dy != 0f) drag(dy)
+                                }
+                            } finally {
+                                // A cancelled gesture puts the row back where it was.
+                                if (!ended) end(false)
+                            }
+                        }
+                    }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DragHandle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 16.dp)
+                        .size(24.dp)
+                )
+            }
+        }
     }
 }
+
+/** The drag handle's slot before the emoji: the 24dp glyph and an 8dp gap. */
+private val HandleSlot = 32.dp
 
 /**
  * The wallet switcher's row card (iOS WalletRow): the emoji circle, the name, an optional
@@ -632,6 +697,8 @@ fun WalletRowCard(
     contentAlpha: Float = 1f,
     /** In place of the address, at full strength: why a faded row cannot be picked. */
     note: String? = null,
+    /** Before the emoji: the switcher's room for its drag handle. */
+    leading: @Composable RowScope.() -> Unit = {},
     trailing: @Composable RowScope.() -> Unit = {}
 ) {
     GlassCard(
@@ -648,6 +715,7 @@ fun WalletRowCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            leading()
             Box(modifier = Modifier.alpha(contentAlpha)) {
                 EmojiCircle(emoji = emoji, size = 44.dp, color = circleColor)
             }
@@ -665,13 +733,13 @@ fun WalletRowCard(
                 )
                 balanceText?.let {
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
+                    // A balance never loses digits: it shrinks, then wraps.
+                    ShrinkToFitText(
                         text = it,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
                         color = MoneroOrange,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        minScale = 0.6f,
+                        wrapAtFloor = true,
                         modifier = Modifier.alpha(contentAlpha)
                     )
                 }

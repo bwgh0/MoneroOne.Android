@@ -212,6 +212,9 @@ fun WalletScreen(
     }
     val formatFiat: (Double) -> String = { amount -> "${selectedCurrency.symbol}${fiatFormat.format(amount)}" }
     val liveFiat: (Long) -> String? = { atomic -> currentPrice?.price?.let { formatFiat(atomic / 1_000_000_000_000.0 * it) } }
+    val switcherBalance: (Long) -> String = { atomic ->
+        liveFiat(atomic)?.takeIf { fiatMode } ?: "${walletViewModel.formatXmr(atomic)} XMR"
+    }
 
     // History: the ledger it draws, and the past moment picked on it, if any.
     val ledger = rememberBalanceLedger(walletState.balance.all, walletState.transactions, walletSessionId)
@@ -415,8 +418,9 @@ fun WalletScreen(
                     WalletManagerRows(
                         wallets = wallets,
                         activeWallet = activeWallet,
-                        liveBalanceText = "${walletViewModel.formatXmr(walletState.balance.all)} XMR",
-                        formatXmr = walletViewModel::formatXmr,
+                        // Fiat Mode shows each balance in fiat, as Transfer and Activity do.
+                        liveBalanceText = switcherBalance(walletState.balance.all),
+                        formatBalance = switcherBalance,
                         onSwitch = { wallet ->
                             // Tapping the active row just closes the list. Otherwise
                             // collapse only when the switch was taken; a refused tap
