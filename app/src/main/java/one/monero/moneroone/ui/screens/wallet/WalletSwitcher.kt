@@ -2,10 +2,28 @@ package one.monero.moneroone.ui.screens.wallet
 
 import one.monero.moneroone.core.locale.tr
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
+import kotlin.math.abs
+import kotlin.math.sign
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.coroutines.Job
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -72,7 +90,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -99,7 +116,6 @@ import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.truncateMiddle
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** Curated emoji set for wallet icons (grid picker, iOS parity in spirit). */
@@ -194,89 +210,147 @@ fun WalletManagerRows(
     val haptic = LocalHapticFeedback.current
     val gapPx = with(LocalDensity.current) { 10.dp.toPx() }
 
-    // Reorder state: the lifted row follows the finger, the rows it passes
-    // slide out of the way by one step, the drop commits the new order.
-    var dragIndex by remember { mutableStateOf<Int?>(null) }
+    // Reorder state, all of it by wallet id, so a row's motion follows its wallet and not
+    // its slot. The lifted row follows the finger; each row it passes slides by the lifted
+    // row's height plus the gap. On the drop every row starts from where it is on screen
+    // and springs into its new slot, so nothing jumps.
+    var draggingId by remember { mutableStateOf<String?>(null) }
+    var settlingId by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
-    var rowHeightPx by remember { mutableFloatStateOf(0f) }
     var suppressClick by remember { mutableStateOf(false) }
-    // pointerInput lambdas outlive recompositions: read the list and the
-    // drop target through state, never through captured locals.
-    val latestWallets by rememberUpdatedState(wallets)
-    fun dropTarget(from: Int): Int {
-        val stepNow = rowHeightPx + gapPx
-        return if (stepNow <= 0f) from
-        else (from + (dragOffset / stepNow).roundToInt()).coerceIn(0, latestWallets.lastIndex)
+    val heights = remember { HashMap<String, Float>() }
+    val motions = remember { HashMap<String, RowMotion>() }
+    // The order of the drop, shown until the store's new list arrives, so the rows never
+    // flash back to the old order for a frame.
+    var pendingOrder by remember { mutableStateOf<List<String>?>(null) }
+    val shown = pendingOrder?.let { order ->
+        val byId = wallets.associateBy { it.id }
+        if (order.size == wallets.size && order.all { it in byId }) order.map { byId.getValue(it) } else null
+    } ?: wallets
+    LaunchedEffect(wallets) {
+        pendingOrder = null
+        val ids = wallets.mapTo(HashSet()) { it.id }
+        heights.keys.retainAll(ids)
+        motions.keys.retainAll(ids)
     }
-    val step = rowHeightPx + gapPx
-    val targetIndex = dragIndex?.let { dropTarget(it) }
+    // pointerInput lambdas outlive recompositions: read the list through state.
+    val latestShown by rememberUpdatedState(shown)
+
+    fun motionOf(id: String) = motions.getOrPut(id) { RowMotion() }
+    fun heightsOf(list: List<WalletInfo>) = list.map { heights[it.id] ?: 0f }
+    fun animateRow(id: String, to: Float) {
+        val m = motionOf(id)
+        if (m.target == to && m.job?.isActive == true) return
+        if (m.target == to && m.offset == to) return
+        m.target = to
+        m.job?.cancel()
+        m.job = scope.launch {
+            animate(m.offset, to, m.velocity, Motion.snappy()) { value, velocity ->
+                m.offset = value
+                m.velocity = velocity
+            }
+            m.velocity = 0f
+        }
+    }
+    fun snapRow(id: String, to: Float) {
+        val m = motionOf(id)
+        m.job?.cancel()
+        m.offset = to
+        m.target = to
+        m.velocity = 0f
+    }
+    fun updateShifts() {
+        val list = latestShown
+        val from = list.indexOfFirst { it.id == draggingId }
+        if (from < 0) return
+        val rowHeights = heightsOf(list)
+        val to = reorderDropIndex(rowHeights, gapPx, from, dragOffset)
+        val step = rowHeights[from] + gapPx
+        list.forEachIndexed { j, w ->
+            if (j == from) return@forEachIndexed
+            animateRow(w.id, when {
+                j in (from + 1)..to -> -step
+                j in to until from -> step
+                else -> 0f
+            })
+        }
+    }
+    fun endDrag(commit: Boolean) {
+        scope.launch { delay(300); suppressClick = false }
+        val list = latestShown
+        val id = draggingId ?: return
+        val from = list.indexOfFirst { it.id == id }
+        draggingId = null
+        if (from < 0) { dragOffset = 0f; return }
+        val rowHeights = heightsOf(list)
+        val to = if (commit) reorderDropIndex(rowHeights, gapPx, from, dragOffset) else from
+        val oldTops = reorderRowTops(rowHeights, gapPx)
+        val onScreen = list.mapIndexed { j, w -> oldTops[j] + if (j == from) dragOffset else motionOf(w.id).offset }
+        val newList = list.toMutableList().apply { add(to, removeAt(from)) }
+        val newTops = reorderRowTops(heightsOf(newList), gapPx)
+        newList.forEachIndexed { k, w ->
+            snapRow(w.id, onScreen[list.indexOf(w)] - newTops[k])
+            animateRow(w.id, 0f)
+        }
+        dragOffset = 0f
+        settlingId = id
+        scope.launch {
+            motionOf(id).job?.join()
+            if (settlingId == id) settlingId = null
+        }
+        if (to != from) {
+            pendingOrder = newList.map { it.id }
+            timber.log.Timber.d("reorder: ${list[from].name} -> position $to")
+            onMove(id, newList.getOrNull(to + 1)?.id)
+        }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        wallets.forEachIndexed { index, wallet ->
-            val isActive = wallet.id == activeWallet?.id
-            val isDragging = dragIndex == index
-            val from = dragIndex
-            val shift = when {
-                from == null || targetIndex == null || isDragging -> 0f
-                index > from && index <= targetIndex -> -step
-                index < from && index >= targetIndex -> step
-                else -> 0f
-            }
-            val animatedShift by animateFloatAsState(shift, Motion.snappy(), label = "shift$index")
-            val lift by animateFloatAsState(if (isDragging) 1f else 0f, Motion.snappy(), label = "lift$index")
-
+        shown.forEachIndexed { index, wallet ->
             key(wallet.id) {
+                val isActive = wallet.id == activeWallet?.id
+                val isDragging = draggingId == wallet.id
+                val motion = motionOf(wallet.id)
+                val lift by animateFloatAsState(if (isDragging) 1f else 0f, Motion.snappy(), label = "lift")
                 WalletRow(
                     wallet = wallet,
                     isActive = isActive,
+                    isLifted = isDragging,
                     balanceText = if (isActive) liveBalanceText else "${formatXmr(wallet.cachedBalance ?: 0L)} XMR",
                     modifier = Modifier
-                        .onSizeChanged { if (rowHeightPx == 0f) rowHeightPx = it.height.toFloat() }
-                        .zIndex(if (isDragging) 1f else 0f)
+                        .onSizeChanged { heights[wallet.id] = it.height.toFloat() }
+                        .zIndex(if (isDragging || settlingId == wallet.id) 1f else 0f)
                         .graphicsLayer {
-                            translationY = if (isDragging) dragOffset else animatedShift
+                            translationY = if (isDragging) dragOffset else motion.offset
                             val s = 1f + 0.02f * lift
                             scaleX = s
                             scaleY = s
                             shadowElevation = 14.dp.toPx() * lift
                             shape = RoundedCornerShape(20.dp)
                         }
-                        .pointerInput(index, wallets.size) {
+                        .pointerInput(wallet.id) {
                             detectDragGesturesAfterLongPress(
                                 onDragStart = {
-                                    dragIndex = index
-                                    dragOffset = 0f
+                                    // A row still springing into place is picked up where it is.
+                                    dragOffset = motion.offset
+                                    snapRow(wallet.id, 0f)
+                                    draggingId = wallet.id
                                     suppressClick = true
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 },
                                 onDrag = { change, delta ->
                                     change.consume()
                                     dragOffset += delta.y
+                                    updateShifts()
                                 },
-                                onDragEnd = {
-                                    val from = dragIndex
-                                    val to = from?.let { dropTarget(it) }
-                                    dragIndex = null
-                                    dragOffset = 0f
-                                    val list = latestWallets
-                                    if (from != null && to != null && to != from && from in list.indices) {
-                                        val remaining = list.filterIndexed { i, _ -> i != from }
-                                        timber.log.Timber.d("reorder: ${list[from].name} -> position $to")
-                                        onMove(list[from].id, remaining.getOrNull(to)?.id)
-                                    }
-                                    scope.launch { delay(300); suppressClick = false }
-                                },
-                                onDragCancel = {
-                                    dragIndex = null
-                                    dragOffset = 0f
-                                    scope.launch { delay(300); suppressClick = false }
-                                }
+                                onDragEnd = { endDrag(commit = true) },
+                                onDragCancel = { endDrag(commit = false) }
                             )
                         },
                     onClick = { if (!suppressClick) onSwitch(wallet) },
                     onRenameRequest = { renameTarget = wallet },
-                    onMoveUp = if (index > 0) ({ onMove(wallet.id, wallets[index - 1].id) }) else null,
-                    onMoveDown = if (index < wallets.lastIndex) ({ onMove(wallet.id, wallets.getOrNull(index + 2)?.id) }) else null,
+                    onMoveUp = if (index > 0) ({ onMove(wallet.id, shown[index - 1].id) }) else null,
+                    onMoveDown = if (index < shown.lastIndex) ({ onMove(wallet.id, shown.getOrNull(index + 2)?.id) }) else null,
                     // The active wallet is deleted from Settings, not by a swipe.
                     onDeleteRequest = if (isActive) null else ({ deleteCandidate = wallet })
                 )
@@ -331,19 +405,61 @@ fun WalletManagerRows(
     }
 }
 
+/** A row's reorder offset, kept by wallet id so it follows the wallet when the list reorders. */
+private class RowMotion {
+    var offset by mutableFloatStateOf(0f)
+    var target = 0f
+    var velocity = 0f
+    var job: Job? = null
+}
+
+/** The top of each row in a column of [heights] spaced [gap] apart. */
+internal fun reorderRowTops(heights: List<Float>, gap: Float): List<Float> {
+    var y = 0f
+    return heights.map { h -> y.also { y += h + gap } }
+}
+
+/**
+ * Where the lifted row at [from], moved by [dragOffset], drops in a column of rows of [heights]
+ * spaced [gap] apart. Each row's own measured height counts: the lifted row takes a row's slot
+ * once its leading edge passes that row's middle.
+ */
+internal fun reorderDropIndex(heights: List<Float>, gap: Float, from: Int, dragOffset: Float): Int {
+    if (from !in heights.indices) return from
+    val tops = reorderRowTops(heights, gap)
+    val top = tops[from] + dragOffset
+    val bottom = top + heights[from]
+    var to = from
+    for (j in from + 1..heights.lastIndex) {
+        if (bottom > tops[j] + heights[j] / 2f) to = j else break
+    }
+    if (to == from) {
+        for (j in from - 1 downTo 0) {
+            if (top < tops[j] + heights[j] / 2f) to = j else break
+        }
+    }
+    return to
+}
+
+private enum class RowSwipe { Closed, Open }
+
 /**
  * One wallet row (iOS WalletRow): emoji, name, orange balance, address under
  * it, rename pencil, and a check when it is the active wallet. Swipe-to-delete
  * reveals a trash button in an overlay — only offset/alpha animate, the row
- * never re-lays-out (iOS aa8e835 lesson). The drag only engages on a clear
- * leftward swipe past 24dp so wobbly taps still click.
+ * never re-lays-out (iOS aa8e835 lesson). The card follows the finger from the
+ * touch slop on; a flick or a pull past 40% of the trash width opens it. The
+ * axis that moved more by the touch slop decides: a mostly horizontal swipe,
+ * diagonal too, is a swipe; a mostly vertical one scrolls the list.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WalletRow(
     wallet: WalletInfo,
     isActive: Boolean,
     balanceText: String,
     modifier: Modifier = Modifier,
+    isLifted: Boolean = false,
     onClick: () -> Unit,
     onRenameRequest: () -> Unit,
     onMoveUp: (() -> Unit)?,
@@ -352,28 +468,96 @@ private fun WalletRow(
 ) {
     val density = LocalDensity.current
     val revealPx = with(density) { 72.dp.toPx() }
-    val dragStartPx = with(density) { 24.dp.toPx() }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    val animatedOffset by animateFloatAsState(targetValue = offsetX, label = "swipe")
-    val revealFraction = (-animatedOffset / revealPx).coerceIn(0f, 1f)
+    val flingPx = with(density) { 125.dp.toPx() }
+    val scope = rememberCoroutineScope()
+    val swipe = remember(revealPx, flingPx) {
+        AnchoredDraggableState(
+            initialValue = RowSwipe.Closed,
+            anchors = DraggableAnchors {
+                RowSwipe.Closed at 0f
+                RowSwipe.Open at -revealPx
+            },
+            positionalThreshold = { distance -> distance * 0.4f },
+            velocityThreshold = { flingPx },
+            snapAnimationSpec = Motion.snappy(),
+            decayAnimationSpec = exponentialDecay()
+        )
+    }
     val swipeEnabled = onDeleteRequest != null
+    val trashEnabled by remember(swipe, revealPx) { derivedStateOf { swipe.offset <= -revealPx * 0.9f } }
+    var swipeJob by remember { mutableStateOf<Job?>(null) }
+    fun animateSwipe(block: suspend () -> Unit) {
+        swipeJob?.cancel()
+        swipeJob = scope.launch { block() }
+    }
+    // A lifted row, or one that can no longer be deleted, closes its trash.
+    LaunchedEffect(swipeEnabled, isLifted) {
+        if ((!swipeEnabled || isLifted) && swipe.currentValue != RowSwipe.Closed) animateSwipe { swipe.animateTo(RowSwipe.Closed) }
+    }
+    // The leading edge moves toward the start: left in LTR, right in RTL.
+    val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1f else 1f
 
-    Box(modifier = modifier.fillMaxWidth()) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(swipeEnabled, isLifted, direction) {
+                if (!swipeEnabled || isLifted) return@pointerInput
+                val slop = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val tracker = VelocityTracker().apply { addPointerInputChange(down) }
+                    var total = Offset.Zero
+                    var dragging = false
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            if (dragging) {
+                                val velocity = tracker.calculateVelocity().x * direction
+                                animateSwipe { swipe.settle(velocity) }
+                            }
+                            break
+                        }
+                        if (!dragging && change.isConsumed) break
+                        tracker.addPointerInputChange(change)
+                        val delta = change.positionChange()
+                        if (dragging) {
+                            change.consume()
+                            swipe.dispatchRawDelta(delta.x * direction)
+                            continue
+                        }
+                        total += delta
+                        if (abs(total.x) < slop && abs(total.y) < slop) {
+                            // The list scroll or the reorder drag may take it first.
+                            awaitPointerEvent(PointerEventPass.Final)
+                            if (change.isConsumed) break
+                            continue
+                        }
+                        // Past the slop, the axis that moved more wins.
+                        if (abs(total.x) <= abs(total.y)) break
+                        dragging = true
+                        swipeJob?.cancel()
+                        change.consume()
+                        swipe.dispatchRawDelta((total.x - sign(total.x) * slop) * direction)
+                    }
+                }
+            }
+    ) {
         if (swipeEnabled) {
             // Trash overlay behind the row — no layout participation.
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 12.dp)
-                    .alpha(revealFraction),
+                    .graphicsLayer { alpha = (-swipe.offset / revealPx).coerceIn(0f, 1f) },
                 contentAlignment = Alignment.Center
             ) {
                 IconButton(
                     onClick = {
-                        offsetX = 0f
+                        animateSwipe { swipe.animateTo(RowSwipe.Closed) }
                         onDeleteRequest?.invoke()
                     },
-                    enabled = revealFraction > 0.9f
+                    enabled = trashEnabled
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -392,7 +576,7 @@ private fun WalletRow(
             isActive = isActive,
             modifier = Modifier
                 .fillMaxWidth()
-                .offset { IntOffset(animatedOffset.roundToInt(), 0) }
+                .offset { IntOffset(swipe.offset.roundToInt(), 0) }
                 .clearAndSetSemantics {
                     contentDescription = "${wallet.name}, $balanceText"
                     selected = isActive
@@ -403,46 +587,11 @@ private fun WalletRow(
                         onMoveUp?.let { add(CustomAccessibilityAction(tr("Move up")) { it(); true }) }
                         onMoveDown?.let { add(CustomAccessibilityAction(tr("Move down")) { it(); true }) }
                     }
-                }
-                .pointerInput(swipeEnabled, revealPx, dragStartPx) {
-                    if (!swipeEnabled) return@pointerInput
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val startOffset = offsetX
-                        var dragging = false
-                        var acc = 0f
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) break
-                            if (change.isConsumed) break   // the list or the reorder drag took it
-                            val dx = change.positionChange().x
-                            if (!dragging) {
-                                acc += dx
-                                val dy = abs(change.position.y - down.position.y)
-                                if (abs(acc) > dragStartPx) {
-                                    val towardsReveal = acc < 0f || startOffset < 0f
-                                    if (towardsReveal && abs(acc) > dy) {
-                                        dragging = true
-                                        offsetX = (startOffset + acc).coerceIn(-revealPx, 0f)
-                                        change.consume()
-                                    } else {
-                                        break   // rightward or mostly vertical: leave it to click / scroll
-                                    }
-                                }
-                            } else {
-                                offsetX = (offsetX + dx).coerceIn(-revealPx, 0f)
-                                change.consume()
-                            }
-                        }
-                        if (dragging) {
-                            offsetX = if (offsetX < -revealPx * 0.5f) -revealPx else 0f
-                        }
-                    }
                 },
             onClick = {
-                if (offsetX != 0f) {
-                    offsetX = 0f
+                // A tap on an open row closes it and never switches.
+                if (swipe.targetValue != RowSwipe.Closed || swipe.offset < -0.5f) {
+                    animateSwipe { swipe.animateTo(RowSwipe.Closed) }
                 } else {
                     onClick()
                 }
