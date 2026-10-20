@@ -1,7 +1,6 @@
 package one.monero.moneroone.paymentlinks
 
 import android.content.Context
-import android.content.Intent
 import android.view.MotionEvent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -127,13 +126,12 @@ private val PRE_BROADCAST_ERRORS = listOf(
     "Invalid amount"
 )
 
-/** Opens the system share sheet with the spec's share text. The link never goes to the clipboard. */
+/**
+ * Opens the system share sheet with the spec's share text, and the sealed envelope with the amount
+ * as its preview. The link never goes to the clipboard.
+ */
 internal fun shareLink(context: Context, amountXmr: String, link: PaymentLink) {
-    val send = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, shareText(amountXmr, link))
-    }
-    context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    shareLinkWithPreview(context, amountXmr, shareText(amountXmr, link))
 }
 
 /**
