@@ -57,6 +57,11 @@ class UsernameStore(private val persistence: UsernamePersistence) {
         catch (_: Exception) { storageError = true; mutable.value = UsernameState() }
     }
     @Synchronized fun savePending(pending: PendingUsernameClaim?) = save(mutable.value.copy(pending = pending))
+    /** A deleted wallet takes its pending claim along. [walletKey] null: every wallet was removed. */
+    @Synchronized fun clearPending(walletKey: String?) {
+        val pending = mutable.value.pending ?: return
+        if (walletKey == null || pending.walletKey == walletKey) save(mutable.value.copy(pending = null))
+    }
     @Synchronized fun accept(binding: UsernameBinding) {
         val old = mutable.value.binding(binding.walletKey, binding.network)
         if (old != null && old.genesisHash != binding.genesisHash) throw UsernameException("verification")

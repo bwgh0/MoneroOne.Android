@@ -1409,6 +1409,11 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         }
         secrets.deleteWalletSecrets(id)
         store.removeWallet(id)
+        // Its pending username claim goes too, unless another row is the same wallet.
+        removed.cachedPrimaryAddress?.takeIf { key -> store.wallets().none { it.cachedPrimaryAddress == key } }?.let { key ->
+            try { one.monero.moneroone.core.username.UsernameStore.get(context).clearPending(key) }
+            catch (e: Exception) { Timber.e(e, "deleteWallet: could not clear the pending username claim") }
+        }
         prefs.edit()
             .remove("wallet.$id.selected_address_index")
             .remove(removed.keyPrefix + RESTORED_FROM_SEED_SUFFIX)
@@ -1508,6 +1513,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
                 // OpenAlias pins record which names were paid.
                 OpenAliasPinStore.create(context).clearAll()
+
+                // No wallet is left to finish a pending username claim.
+                try {
+                    one.monero.moneroone.core.username.UsernameStore.get(context).clearPending(null)
+                } catch (e: Exception) {
+                    Timber.e(e, "Remove All: could not clear the pending username claim")
+                }
 
                 // Reset state
                 _wallets.value = emptyList()
