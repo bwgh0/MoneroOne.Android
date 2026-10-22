@@ -103,6 +103,7 @@
     <string name="l10n_add_memo_4caf1d1c" formatted="false">"Adaugă notă"</string>
     <string name="l10n_add_note_63565c04" formatted="false">"Adaugă notă"</string>
     <string name="l10n_add_places_you_trust_like_home_or_work_60974482" formatted="false">"Adaugă locuri de încredere, cum ar fi acasă sau la serviciu."</string>
+    <string name="l10n_add_to_contacts_7eeada71" formatted="false">"Adaugă la contacte"</string>
     <string name="l10n_add_your_home_office_or_other_safe_locations_if_your_wa_43d93c16" formatted="false">"Adaugă casa, biroul sau alte locuri sigure. Dacă portofelul detectează activitate în afara acestor zone, vei fi notificat."</string>
     <string name="l10n_address_56ef8f20" formatted="false">"Adresă"</string>
     <string name="l10n_address_private_view_key_75968792" formatted="false">"Adresă + cheie secretă de citire"</string>
@@ -112,6 +113,7 @@
     <string name="l10n_address_doesn_t_look_valid_for_mainnet_027a2baf" formatted="false">"Adresa nu pare validă pentru rețeaua principală."</string>
     <string name="l10n_address_doesn_t_look_valid_for_testnet_e4c3a7a2" formatted="false">"Adresa nu pare validă pentru rețeaua de test."</string>
     <string name="l10n_address_found_for_s_0af31ca9" formatted="false">"Adresă găsită pentru %1$s"</string>
+    <string name="l10n_address_or_openalias_3d7fa804" formatted="false">"Adresă sau OpenAlias"</string>
     <string name="l10n_address_fa0882e2" formatted="false">"Adresă:"</string>
     <string name="l10n_adjust_to_explore_the_balance_and_activity_at_each_time_fc6ccd58" formatted="false">"Ajustează pentru a explora soldul și activitatea în fiecare moment. Revino la „Acum” pentru a afișa portofelul curent."</string>
     <string name="l10n_after_a_payment_arrives_receive_shows_a_new_address_old_579be71c" formatted="false">"După ce sosește o plată, Primește afișează o adresă nouă. Cele vechi funcționează în continuare."</string>
@@ -221,6 +223,7 @@
     <string name="l10n_choose_a_new_6_digit_pin_c2846426" formatted="false">"PIN nou"</string>
     <string name="l10n_choose_a_wallet_d1157c4d" formatted="false">"Alege un portofel"</string>
     <string name="l10n_choose_another_date_d8c80c56" formatted="false">"Alege altă dată"</string>
+    <string name="l10n_choose_from_contacts_841a7832" formatted="false">"Alege din contacte"</string>
     <string name="l10n_choose_your_preferred_app_appearance_9f795e99" formatted="false">"Aspect"</string>
     <string name="l10n_claim_4ca41db0" formatted="false">"Revendică"</string>
     <string name="l10n_claim_by_aff685c9" formatted="false">"Revendică până la"</string>
@@ -239,6 +242,7 @@
     <string name="l10n_clear_83b12c22" formatted="false">"Șterge"</string>
     <string name="l10n_clear_address_8b6db0f3" formatted="false">"Șterge adresa"</string>
     <string name="l10n_clear_address_search_bdfb1064" formatted="false">"Șterge căutarea adreselor"</string>
+    <string name="l10n_clear_recipient_ed7495d7" formatted="false">"Șterge destinatarul"</string>
     <string name="l10n_close_7d9eb7ac" formatted="false">"Închide"</string>
     <string name="l10n_closes_the_wallet_list_9f8cd790" formatted="false">"Închide lista de portofele"</string>
     <string name="l10n_collapsed_b322b652" formatted="false">"Restrâns"</string>
@@ -275,11 +279,14 @@
     <string name="l10n_connection_will_be_unencrypted_http_638750af" formatted="false">"Conexiunea nu va fi criptată (HTTP)"</string>
     <string name="l10n_connects_your_hardware_wallet_briefly_to_update_the_lis_65893ea3" formatted="false">"Conectează pentru scurt timp portofelul hardware ca să actualizeze lista tranzacțiilor trimise."</string>
     <string name="l10n_contact_support_f8d47b82" formatted="false">"Contactează asistența"</string>
+    <string name="l10n_contacts_b450645d" formatted="false">"Contacte"</string>
+    <string name="l10n_contacts_you_save_show_here_2997506e" formatted="false">"Contactele pe care le salvezi apar aici."</string>
     <string name="l10n_continue_31fbef16" formatted="false">"Continuă"</string>
     <string name="l10n_continue_anyway_911beb63" formatted="false">"Continuă oricum"</string>
     <string name="l10n_copied_8d525e5f" formatted="false">"Copiat"</string>
     <string name="l10n_copied_to_clipboard_d37078fe" formatted="false">"Copiat"</string>
     <string name="l10n_copied_ea61bc15" formatted="false">"Copiat!"</string>
+    <string name="l10n_copies_a_name_from_your_iphone_s_contacts_f2352a4b" formatted="false">"Copiază un nume din contactele de pe iPhone"</string>
     <string name="l10n_copies_every_field_of_this_transaction_as_text_0836937f" formatted="false">"Copiază fiecare câmp al acestei tranzacții ca text"</string>
     <string name="l10n_copies_the_monero_address_to_clipboard_991cb998" formatted="false">"Copiază adresa Monero în clipboard"</string>
     <string name="l10n_copies_the_full_transaction_id_to_clipboard_fc010437" formatted="false">"Copiază în clipboard ID-ul complet al tranzacției"</string>
@@ -288,6 +295,7 @@
     <string name="l10n_copy_address_b0e3d6c0" formatted="false">"Copiază adresa"</string>
     <string name="l10n_copy_all_7a1861e4" formatted="false">"Copiază tot"</string>
     <string name="l10n_copy_all_details_eca14d85" formatted="false">"Copiază toate detaliile"</string>
+    <string name="l10n_copy_openalias_e0ea9d93" formatted="false">"Copiază OpenAlias"</string>
     <string name="l10n_copy_seed_phrase_fbf381be" formatted="false">"Copiază fraza seed"</string>
     <string name="l10n_copy_address_7c4e5224" formatted="false">"Copiază adresa"</string>
     <string name="l10n_copy_address_view_key_and_restore_height_5880f9b1" formatted="false">"Copiază adresa, cheia de citire și înălțimea de restaurare"</string>
@@ -362,6 +370,8 @@
     <string name="l10n_default_nodes_182c35e8" formatted="false">"Noduri implicite"</string>
     <string name="l10n_define_security_zones_where_your_wallet_stays_updated_r_5cb6358f" formatted="false">"Definește zone de securitate în care portofelul rămâne actualizat. Necesită permisiunea de localizare „Întotdeauna”."</string>
     <string name="l10n_delete_e2d0a549" formatted="false">"Șterge"</string>
+    <string name="l10n_delete_contact_326d43c1" formatted="false">"Șterge contactul"</string>
+    <string name="l10n_delete_contact_74ab8e34" formatted="false">"Ștergi contactul?"</string>
     <string name="l10n_delete_location_a85b0a95" formatted="false">"Șterge locația"</string>
     <string name="l10n_delete_location_a3f3e9c5" formatted="false">"Ștergi locația?"</string>
     <string name="l10n_delete_wallet_279d5ef5" formatted="false">"Ștergi portofelul?"</string>
@@ -407,12 +417,14 @@
     <string name="l10n_double_tap_to_select_this_address_1cd99192" formatted="false">"Apasă dublu pentru a selecta această adresă"</string>
     <string name="l10n_double_tap_to_send_s_xmr_0c79892b" formatted="false">"Apasă dublu pentru a trimite %1$s XMR"</string>
     <string name="l10n_double_tap_to_send_monero_d67cbfb6" formatted="false">"Apasă dublu pentru a trimite Monero"</string>
+    <string name="l10n_double_tap_to_send_to_this_wallet_9c41ec7a" formatted="false">"Apasă dublu pentru a trimite către acest portofel"</string>
     <string name="l10n_double_tap_to_skip_biometric_setup_d4270d92" formatted="false">"Apasă dublu pentru a omite configurarea biometrică"</string>
     <string name="l10n_double_tap_to_switch_to_this_wallet_d0b0a219" formatted="false">"Apasă dublu pentru a trece la acest portofel"</string>
     <string name="l10n_double_tap_to_unlock_with_your_pin_5ab80f93" formatted="false">"Apasă dublu pentru a debloca cu PIN-ul"</string>
     <string name="l10n_double_tap_to_use_a_4_digit_pin_52a1514c" formatted="false">"Apasă dublu pentru a folosi un PIN de 4 cifre"</string>
     <string name="l10n_double_tap_to_use_a_6_digit_pin_e60efb15" formatted="false">"Apasă dublu pentru a folosi un PIN de 6 cifre"</string>
     <string name="l10n_edit_464c4ffd" formatted="false">"Editează"</string>
+    <string name="l10n_edit_contact_6b243902" formatted="false">"Editează contactul"</string>
     <string name="l10n_edit_location_c081701b" formatted="false">"Editează locația"</string>
     <string name="l10n_edit_node_ce03c641" formatted="false">"Editează nodul"</string>
     <string name="l10n_edit_proxy_ee3e6a16" formatted="false">"Editează proxy-ul"</string>
@@ -489,8 +501,11 @@
     <string name="l10n_forgot_your_pin_7428917f" formatted="false">"Ai uitat PIN-ul?"</string>
     <string name="l10n_format_2f343666" formatted="false">"Format"</string>
     <string name="l10n_fresh_receive_address_596c8897" formatted="false">"Adresă de primire nouă"</string>
+    <string name="l10n_from_21819769" formatted="false">"De la"</string>
+    <string name="l10n_from_s_dd2888a3" formatted="false">"De la %1$s"</string>
     <string name="l10n_from_s_to_s_8d8ddcf6" formatted="false">"De la %1$s la %2$s"</string>
     <string name="l10n_from_beginning_full_scan_17265d0d" formatted="false">"Se va scana de la început"</string>
+    <string name="l10n_from_s_975ca201" formatted="false">"De la: %1$s"</string>
     <string name="l10n_full_wallet_you_can_send_and_receive_adca402c" formatted="false">"Portofel complet — poți trimite și primi."</string>
     <string name="l10n_funding_transaction_c2006a3f" formatted="false">"Tranzacția de finanțare"</string>
     <string name="l10n_general_stability_improvements_and_bug_fixes_d6cabb44" formatted="false">"Îmbunătățiri generale de stabilitate și remedieri de erori."</string>
@@ -549,6 +564,7 @@
     <string name="l10n_invalid_seed_phrase_3a8da7cf" formatted="false">"Frază seed nevalidă"</string>
     <string name="l10n_invalid_seed_phrase_please_check_your_words_and_try_aga_48aabf18" formatted="false">"Frază seed nevalidă. Verifică cuvintele și încearcă din nou."</string>
     <string name="l10n_it_checks_again_every_few_seconds_while_this_screen_is__aa8d210f" formatted="false">"Verifică din nou la câteva secunde cât timp ecranul este deschis."</string>
+    <string name="l10n_it_shows_in_s_when_you_next_open_that_wallet_a02bb666" formatted="false">"Apare în %1$s când deschizi din nou acel portofel."</string>
     <string name="l10n_item_not_found_in_keychain_cc73af45" formatted="false">"Elementul nu a fost găsit în portchei"</string>
     <string name="l10n_japanese_yen_fa53dbe5" formatted="false">"Yen japonez"</string>
     <string name="l10n_keep_your_seed_safe_cdc03cc8" formatted="false">"Protejează fraza seed"</string>
@@ -616,6 +632,7 @@
     <string name="l10n_move_up_c66feb5e" formatted="false">"Mută în sus"</string>
     <string name="l10n_moved_down_69318bee" formatted="false">"Mutat în jos"</string>
     <string name="l10n_moved_up_dbbbde2a" formatted="false">"Mutat în sus"</string>
+    <string name="l10n_moves_xmr_to_another_of_your_wallets_55cc6306" formatted="false">"Mută XMR într-un alt portofel al tău"</string>
     <string name="l10n_moves_between_transactions_426445ed" formatted="false">"Navighează între tranzacții"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_s_e697ef03" formatted="false">"Mută banii din acest link înapoi în %1$s"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_your_wallet_fb8d98af" formatted="false">"Mută banii din acest link înapoi în portofelul tău"</string>
@@ -624,6 +641,7 @@
     <string name="l10n_name_not_signed_a4712126" formatted="false">"Nume nesemnat"</string>
     <string name="l10n_name_your_wallet_31b56e34" formatted="false">"Numele portofelului"</string>
     <string name="l10n_name_this_link_4aa3d2cb" formatted="false">"Dă un nume acestui link"</string>
+    <string name="l10n_name_address_or_openalias_d13028c0" formatted="false">"Nume, adresă sau OpenAlias"</string>
     <string name="l10n_name_number_or_address_04f4c03c" formatted="false">"Nume, număr sau adresă"</string>
     <string name="l10n_needs_always_90893ff3" formatted="false">"Necesită „Întotdeauna”"</string>
     <string name="l10n_needs_always_permission_6dd576c0" formatted="false">"Necesită permisiunea „Întotdeauna”"</string>
@@ -639,6 +657,7 @@
     <string name="l10n_never_share_your_recovery_phrase_anyone_with_these_word_0d06c193" formatted="false">"Nu împărtăși niciodată fraza de recuperare. Oricine are aceste cuvinte poate accesa fondurile tale. Păstreaz-o în siguranță offline."</string>
     <string name="l10n_new_address_0064a544" formatted="false">"Adresă nouă"</string>
     <string name="l10n_new_alert_bd108465" formatted="false">"Alertă nouă"</string>
+    <string name="l10n_new_contact_3fe26353" formatted="false">"Contact nou"</string>
     <string name="l10n_new_pin_6d8849e8" formatted="false">"PIN nou"</string>
     <string name="l10n_new_pin_length_483a5a20" formatted="false">"Lungimea noului PIN"</string>
     <string name="l10n_new_price_alert_70e1b4c1" formatted="false">"Alertă nouă"</string>
@@ -646,8 +665,11 @@
     <string name="l10n_new_seed_phrase_entry_0dd2e324" formatted="false">"Introducere nouă a frazei seed"</string>
     <string name="l10n_new_wallets_are_created_faster_1212ea81" formatted="false">"Portofelele noi sunt create mai rapid."</string>
     <string name="l10n_next_transaction_37f49104" formatted="false">"Tranzacția următoare"</string>
+    <string name="l10n_no_contacts_e18de189" formatted="false">"Niciun contact"</string>
+    <string name="l10n_no_mail_app_88fad5f5" formatted="false">"Nicio aplicație de e-mail"</string>
     <string name="l10n_no_monero_address_for_this_name_79d0651c" formatted="false">"Nicio adresă Monero pentru acest nume"</string>
     <string name="l10n_no_price_alerts_cfb97a21" formatted="false">"Nicio alertă de preț"</string>
+    <string name="l10n_no_results_ed805f62" formatted="false">"Niciun rezultat"</string>
     <string name="l10n_no_thanks_c6394418" formatted="false">"Nu, mulțumesc"</string>
     <string name="l10n_no_trusted_locations_008f580f" formatted="false">"Fără locații de încredere"</string>
     <string name="l10n_no_warranty_420d720d" formatted="false">"Fără garanție"</string>
@@ -718,7 +740,9 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Doar acest telefon păstrează nota."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Deschidere"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Deschide Configurări"</string>
+    <string name="l10n_open_this_wallet_once_to_send_to_it_7a952da2" formatted="false">"Deschide acest portofel o dată pentru a trimite către el"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Se deschide portofelul de pe dispozitiv…"</string>
+    <string name="l10n_opens_a_mail_to_support_with_the_app_version_and_iphone_15ac2fa3" formatted="false">"Deschide un e-mail către asistență cu versiunea aplicației și modelul iPhone-ului"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Deschide selectorul de adrese pentru a schimba adresa de primire"</string>
     <string name="l10n_opens_monero_one_in_your_browser_578efc16" formatted="false">"Deschide monero.one în browser"</string>
     <string name="l10n_opens_privacy_policy_in_your_browser_eee17b7f" formatted="false">"Deschide politica de confidențialitate în browser"</string>
@@ -837,9 +861,12 @@
     <string name="l10n_recipient_address_f6f6311d" formatted="false">"Adresa destinatarului"</string>
     <string name="l10n_recipient_address_454d0391" formatted="false">"Adresa destinatarului"</string>
     <string name="l10n_recipient_address_or_openalias_name_05d761e3" formatted="false">"Adresa destinatarului sau numele OpenAlias"</string>
+    <string name="l10n_recipient_name_address_or_openalias_b73cb5f8" formatted="false">"Numele, adresa sau OpenAlias-ul destinatarului"</string>
     <string name="l10n_recipient_not_available_for_transactions_sent_before_th_bcca6091" formatted="false">"Destinatarul nu este disponibil pentru tranzacțiile trimise înainte de restaurarea acestui portofel"</string>
     <string name="l10n_recipient_payment_link_anyone_with_the_link_can_claim_i_f9e24380" formatted="false">"Destinatar, link de plată. Oricine are linkul îl poate revendica"</string>
     <string name="l10n_recipient_s_4d3d8df1" formatted="false">"Destinatar: %1$s"</string>
+    <string name="l10n_recipient_s_s_01b8ba81" formatted="false">"Destinatar: %1$s, %2$s"</string>
+    <string name="l10n_recipient_s_s_address_s_f516682e" formatted="false">"Destinatar: %1$s, %2$s, adresa %3$s"</string>
     <string name="l10n_recipient_s_address_s_b4e456fc" formatted="false">"Destinatar: %1$s, adresa %2$s"</string>
     <string name="l10n_recipient_anyone_with_the_link_393c9974" formatted="false">"Destinatar: oricine are linkul"</string>
     <string name="l10n_reclaim_1d2867cd" formatted="false">"Recuperează"</string>
@@ -870,6 +897,7 @@
     <string name="l10n_rename_wallet_02d657cc" formatted="false">"Redenumește portofelul"</string>
     <string name="l10n_rename_s_37736fea" formatted="false">"Redenumește, %1$s"</string>
     <string name="l10n_renames_the_link_1efc85b4" formatted="false">"Redenumește linkul"</string>
+    <string name="l10n_reorder_14ac200e" formatted="false">"Reordonează"</string>
     <string name="l10n_request_amount_optional_a62bd939" formatted="false">"Sumă solicitată (opțional)"</string>
     <string name="l10n_request_amount_in_s_faaa0bea" formatted="false">"Solicită suma în %1$s"</string>
     <string name="l10n_request_amount_in_xmr_08acf2d7" formatted="false">"Solicită suma în XMR"</string>
@@ -924,6 +952,7 @@
     <string name="l10n_scans_this_wallet_again_from_its_restore_height_83ca1392" formatted="false">"Scanează din nou acest portofel de la înălțimea de restaurare"</string>
     <string name="l10n_screen_reader_is_on_f2332054" formatted="false">"Cititorul de ecran este activat"</string>
     <string name="l10n_screen_reader_is_on_d067b754" formatted="false">"Cititorul de ecran este activat"</string>
+    <string name="l10n_search_49c266ba" formatted="false">"Caută"</string>
     <string name="l10n_search_address_116a5d3a" formatted="false">"Caută o adresă"</string>
     <string name="l10n_search_addresses_f73d31a1" formatted="false">"Caută adrese"</string>
     <string name="l10n_search_by_id_address_or_memo_c6aa49e6" formatted="false">"Caută după ID, adresă sau notă"</string>
@@ -1006,6 +1035,7 @@
     <string name="l10n_shows_transaction_details_f7f06755" formatted="false">"Afișează detaliile tranzacției"</string>
     <string name="l10n_shows_wallet_sync_progress_while_running_in_the_backgro_9f004867" formatted="false">"Afișează progresul sincronizării portofelului în fundal"</string>
     <string name="l10n_shows_your_balance_over_time_40113f92" formatted="false">"Afișează soldul în timp"</string>
+    <string name="l10n_shows_your_contacts_1588ca65" formatted="false">"Afișează contactele tale"</string>
     <string name="l10n_shows_your_payment_links_a6c313d0" formatted="false">"Afișează linkurile tale de plată"</string>
     <string name="l10n_sign_with_trezor_63d35e0b" formatted="false">"Semnează cu Trezor"</string>
     <string name="l10n_simple_private_secure_9cc5a4a5" formatted="false">"Simplu. Privat. Sigur."</string>
@@ -1123,6 +1153,9 @@
     <string name="l10n_this_will_delete_all_wallet_data_from_this_device_you_c_f5eb4984" formatted="false">"Toate datele portofelului vor fi șterse de pe acest dispozitiv. Poți restaura portofelul folosind fraza seed.\n\nAceastă acțiune nu poate fi anulată."</string>
     <string name="l10n_time_33b93476" formatted="false">"Timp"</string>
     <string name="l10n_timed_out_waiting_for_device_wallet_to_sync_2dbd6f57" formatted="false">"Timpul de așteptare pentru sincronizarea portofelului de pe dispozitiv a expirat."</string>
+    <string name="l10n_to_f4b06ef6" formatted="false">"Către"</string>
+    <string name="l10n_to_s_7b627a25" formatted="false">"Către %1$s"</string>
+    <string name="l10n_to_this_wallet_7f901fed" formatted="false">"Către acest portofel"</string>
     <string name="l10n_to_scan_qr_codes_please_allow_camera_access_42e4821f" formatted="false">"Permite accesul la cameră pentru a scana coduri QR."</string>
     <string name="l10n_toggle_to_confirm_you_have_saved_your_seed_phrase_4f7f0fa2" formatted="false">"Comută pentru a confirma că ai salvat fraza seed"</string>
     <string name="l10n_toggle_to_specify_when_the_wallet_was_created_for_faste_383992d9" formatted="false">"Comută pentru a specifica data creării portofelului, pentru o scanare mai rapidă"</string>
@@ -1145,6 +1178,7 @@
     <string name="l10n_transaction_key_unavailable_on_this_device_8d497a79" formatted="false">"Cheia tranzacției nu este disponibilă pe acest dispozitiv"</string>
     <string name="l10n_transaction_not_found_eb7c4fd4" formatted="false">"Tranzacția nu a fost găsită"</string>
     <string name="l10n_transactions_are_irreversible_95e5dd6b" formatted="false">"Tranzacțiile sunt ireversibile"</string>
+    <string name="l10n_transfer_dde8bef7" formatted="false">"Transferă"</string>
     <string name="l10n_trezor_ble_write_timed_out_efeed4ff" formatted="false">"Scrierea BLE pe Trezor a expirat"</string>
     <string name="l10n_trezor_ready_0a4b6158" formatted="false">"Trezor pregătit"</string>
     <string name="l10n_trezor_didn_t_complete_the_key_image_export_confirm_the_2161fef2" formatted="false">"Trezor nu a finalizat exportul de imagini cheie. Confirmă solicitarea pe dispozitiv și încearcă din nou."</string>
@@ -1277,6 +1311,7 @@
     <string name="l10n_working_b93900bd" formatted="false">"Se încarcă…"</string>
     <string name="l10n_write_down_your_seed_phrase_221efe05" formatted="false">"Notează fraza seed"</string>
     <string name="l10n_write_it_down_and_never_share_it_c893cd53" formatted="false">"Noteaz-o și nu o partaja niciodată."</string>
+    <string name="l10n_write_to_support_monero_one_with_version_s_d9cac4cc" formatted="false">"Scrie la support@monero.one și menționează versiunea %1$s."</string>
     <string name="l10n_xmr_price_f7a84387" formatted="false">"Preț XMR"</string>
     <string name="l10n_xmr_price_alert_1a46bccf" formatted="false">"Alertă de preț XMR"</string>
     <string name="l10n_xmr_price_moved_implausibly_far_in_one_update_keeping_t_f307b65f" formatted="false">"Prețul XMR s-a modificat neplauzibil de mult într-o singură actualizare. Se păstrează ultima valoare cunoscută."</string>
@@ -1295,6 +1330,7 @@
     <string name="l10n_your_screen_reader_will_read_your_recovery_phrase_out_l_5b850931" formatted="false">"Cititorul de ecran va citi fraza de recuperare cu voce tare. Oricine o aude îți poate fura fondurile. Folosește căști sau asigură-te că nimeni nu îți poate auzi dispozitivul înainte de a continua."</string>
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"Cititorul de ecran va citi fraza de recuperare cu voce tare. Oricine o aude îți poate fura fondurile. Folosește căști sau asigură-te că nimeni nu îți poate auzi dispozitivul înainte de a continua."</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"Tranzacție transmisă."</string>
+    <string name="l10n_your_transactions_stay_in_history_64d780b9" formatted="false">"Tranzacțiile tale rămân în Istoric."</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"Tranzacțiile vor apărea aici după sincronizare"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Portofelul tău nu are încă o adresă de primire. Așteaptă să se încarce, apoi încearcă din nou."</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"Portofelul tău este ocupat. Încearcă din nou peste puțin timp."</string>

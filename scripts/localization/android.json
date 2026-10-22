@@ -1987,5 +1987,39 @@
     "uk": "Нові гаманці створюються швидше.",
     "zh-Hans": "新钱包创建更快。",
     "zh-Hant": "新錢包建立更快。"
+  },
+  "Reorder": {
+    "de": "Neu anordnen",
+    "es": "Reordenar",
+    "fr": "Réorganiser",
+    "it": "Riordina",
+    "ja": "並べ替え",
+    "ko": "순서 변경",
+    "nl": "Herschikken",
+    "pl": "Zmień kolejność",
+    "pt-BR": "Reordenar",
+    "ro": "Reordonează",
+    "ru": "Изменить порядок",
+    "tr": "Yeniden sırala",
+    "uk": "Змінити порядок",
+    "zh-Hans": "重新排序",
+    "zh-Hant": "重新排序"
+  },
+  "No Results": {
+    "de": "Keine Ergebnisse",
+    "es": "Sin resultados",
+    "fr": "Aucun résultat",
+    "it": "Nessun risultato",
+    "ja": "結果なし",
+    "ko": "결과 없음",
+    "nl": "Geen resultaten",
+    "pl": "Brak wyników",
+    "pt-BR": "Nenhum Resultado",
+    "ro": "Niciun rezultat",
+    "ru": "Нет результатов",
+    "tr": "Sonuç Yok",
+    "uk": "Немає результатів",
+    "zh-Hans": "无结果",
+    "zh-Hant": "無結果"
   }
 }
