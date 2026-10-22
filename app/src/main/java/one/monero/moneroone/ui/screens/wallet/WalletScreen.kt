@@ -1,5 +1,16 @@
 package one.monero.moneroone.ui.screens.wallet
 
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.lifecycle.viewmodel.compose.viewModel
+import one.monero.moneroone.core.username.UsernameBinding
+import one.monero.moneroone.core.username.UsernameConfiguration
+import one.monero.moneroone.core.username.UsernameViewModel
+
 import one.monero.moneroone.core.locale.tr
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -196,6 +207,17 @@ fun WalletScreen(
     val wallets by walletViewModel.wallets.collectAsState()
     val activeWallet by walletViewModel.activeWallet.collectAsState()
     val walletSessionId by walletViewModel.walletSessionId.collectAsState()
+    val usernames: UsernameViewModel = viewModel()
+    val usernameState by usernames.store.state.collectAsState()
+    val locked by walletViewModel.isLocked.collectAsState()
+    var showUsername by remember(walletSessionId) { mutableStateOf(false) }
+    var shownUsername by remember(walletSessionId) { mutableStateOf<UsernameBinding?>(null) }
+    val usernameKey = activeWallet?.cachedPrimaryAddress
+    val ownUsername = usernameState.binding(usernameKey, "mainnet").takeUnless { usernames.store.storageError }
+    val offersUsername = !locked && !usernameKey.isNullOrEmpty() && UsernameConfiguration.current != null && activeWallet?.isViewOnly == false &&
+        activeWallet?.deviceWalletId == null && ownUsername == null && !usernames.store.storageError && usernameState.hasLocalClaimSlot() &&
+        (usernameState.pending == null || (usernameState.pending?.walletKey == usernameKey && usernameState.pending?.network == "mainnet"))
+    LaunchedEffect(locked) { if (locked) showUsername = false else usernames.store.reload() }
     val linkIndex = rememberPaymentLinkIndex()
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
@@ -247,7 +269,7 @@ fun WalletScreen(
         val lifecycle = LocalLifecycleOwner.current.lifecycle
         val sendState by walletViewModel.sendState.collectAsState()
         val canLook by rememberUpdatedState(
-            walletState.syncState is SyncState.Synced && sendState !is SendState.Sending && asOf == null
+            walletState.syncState is SyncState.Synced && sendState !is SendState.Sending && asOf == null && !showUsername
         )
         val currentWalletIds by rememberUpdatedState(walletIds)
         LaunchedEffect(paymentLinks, walletId) {
@@ -309,7 +331,7 @@ fun WalletScreen(
     val claimSheetOpen = paymentLinks?.store?.pendingOpen?.collectAsState()?.value != null
     val linkProblemShowing = paymentLinks?.store?.intakeProblem?.collectAsState()?.value != null
     ReviewPromptAfterSend(
-        isIdle = !switcherExpanded && !history.expanded && !claimSheetOpen && !linkProblemShowing && !linkAlertShowing
+        isIdle = !switcherExpanded && !history.expanded && !claimSheetOpen && !linkProblemShowing && !linkAlertShowing && !showUsername
     )
     // Money arrives: new payments play on the balance card while the tab is idle (no sheet, the wallet
     // list closed, no chart point picked); payments found while away play at the next idle look.
@@ -317,7 +339,7 @@ fun WalletScreen(
         walletId = activeWallet?.id,
         sessionId = walletSessionId,
         synced = walletState.syncState is SyncState.Synced,
-        idle = !switcherExpanded && asOf == null && !claimSheetOpen && !linkProblemShowing && !linkAlertShowing,
+        idle = !switcherExpanded && asOf == null && !claimSheetOpen && !linkProblemShowing && !linkAlertShowing && !showUsername,
         balance = walletState.balance.all,
         transactions = walletState.transactions,
         isClaim = { linkIndex.match(it)?.kind == one.monero.moneroone.paymentlinks.LinkActivityKind.CLAIM },
@@ -341,6 +363,11 @@ fun WalletScreen(
                 expanded = switcherExpanded,
                 onToggleSwitcher = { switcherExpanded = !switcherExpanded }
             )
+            if (offersUsername && !switcherExpanded) {
+                TextButton(onClick = { activeWallet?.let { usernames.open(it); shownUsername = null; showUsername = true } }) {
+                    Text("Get Your Username", color = MoneroOrange)
+                }
+            }
 
             // Offline banner, 8dp under the greeting as in the iOS header:
             // slides down from the top and fades in, and leaves the same way
@@ -450,6 +477,8 @@ fun WalletScreen(
                         // A new wallet gets a new card: History closed, its chart not built (iOS .id(walletSessionId)).
                         key(walletSessionId) {
                             BalanceCard(
+                                username = ownUsername,
+                                onUsernameTap = { shownUsername = ownUsername; showUsername = true },
                                 balance = walletState.balance.all,
                                 unlockedBalance = walletState.balance.unlocked,
                                 formatXmr = walletViewModel::formatXmr,
@@ -614,6 +643,11 @@ fun WalletScreen(
         item { Spacer(modifier = Modifier.height(8.dp)) }
     }
     } // PullToRefreshBox
+    if (showUsername && !locked) {
+        activeWallet?.let { wallet ->
+            UsernameSheet(wallet, walletSessionId, walletViewModel, usernames, shownUsername) { showUsername = false }
+        }
+    }
 }
 
 @Composable
@@ -657,6 +691,8 @@ private fun GreetingHeader(
 
 @Composable
 internal fun BalanceCard(
+    username: UsernameBinding? = null,
+    onUsernameTap: () -> Unit = {},
     balance: Long,
     unlockedBalance: Long,
     formatXmr: (Long) -> String,
@@ -723,7 +759,29 @@ internal fun BalanceCard(
     }
 
     val currentToggle by rememberUpdatedState(toggleHistory)
-    GlassCard(modifier = Modifier.fillMaxWidth().testTag("wallet.balanceCard")) {
+    val usernameEdge = MoneroOrange
+    GlassCard(modifier = Modifier.fillMaxWidth().testTag("wallet.balanceCard").drawWithContent {
+        drawContent()
+        if (username != null) {
+            val r = 20.dp.toPx()
+            val edge = Path().apply {
+                moveTo(0f, r); quadraticTo(0f, 1.dp.toPx(), r, 1.dp.toPx())
+                lineTo(size.width-r, 1.dp.toPx()); quadraticTo(size.width, 1.dp.toPx(), size.width, r)
+            }
+            drawPath(edge, usernameEdge, style = Stroke(2.dp.toPx()))
+        }
+    }) {
+        Column {
+        if (username != null) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onUsernameTap)
+                .padding(horizontal = 24.dp).testTag("wallet.username"), verticalAlignment = Alignment.CenterVertically) {
+                Text(androidx.compose.ui.text.buildAnnotatedString {
+                    pushStyle(androidx.compose.ui.text.SpanStyle(color = usernameEdge)); append("@"); pop(); append(username.displayHandle)
+                }, fontSize = 18.sp, letterSpacing = (-0.35).sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.weight(1f))
+                Icon(Icons.Default.ChevronRight, contentDescription = "Your username", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+        }
         Column(
             // A tap anywhere on the card opens and closes History, as the
             // History button does. The buttons keep their own taps, the open
@@ -979,6 +1037,7 @@ internal fun BalanceCard(
             }
 
             openLinks(isPast)
+        }
         }
     }
 }

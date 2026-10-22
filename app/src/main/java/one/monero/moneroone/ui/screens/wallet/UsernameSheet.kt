@@ -1,0 +1,297 @@
+package one.monero.moneroone.ui.screens.wallet
+
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AlternateEmail
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import one.monero.moneroone.R
+import one.monero.moneroone.core.username.*
+import one.monero.moneroone.core.wallet.WalletInfo
+import one.monero.moneroone.core.wallet.WalletViewModel
+import one.monero.moneroone.ui.theme.MoneroOrange
+import one.monero.moneroone.ui.components.rememberReduceMotion
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.core.content.FileProvider
+import java.io.File
+
+@Composable
+fun UsernameCard(handle: String, externalAddress: String, modifier: Modifier = Modifier, still: Boolean = false) {
+    val orange = MoneroOrange
+    val tilt = rememberUsernameTilt(!still && !rememberReduceMotion())
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val ink = if (dark) Color(0xFFECEDEF) else Color(0xFF363C40)
+    val secondary = if (dark) Color(0xFFADB4B9) else Color(0xFF687176)
+    BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(1000f / 600f).graphicsLayer {
+        rotationY = tilt.x * 3; rotationX = -tilt.y * 2
+    }.clearAndSetSemantics {
+        contentDescription = "$handle, Monero One username card. $externalAddress"
+    }) {
+        val s = maxWidth.value / 1000f
+        val shape = RoundedCornerShape((30*s).dp)
+        Box(Modifier.fillMaxSize().shadow((14*s).dp, shape).clip(shape)
+            .background(Brush.linearGradient(if (dark) listOf(Color(0xFF343B3F), Color(0xFF262C30), Color(0xFF1A2025))
+                else listOf(Color(0xFFF0F2F2), Color(0xFFE4E7E8), Color(0xFFD5DADD))))
+            .border((1.5f*s).dp, Color.White.copy(alpha = if (dark) 0.12f else 0.6f), shape)) {
+            Box(Modifier.fillMaxSize().padding((44*s).dp).clip(RoundedCornerShape((18*s).dp))
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = if (dark) 0.1f else 0.025f), Color.White.copy(alpha = if (dark) 0.01f else 0.14f))))
+                .border((2*s).dp, Color.Black.copy(alpha = if (dark) 0.25f else 0.1f), RoundedCornerShape((18*s).dp)))
+            Canvas(Modifier.fillMaxSize()) {
+                drawRect(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.12f), Color.Transparent),
+                    center = Offset(size.width*(0.3f+tilt.x*0.2f), size.height*(0.18f+tilt.y*0.2f)), radius = size.width*0.7f))
+            }
+            Image(painterResource(R.drawable.monero_mark), contentDescription = null,
+                modifier = Modifier.offset((87*s).dp, (87*s).dp).size((48*s).dp))
+            Text("MONERO ONE", color = secondary, fontSize = (17*s).sp, fontWeight = FontWeight.Medium, letterSpacing = (2*s).sp,
+                modifier = Modifier.offset((88*s).dp, (93*s).dp).width((824*s).dp), textAlign = TextAlign.End)
+            Text(buildAnnotatedString { withStyle(SpanStyle(color = MoneroOrange)) { append("@") }; withStyle(SpanStyle(color = ink)) { append(handle) } },
+                // Inter's widest capitals need this fixed size to stay inside the inset at 15 characters.
+                fontSize = (51*s).sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1.8f*s).sp, maxLines = 1,
+                modifier = Modifier.offset((88*s).dp, (248*s).dp))
+            Text(externalAddress, color = secondary, fontSize = (38*s).sp, letterSpacing = (-0.5f*s).sp, maxLines = 1,
+                modifier = Modifier.offset((88*s).dp, (328*s).dp))
+            Canvas(Modifier.fillMaxSize()) {
+                val scale = size.width / 1000f
+                drawLine(orange, Offset(88*scale, 510*scale), Offset(116*scale, 510*scale), 4*scale)
+                drawLine(orange, Offset(884*scale, 510*scale), Offset(912*scale, 510*scale), 4*scale)
+                val edge = Path().apply {
+                    moveTo(0f, size.height - 22*scale)
+                    quadraticTo(0f, size.height - 2*scale, 30*scale, size.height - 2*scale)
+                    lineTo(size.width - 30*scale, size.height - 2*scale)
+                    quadraticTo(size.width, size.height - 2*scale, size.width, size.height - 22*scale)
+                }
+                drawPath(edge, orange, style = Stroke(5*scale))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, model: UsernameViewModel,
+                  binding: UsernameBinding?, onDismiss: () -> Unit) {
+    val state by model.state.collectAsState()
+    val busy = binding == null && state.stage == UsernameStage.CLAIMING
+    val cardLayer = rememberGraphicsLayer()
+    val cardCapture = Modifier.drawWithContent {
+        cardLayer.record { this@drawWithContent.drawContent() }
+        drawLayer(cardLayer)
+    }
+    val shareCard: suspend () -> android.graphics.Bitmap = { cardLayer.toImageBitmap().asAndroidBitmap() }
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !busy })
+    ModalBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = sheet,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                if (binding == null && state.stage == UsernameStage.CONFIRM && model.store.state.value.pending == null) {
+                    TextButton(onClick = model::choose) { Text("Back") }
+                } else Spacer(Modifier.width(48.dp))
+                TextButton(onClick = onDismiss, enabled = !busy) { Text("Done") }
+            }
+            if (binding != null) {
+                Text("Your Username", style = MaterialTheme.typography.titleLarge)
+                UsernameCard(binding.displayHandle, binding.externalAddress, cardCapture)
+                UsernameWalletNote(wallet)
+                UsernameActions(binding, shareCard)
+            } else when (state.stage) {
+                UsernameStage.WELCOME -> {
+                    Icon(Icons.Default.AlternateEmail, null, tint = MoneroOrange, modifier = Modifier.padding(top = 24.dp).size(100.dp))
+                    Text("Get Your Username.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Text("A short username people can use to pay you.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                    UsernamePrimary("Choose My Username", action = model::choose)
+                    TextButton(onClick = onDismiss) { Text("Not Now") }
+                }
+                UsernameStage.CHOOSE -> {
+                    Text("Choose Your Username", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    val valid = remember(state.input) { runCatching { OahCore.normalize(state.input) }.isSuccess }
+                    OutlinedTextField(state.input, model::input, modifier = Modifier.fillMaxWidth(), prefix = { Text("@", color = MoneroOrange) },
+                        singleLine = true, textStyle = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii),
+                        placeholder = { Text("username") })
+                    Text(usernameValidation(state.input), style = MaterialTheme.typography.bodySmall, color = if (valid || state.input.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MoneroOrange)
+                    UsernameWalletNote(wallet)
+                    UsernamePrimary("Continue", enabled = valid, action = model::confirm)
+                }
+                UsernameStage.NO_FREE_CLAIM -> {
+                    Text("A free username isn't available on this phone.", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                    UsernamePrimary("Done", action = onDismiss)
+                }
+                else -> {
+                    val claimed = state.binding
+                    if (state.stage == UsernameStage.REVEALED) Text("It's Yours.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    UsernameCard(claimed?.displayHandle ?: state.input, claimed?.externalAddress ?: "${state.input.lowercase(java.util.Locale.ROOT)}@monero.one", cardCapture, still = busy)
+                    UsernameWalletNote(wallet)
+                    if (busy) {
+                        CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(24.dp))
+                        Text("Claiming…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else if (claimed != null) {
+                        UsernameActions(claimed, shareCard)
+                        UsernamePrimary("Done", action = onDismiss)
+                    } else {
+                        Text("Usernames are permanent.")
+                        Text("This is a local development claim.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        UsernamePrimary("Claim @${state.input}") { model.claim(wallet, session, wallets) }
+                    }
+                }
+            }
+            if (binding == null && state.error != null && state.stage != UsernameStage.NO_FREE_CLAIM) {
+                Text(state.error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable private fun UsernameWalletNote(wallet: WalletInfo) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Payments go to", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("${wallet.emoji} ${wallet.name}", fontWeight = FontWeight.Medium)
+    }
+}
+@Composable private fun UsernamePrimary(title: String, enabled: Boolean = true, action: () -> Unit) {
+    Button(onClick = action, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface)) {
+        Text(title, fontWeight = FontWeight.SemiBold)
+    }
+}
+@Composable private fun UsernameActions(binding: UsernameBinding, shareCard: suspend () -> android.graphics.Bitmap) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var menu by remember { mutableStateOf(false) }
+    var copied by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
+    var shareError by remember { mutableStateOf(false) }
+    fun copy(value: String) {
+        (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Username", value))
+        menu = false; copied = true
+    }
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f)) {
+                OutlinedButton(onClick = { menu = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
+                    Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Copy")
+                }
+                DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem(text = { Text("${binding.shortName} · Monero One") }, onClick = { copy(binding.shortName) })
+                    DropdownMenuItem(text = { Text("${binding.externalAddress} · Other apps") }, onClick = { copy(binding.externalAddress) })
+                    DropdownMenuItem(text = { Text("Share link") }, onClick = { copy(binding.shareUrl) })
+                }
+            }
+            OutlinedButton(onClick = {
+                sharing = true; shareError = false
+                scope.launch {
+                    try {
+                        val bitmap = shareCard()
+                        val uri = withContext(Dispatchers.IO) {
+                            val directory = File(context.cacheDir, "shared").apply { mkdirs() }
+                            val file = File(directory, "username-card.png")
+                            file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                            FileProvider.getUriForFile(context, "${context.packageName}.qrshare", file)
+                        }
+                        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                            type = "image/png"; putExtra(Intent.EXTRA_STREAM, uri)
+                            putExtra(Intent.EXTRA_TEXT, "${binding.shortName}\n${binding.externalAddress}\n${binding.shareUrl}")
+                            clipData = ClipData.newUri(context.contentResolver, "Username card", uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }, "Share username"))
+                    } catch (_: Exception) { shareError = true }
+                    finally { sharing = false }
+                }
+            }, enabled = !sharing, modifier = Modifier.weight(1f).heightIn(min = 54.dp)) {
+                Icon(Icons.Default.IosShare, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Share")
+            }
+        }
+        if (copied) Text("Copied", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (shareError) Text("The card couldn't be shared. Please try again.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+/** Follows the same relative attitude as iOS, and stops when the sheet or app leaves. */
+@Composable private fun rememberUsernameTilt(enabled: Boolean): Offset {
+    val context = LocalContext.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    var tilt by remember { mutableStateOf(Offset.Zero) }
+    DisposableEffect(context, lifecycle, enabled) {
+        val manager = context.getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager
+        val sensor = manager.getDefaultSensor(android.hardware.Sensor.TYPE_GAME_ROTATION_VECTOR)
+        val rotation = FloatArray(9); val orientation = FloatArray(3)
+        var initial: Offset? = null
+        val listener = object : android.hardware.SensorEventListener {
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) { }
+            override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                android.hardware.SensorManager.getRotationMatrixFromVector(rotation, event.values)
+                android.hardware.SensorManager.getOrientation(rotation, orientation)
+                val current = Offset(orientation[2], orientation[1])
+                if (initial == null) initial = current
+                val delta = current - initial!!
+                tilt = Offset((delta.x*2).coerceIn(-1f,1f), (delta.y*2).coerceIn(-1f,1f))
+            }
+        }
+        fun update() {
+            manager.unregisterListener(listener); initial = null; tilt = Offset.Zero
+            if (enabled && sensor != null && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                manager.registerListener(listener, sensor, 33_333)
+            }
+        }
+        val observer = androidx.lifecycle.LifecycleEventObserver { _,_ -> update() }
+        lifecycle.addObserver(observer); update()
+        onDispose { lifecycle.removeObserver(observer); manager.unregisterListener(listener) }
+    }
+    return tilt
+}
+private fun usernameValidation(input: String): String {
+    if (input.isEmpty()) return "3–15 characters. Letters, numbers and _."
+    return try { OahCore.normalize(input); "3–15 characters. Availability is checked when you claim." }
+    catch (e: OahException) { when (e.code) {
+        "handle.too_short" -> "Use at least 3 characters."
+        "handle.too_long" -> "Use no more than 15 characters."
+        "handle.first_not_letter" -> "Start with a letter."
+        "handle.double_underscore" -> "Use only one _ in a row."
+        "handle.blocked" -> "This username is reserved to protect users from scams."
+        else -> "Use only a–z, 0–9 and _."
+    } }
+}

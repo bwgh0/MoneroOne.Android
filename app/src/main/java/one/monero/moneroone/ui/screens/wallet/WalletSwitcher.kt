@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -346,6 +347,9 @@ private fun WalletRow(
     onMoveDown: (() -> Unit)?,
     onDeleteRequest: (() -> Unit)?
 ) {
+    val usernameStore = one.monero.moneroone.core.username.UsernameStore.get(androidx.compose.ui.platform.LocalContext.current)
+    val usernameState by usernameStore.state.collectAsState()
+    val username = usernameState.binding(wallet.cachedPrimaryAddress, "mainnet").takeUnless { usernameStore.storageError }?.shortName
     val density = LocalDensity.current
     val revealPx = with(density) { 72.dp.toPx() }
     val dragStartPx = with(density) { 24.dp.toPx() }
@@ -381,6 +385,7 @@ private fun WalletRow(
         }
 
         WalletRowCard(
+            username = username,
             emoji = wallet.emoji,
             name = wallet.name,
             address = wallet.cachedPrimaryAddress?.takeIf { SeedValidation.isPlausiblePrimaryAddress(it) },
@@ -390,7 +395,7 @@ private fun WalletRow(
                 .fillMaxWidth()
                 .offset { IntOffset(animatedOffset.roundToInt(), 0) }
                 .clearAndSetSemantics {
-                    contentDescription = "${wallet.name}, $balanceText"
+                    contentDescription = "${wallet.name}, $balanceText" + (username?.let { ", $it" } ?: "")
                     selected = isActive
                     onClick(label = tr(if (isActive) "Close" else "Switch wallet")) { onClick(); true }
                     customActions = buildList {
@@ -469,6 +474,7 @@ fun WalletRowCard(
     emoji: String,
     name: String,
     address: String?,
+    username: String? = null,
     modifier: Modifier = Modifier,
     balanceText: String? = null,
     isActive: Boolean = false,
@@ -514,7 +520,10 @@ fun WalletRowCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                address?.let {
+                if (username != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(username, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                } else address?.let {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = truncateMiddle(it),
