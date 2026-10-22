@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
+import one.monero.moneroone.core.username.UsernameRecipient
 import one.monero.moneroone.core.wallet.FakeSharedPreferences
 import one.monero.moneroone.core.wallet.SendFlow
 import one.monero.moneroone.core.wallet.SendState
@@ -98,10 +99,24 @@ class OpenAliasTest {
             assertEquals("@joe", result.name.display)
             assertTrue(result.name.isUsername)
         }
-        assertEquals("@work.joe", (OpenAlias.classify("@work.Joe") as RecipientInput.Name).name.display)
         for (input in listOf("@jo", "@abcdefghijklmnop", "@joe__smith", "@jóe", "@@joe", "@joe/path")) {
             assertEquals(RecipientInput.InvalidName, OpenAlias.classify(input))
         }
+    }
+
+    @Test
+    fun aUsernameIsOneLabel() {
+        assertEquals("joe", UsernameRecipient.localPart("@joe"))
+        assertEquals("joe", UsernameRecipient.localPart("joe@monero.one"))
+        for (input in listOf("@work.joe", "@getmonero.org", "@paypal.com", "a.b@monero.one", "a.b.monero.one")) {
+            assertNull(input, UsernameRecipient.localPart(input))
+        }
+        // The @ shorthand never takes a dot.
+        for (input in listOf("@work.Joe", "@getmonero.org", "@paypal.com")) {
+            assertEquals(input, RecipientInput.InvalidName, OpenAlias.classify(input))
+        }
+        // A dotted name under monero.one is reserved and never looked up.
+        assertEquals(RecipientInput.Reserved, OpenAlias.classify("a.b@monero.one"))
     }
 
     @Test
@@ -131,7 +146,7 @@ class OpenAliasTest {
 
     @Test
     fun classifyReserved() {
-        for (input in listOf("monero.one", "a.b.monero.one", "MONERO.ONE")) {
+        for (input in listOf("monero.one", "a.b.monero.one", "a.b@monero.one", "MONERO.ONE")) {
             assertEquals(input, RecipientInput.Reserved, OpenAlias.classify(input))
         }
     }
@@ -155,7 +170,7 @@ class OpenAliasTest {
         val longName = "a".repeat(63) + "." + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(58) + ".com"
         assertEquals(254, longName.length)
         val invalid = listOf(
-            "@ab.org", "joe@", "a@b@c.com",
+            "@getmonero.org", "joe@", "a@b@c.com",
             "dоnate@getmonero.org", // Cyrillic "о"
             "-pay.example.com", "a..b.com", "pay.example.123",
             "pay.onion", "joe@localhost",

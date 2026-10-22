@@ -26,6 +26,8 @@ enum class UsernameTrust { PUBLISHED, PENDING, STALE, EXPIRED;
 object UsernameRecipient {
     fun localPart(raw: String): String? {
         // Classify syntax locally. Rust verifies the frozen rules at resolve.
+        // A username is one label: `@getmonero.org` is not a username, and
+        // a dotted name under monero.one stays reserved.
         if (raw.any { it.code !in 0x21..0x7e }) return null
         val lower = raw.lowercase(Locale.ROOT)
         val local = when {
@@ -33,10 +35,7 @@ object UsernameRecipient {
             lower.endsWith("@monero.one") || lower.endsWith(".monero.one") -> lower.dropLast(11)
             else -> return null
         }
-        val labels = local.split('.')
-        return local.takeIf { labels.size in 1..2 && labels.all {
-            it.matches(Regex("[a-z][a-z0-9_]{2,14}")) && !it.contains("__")
-        } }
+        return local.takeIf { it.matches(Regex("[a-z][a-z0-9_]{2,14}")) && !it.contains("__") }
     }
 }
 

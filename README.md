@@ -50,13 +50,14 @@ For an offline visual check, the Debug-only `UsernamePreviewActivity` renders th
 
 ### Username payments (2026-10-21)
 
-Send classifies `@Joe`, `joe@monero.one`, and single-level subhandles into the
-shared signature verifier. The operator's `donate@monero.one` continues through
+Send classifies `@Joe` and `joe@monero.one` into the shared signature
+verifier. A username is one label: `@getmonero.org` is invalid, and a dotted
+name under monero.one stays reserved. The operator's `donate@monero.one` continues through
 the existing DNSSEC/OpenAlias path. Home still shows only the short username.
 The client fetches the chain from the operator and the signed snapshot from a
 separate mirror, checks the pinned namespace genesis/rules/key, and persists
 root identity pins and signed receipts before exposing a payment address.
-Subhandles share the root pin. Receipt write failures stop resolution.
+Receipt write failures stop resolution.
 
 The UI distinguishes “Signature checked,” “Not yet in the public log,” and stale
 records. A first payment asks the user to confirm the username. The provisional
