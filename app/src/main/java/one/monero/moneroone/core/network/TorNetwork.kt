@@ -45,6 +45,18 @@ object TorNetwork {
         clients.forEach { it.dispatcher.cancelAll(); it.connectionPool.evictAll() }
     }
 
+    /**
+     * For a client built outside [withClient] (OpenAlias DoH): [save] cancels its calls. Pair with [untrack].
+     */
+    @Synchronized fun track(client: OkHttpClient) { clients += client }
+
+    @Synchronized fun untrack(client: OkHttpClient) { clients -= client }
+
+    /** Throws unless [route] is still the saved route: no new connection may use an old one. */
+    fun ensureRoute(route: TorConfig) {
+        if (route != this.route) throw IOException("Connection settings changed")
+    }
+
     fun <T> withClient(route: TorConfig = current, directTimeoutSeconds: Long = 10, block: (OkHttpClient) -> T): T {
         val client = synchronized(this) {
             if (route != this.route) throw IOException("Connection settings changed")

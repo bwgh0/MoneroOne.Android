@@ -3,6 +3,12 @@ package one.monero.moneroone.core.network
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
 import one.monero.moneroone.core.node.NodeBenchmark
+import one.monero.moneroone.core.openalias.AddressCheck
+import one.monero.moneroone.core.openalias.OpenAliasConfig
+import one.monero.moneroone.core.openalias.OpenAliasFailure
+import one.monero.moneroone.core.openalias.OpenAliasName
+import one.monero.moneroone.core.openalias.OpenAliasOutcome
+import one.monero.moneroone.core.openalias.OpenAliasResolver
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.repository.PriceRepository
 import okhttp3.Request
@@ -65,6 +71,18 @@ class TorRoutingTest {
             TorNetwork.save(TorConfig(true, proxy.address))
             assertTrue(PriceRepository().fetchCurrentPrice(Currency.USD).isFailure)
             assertEquals("monero.one", proxy.destinations.poll(2, TimeUnit.SECONDS)?.host)
+        }
+    }
+    @Test fun openAliasLookupUsesTheProxyWithoutLocalDns() = runBlocking<Unit> {
+        LocalSocksProxy(LocalSocksProxy.Mode.REJECT).use { proxy ->
+            TorNetwork.save(TorConfig(true, proxy.address))
+            val outcome = OpenAliasResolver().resolve(OpenAliasName("donate@monero.one", "donate.monero.one")) { AddressCheck.VALID }
+            assertEquals(OpenAliasOutcome.Failed(OpenAliasFailure.TOR), outcome)
+            val dohHosts = OpenAliasConfig.DOH_SERVERS.map { it.removePrefix("https://").substringBefore('/') }.toSet()
+            val first = proxy.destinations.poll(2, TimeUnit.SECONDS)
+            assertNotNull("the DoH request reached the proxy", first)
+            assertTrue("${first?.host} is a DoH server name", first!!.host in dohHosts)
+            assertEquals(443, first.port)
         }
     }
     @Test fun changingSettingsCancelsAnInFlightRequest() {
