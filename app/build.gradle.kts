@@ -16,6 +16,9 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+fun usernameSetting(name: String): String = "\"" + providers.gradleProperty(name).orElse("").get()
+    .replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "").replace("\r", "") + "\""
+
 android {
     namespace = "one.monero.moneroone"
     compileSdk = 36
@@ -43,6 +46,11 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        buildConfigField("String", "USERNAME_REGISTRY_URL", "\"\"")
+        buildConfigField("String", "USERNAME_REGISTRAR_KEY", "\"\"")
+        buildConfigField("String", "USERNAME_RULES_HASH", "\"\"")
+        buildConfigField("String", "USERNAME_MIRROR_URL", "\"\"")
+        buildConfigField("String", "USERNAME_GENESIS_ROOT", "\"\"")
     }
 
     buildTypes {
@@ -58,6 +66,11 @@ android {
         debug {
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
+            buildConfigField("String", "USERNAME_REGISTRY_URL", usernameSetting("usernameRegistryUrl"))
+            buildConfigField("String", "USERNAME_REGISTRAR_KEY", usernameSetting("usernameRegistrarKey"))
+            buildConfigField("String", "USERNAME_RULES_HASH", usernameSetting("usernameRulesHash"))
+            buildConfigField("String", "USERNAME_MIRROR_URL", usernameSetting("usernameMirrorUrl"))
+            buildConfigField("String", "USERNAME_GENESIS_ROOT", usernameSetting("usernameGenesisRoot"))
         }
     }
 

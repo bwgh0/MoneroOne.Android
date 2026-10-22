@@ -99,3 +99,7 @@ keystore.properties
 
 # Claude Code
 .claude/
+
+# Built by scripts/build-oah-android.sh from the shared Rust core
+app/src/main/jniLibs/*/liboah_mobile.so
+app/src/main/jniLibs/*/liboah_jni.so

@@ -35,3 +35,5 @@
 
 # Lombok (used by MoneroKit at compile time)
 -dontwarn lombok.**
+
+-keep class one.monero.moneroone.core.username.OahCore { *; }
