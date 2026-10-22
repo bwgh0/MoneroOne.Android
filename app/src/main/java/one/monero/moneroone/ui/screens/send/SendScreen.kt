@@ -1,5 +1,8 @@
 package one.monero.moneroone.ui.screens.send
 
+import one.monero.moneroone.core.contacts.Contact
+import one.monero.moneroone.core.contacts.ContactStore
+import one.monero.moneroone.core.contacts.Contacts
 import one.monero.moneroone.core.locale.tr
 import android.view.MotionEvent
 import androidx.activity.compose.BackHandler
@@ -31,6 +34,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -109,6 +114,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
@@ -141,6 +147,10 @@ import one.monero.moneroone.core.wallet.ReviewFeeState
 import one.monero.moneroone.core.wallet.SendState
 import one.monero.moneroone.core.wallet.SendFlow
 import one.monero.moneroone.core.wallet.SendRequest
+import one.monero.moneroone.core.wallet.SeedValidation
+import one.monero.moneroone.core.wallet.SendNameStore
+import one.monero.moneroone.core.wallet.SendNames
+import one.monero.moneroone.core.wallet.WalletInfo
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.paymentlinks.EnvelopeDraft
 import one.monero.moneroone.paymentlinks.LinkNames
@@ -210,10 +220,11 @@ internal sealed interface SendBack {
  * System back on each Send step (iOS SendFlowView). Address closes Send; Amount and Review go
  * back one step. Sending, Success and Error have no back: back must never leave a broadcast in
  * flight, and Success and Error leave only through their own buttons (Done, Try Again, Close).
+ * A [transfer] starts on Amount, so back there leaves Send for the Transfer screen.
  */
-internal fun sendBack(phase: SendPhase): SendBack = when (phase) {
+internal fun sendBack(phase: SendPhase, transfer: Boolean = false): SendBack = when (phase) {
     SendPhase.ADDRESS -> SendBack.Close
-    SendPhase.AMOUNT -> SendBack.Step(SendPhase.ADDRESS)
+    SendPhase.AMOUNT -> if (transfer) SendBack.Close else SendBack.Step(SendPhase.ADDRESS)
     SendPhase.REVIEW -> SendBack.Step(SendPhase.AMOUNT)
     SendPhase.SENDING, SendPhase.SUCCESS, SendPhase.ERROR -> SendBack.Blocked
 }
@@ -228,6 +239,8 @@ fun SendScreen(
     incomingLink: OpenSendLink? = null,
     onIncomingLink: (link: OpenSendLink, accepted: Boolean) -> Unit = { _, _ -> },
     initialName: String? = null,
+    /** A Transfer: Send's amount step for the wallet with this id, at its saved primary address. */
+    transferToId: String? = null,
     onBack: () -> Unit,
     onScanQr: () -> Unit,
     onSent: () -> Unit,
@@ -239,12 +252,24 @@ fun SendScreen(
     val flow = rememberSaveable(saver = SendFlowSaver) { SendFlow(walletViewModel.activeWallet.value?.id) }
     val sharedSendState by walletViewModel.sendState.collectAsState()
     val sendState = sharedSendState.takeIf { it.flow == flow } ?: SendState.Idle
+    val wallets by walletViewModel.wallets.collectAsState()
+
+    // A Transfer goes to the other wallet's saved primary address, checked as a typed address is.
+    // Read once: the destination never changes during this Send. Without one, Send closes.
+    val isTransfer = transferToId != null
+    val transferTo = remember { transferToId?.let { id -> walletViewModel.wallets.value.firstOrNull { it.id == id } } }
+    val transferAddress = remember { transferTo?.let { wallet -> SendNames.transferAddress(wallet) { isValidMoneroAddress(it) } } }
+    if (isTransfer && transferAddress == null) {
+        LaunchedEffect(Unit) { onBack() }
+        return
+    }
+    val nameStore = SendNameStore.get(LocalContext.current)
 
     // Pre-fill arrives via QR / deep link and is untrusted: it must pass the
     // same checks as manual entry or be dropped, so the flow can never skip
     // the phase where the dropped value would have been entered.
     val prefilledAddress = remember {
-        initialAddress?.trim()?.takeIf { isValidMoneroAddress(it) }
+        transferAddress ?: initialAddress?.trim()?.takeIf { isValidMoneroAddress(it) }
     }
     // An OpenAlias name from a QR code: the flow starts on the address step and
     // looks the name up at once.
@@ -286,6 +311,8 @@ fun SendScreen(
     var recipientInput by rememberSaveable { mutableStateOf(prefilledAddress ?: prefilledName ?: "") }
     var openAliasSummary by rememberSaveable(stateSaver = OpenAliasSummarySaver) { mutableStateOf<OpenAliasSummary?>(null) }
     val openAlias = rememberOpenAliasLookup()
+    val contactStore = ContactStore.get(LocalContext.current)
+    val contacts by contactStore.contacts.collectAsState()
     // A prefilled address or name (from a scan) is classified at once, like a paste.
     LaunchedEffect(Unit) { if (recipientInput.isNotEmpty()) openAlias.onInputChanged(recipientInput, immediate = true) }
     var amount by rememberSaveable { mutableStateOf(prefilledAmount ?: "") }
@@ -368,7 +395,8 @@ fun SendScreen(
     // is refused: holding it would fill the next Send the user opens on purpose.
     LaunchedEffect(incomingLink) {
         val link = incomingLink ?: return@LaunchedEffect
-        val accepted = acceptsPaymentLink(phase, confirmed = sendInProgress)
+        // A Transfer keeps its wallet: a link never replaces it.
+        val accepted = !isTransfer && acceptsPaymentLink(phase, confirmed = sendInProgress)
         if (accepted) {
             linkMode = false
             linkDraft = null
@@ -395,12 +423,17 @@ fun SendScreen(
     // System back button and gesture. Always enabled, so on Sending, Success and Error it
     // takes the back and does nothing, as iOS (the Send screen must not close mid-broadcast).
     BackHandler {
-        when (val back = sendBack(phase)) {
+        when (val back = sendBack(phase, transfer = isTransfer)) {
             SendBack.Close -> onBack()
             is SendBack.Step -> goBack(back.to)
             SendBack.Blocked -> {}
         }
     }
+
+    // A Send to the saved address of one of your wallets reads as a Transfer: the title and Review
+    // name the wallet. A wallet wins over a contact; a contact over an OpenAlias name.
+    val toWalletShown = transferTo ?: if (!linkMode && openAliasSummary == null) SendNames.matchWallet(address, wallets) else null
+    val sendContact = if (linkMode || toWalletShown != null) null else Contacts.forInput(recipientInput, contacts)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -411,7 +444,9 @@ fun SendScreen(
                     Text(
                         text = when (phase) {
                             SendPhase.ADDRESS -> tr("Send XMR")
-                            SendPhase.AMOUNT -> if (linkMode) tr("Send with a link") else openAliasSummary?.let { openAliasAmountTitle(it) }
+                            SendPhase.AMOUNT -> if (linkMode) tr("Send with a link") else toWalletShown?.let { tr("Send to %s", it.name) }
+                                ?: sendContact?.let { tr("Send to %s", it.name) }
+                                ?: openAliasSummary?.let { openAliasAmountTitle(it) }
                                 ?: if (address.length > 20) tr("Send to %s", truncateMiddle(address)) else tr("Amount")
                             SendPhase.REVIEW -> tr("Review")
                             else -> ""
@@ -426,7 +461,7 @@ fun SendScreen(
                         IconButton(onClick = {
                             when (phase) {
                                 SendPhase.ADDRESS -> onBack()
-                                SendPhase.AMOUNT -> goBack(SendPhase.ADDRESS)
+                                SendPhase.AMOUNT -> if (isTransfer) onBack() else goBack(SendPhase.ADDRESS)
                                 SendPhase.REVIEW -> goBack(SendPhase.AMOUNT)
                                 else -> {}
                             }
@@ -464,6 +499,8 @@ fun SendScreen(
                 SendPhase.ADDRESS -> AddressPhase(
                     input = recipientInput,
                     lookup = openAlias,
+                    wallets = wallets,
+                    contacts = contacts,
                     onInputChange = { text, immediate ->
                         // A pasted claim link opens the claim sheet (which explains a cut-off one); it is never
                         // an address or a name. Typed by hand, a link opens once it is whole.
@@ -559,6 +596,9 @@ fun SendScreen(
                     ReviewPhase(
                         address = address,
                         openAliasSummary = openAliasSummary,
+                        fromWallet = if (toWalletShown != null) walletViewModel.activeWallet.value else null,
+                        toWallet = toWalletShown,
+                        toContact = sendContact,
                         amount = amount,
                         memo = memo,
                         isSweepAll = isSweepAll,
@@ -594,6 +634,7 @@ fun SendScreen(
                     } else {
                         SuccessPhase(
                             txHash = (sendState as? SendState.Success)?.txHash ?: "",
+                            detail = transferTo?.let { tr("It shows in %s when you next open that wallet.", it.name) },
                             onDone = onSent
                         )
                     }
@@ -674,11 +715,18 @@ fun SendScreen(
                             reviewBuild++
                             return@launch
                         }
+                        // A send to one of your wallets (a Transfer, or its saved address typed, pasted or scanned)
+                        // names both sides in History. The name is saved before the broadcast.
+                        val fromId = flow.walletId
+                        val toId = transferTo?.id ?: SendNames.matchWallet(address, wallets)?.id
                         // The transfer the review built goes out as it is: its fee is the one the review showed.
                         walletViewModel.send(
                             flow,
                             SendRequest.of(address, walletViewModel.parseXmr(amount), memo, isSweepAll),
-                            prepared = prepared
+                            prepared = prepared,
+                            beforeCommit = if (fromId != null && toId != null) {
+                                { signed -> nameStore.recordSend(signed.txids, fromId, toId) }
+                            } else null
                         )
                     }
                 }
@@ -706,12 +754,30 @@ private fun AddressPhase(
     linkMode: Boolean = false,
     /** The Link capsule: any wallet that can send (view-only wallets do not see it). */
     showLinkButton: Boolean = false,
-    onLinkModeChange: (Boolean) -> Unit = {}
+    onLinkModeChange: (Boolean) -> Unit = {},
+    /** Your wallets: an address that is one's saved primary address shows that wallet's card. */
+    wallets: List<WalletInfo> = emptyList(),
+    /** Your contacts: one's address or OpenAlias name shows its card; typing lists the matches. */
+    contacts: List<Contact> = emptyList()
 ) {
     val kind = remember(input) { OpenAlias.classify(input) }
+    val ownWallet = remember(input, wallets) {
+        (kind as? RecipientInput.Address)?.text
+            ?.takeIf { isValidMoneroAddress(it) }
+            ?.let { SendNames.matchWallet(it, wallets) }
+    }
+    // A wallet match wins over a contact match.
+    val contact = remember(input, contacts, ownWallet) { if (ownWallet != null) null else Contacts.forInput(input, contacts) }
+    var showContacts by rememberSaveable { mutableStateOf(false) }
+    // The contact picked last: its row keeps the check when the sheet opens again.
+    var pickedId by rememberSaveable { mutableStateOf<String?>(null) }
     val status = lookup.status
     val resolved = (status as? LookupStatus.Resolved)?.takeIf { kind is RecipientInput.Name }
     val resolvedSummary = resolved?.summary()
+    // While the field holds text and no card, the contacts that match show under it (ios-12).
+    val matches = remember(input, contacts, contact, ownWallet, resolvedSummary, linkMode) {
+        if (linkMode || contact != null || ownWallet != null || resolvedSummary != null) emptyList() else Contacts.matches(input, contacts)
+    }
     val lookingUp = (status as? LookupStatus.Running)?.name?.takeIf { kind is RecipientInput.Name }
     val fieldFocus = remember { FocusRequester() }
     // Set by the card's clear button: the field that comes back gets the cursor.
@@ -800,8 +866,8 @@ private fun AddressPhase(
             // Address field. A resolved name turns it into the recipient card,
             // inside the same rounded field, with the iOS step-forward spring.
             AnimatedContent(
-                targetState = resolvedSummary,
-                contentKey = { it != null },
+                targetState = ownWallet ?: contact ?: resolvedSummary,
+                contentKey = { card -> when (card) { null -> 0; is WalletInfo -> 2; is Contact -> 3; else -> 1 } },
                 transitionSpec = {
                     fadeIn(openAliasCardSpring()) togetherWith fadeOut(openAliasCardSpring()) using
                         SizeTransform(clip = false) { _, _ -> openAliasCardSpring(IntSize.VisibilityThreshold) }
@@ -811,9 +877,19 @@ private fun AddressPhase(
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant, FieldShape),
                 label = "recipientField"
-            ) { summary ->
-                if (summary != null) {
-                    OpenAliasRecipientCard(summary, onClear = {
+            ) { card ->
+                if (card is OpenAliasSummary) {
+                    OpenAliasRecipientCard(card, onClear = {
+                        focusFieldOnShow = true
+                        onInputChange("", true)
+                    })
+                } else if (card is WalletInfo) {
+                    OwnWalletRecipientCard(card, onClear = {
+                        focusFieldOnShow = true
+                        onInputChange("", true)
+                    })
+                } else if (card is Contact) {
+                    ContactRecipientCard(card, onClear = {
                         focusFieldOnShow = true
                         onInputChange("", true)
                     })
@@ -828,7 +904,7 @@ private fun AddressPhase(
                             .fillMaxWidth()
                             .focusRequester(fieldFocus)
                             .semantics { contentDescription = fieldLabel },
-                        placeholder = { Text(tr("Enter XMR address or OpenAlias"), style = MonoCaption) },
+                        placeholder = { Text(tr("Name, address or OpenAlias"), style = MonoCaption) },
                         textStyle = MonoCaption,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Text,
@@ -842,7 +918,7 @@ private fun AddressPhase(
                         trailingIcon = if (input.isNotEmpty()) {
                             { RecipientFieldTrailing(lookingUp, onClear = { onInputChange("", true) }) }
                         } else {
-                            null
+                            { ContactsFieldButton(onClick = { showContacts = true }) }
                         },
                         singleLine = true
                     )
@@ -860,7 +936,7 @@ private fun AddressPhase(
         // Inline validation indicator (addresses). On the name path the
         // OpenAlias row takes its place, in a slot one row high while the
         // field has text, so the buttons keep their positions (as on iOS). A link has no recipient to check.
-        if (!linkMode && input.isNotEmpty()) {
+        if (!linkMode && input.isNotEmpty() && matches.isEmpty()) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 AddressCheckRow(valid = false, modifier = Modifier.alpha(0f).clearAndSetSemantics { })
                 AddressCheckSlot(status)
@@ -876,7 +952,11 @@ private fun AddressPhase(
         // for the address they bring. Three capsules stack at large text (iOS AX sizes).
         val linkHint = tr("Sends the money as a link anyone can claim")
         val narrow = PaddingValues(horizontal = 8.dp, vertical = 12.dp)
-        RecipientButtons(stack = LocalDensity.current.fontScale >= 1.5f) {
+        // They step aside while the field has typed text and no card (ios-11, ios-12).
+        val stackButtons = LocalDensity.current.fontScale >= 1.5f
+        val buttonsShown = linkMode || input.isEmpty() || ownWallet != null || contact != null || resolvedSummary != null
+        AnimatedVisibility(visible = buttonsShown, enter = fadeIn(openAliasFadeSpec), exit = fadeOut(openAliasFadeSpec)) {
+        RecipientButtons(stack = stackButtons) {
             PrimaryButton(onClick = onScanQr, contentPadding = narrow) {
                 Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(20.dp))
                 Text(tr("Scan QR"))
@@ -908,8 +988,21 @@ private fun AddressPhase(
                 }
             }
         }
+        }
 
-        Spacer(modifier = Modifier.weight(1f))
+        if (matches.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(matches, key = { it.id }) { match ->
+                    ContactRow(match, onClick = { onInputChange(match.destination, true) })
+                }
+            }
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
 
         // Continue button
         PrimaryButton(
@@ -931,6 +1024,18 @@ private fun AddressPhase(
         }
 
         Spacer(modifier = Modifier.height(40.dp))
+    }
+
+    if (showContacts) {
+        ContactsSheet(
+            selectedId = contact?.id ?: pickedId,
+            onPick = { picked ->
+                showContacts = false
+                pickedId = picked.id
+                onInputChange(picked.destination, true)
+            },
+            onDismiss = { showContacts = false }
+        )
     }
 
     confirming?.let { request ->
@@ -1273,6 +1378,12 @@ private fun AmountPhase(
 private fun ReviewPhase(
     address: String,
     openAliasSummary: OpenAliasSummary?,
+    /** A Transfer: the wallet it leaves, over [toWallet]. */
+    fromWallet: WalletInfo? = null,
+    /** A Transfer: the wallet it goes to, at [address]. Null keeps the Recipient row. */
+    toWallet: WalletInfo? = null,
+    /** A send to a contact: Review names the contact, as it names a wallet. */
+    toContact: Contact? = null,
     amount: String,
     memo: String,
     isSweepAll: Boolean,
@@ -1366,6 +1477,24 @@ private fun ReviewPhase(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
 
+                    if (toWallet != null) {
+                        // A Transfer: From over To, each wallet's emoji, name and address 8…8.
+                        fromWallet?.let { from ->
+                            ReviewWalletRow(
+                                label = tr("From"),
+                                wallet = from,
+                                address = from.cachedPrimaryAddress?.takeIf { SeedValidation.isPlausiblePrimaryAddress(it) }
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                        ReviewWalletRow(label = tr("To"), wallet = toWallet, address = address)
+                    } else if (toContact != null) {
+                        ReviewContactRow(toContact, address)
+                        // A name keeps its checks (signature, pin) under the row.
+                        openAliasSummary?.let { OpenAliasReviewNotes(it, modifier = Modifier.padding(start = 52.dp)) }
+                    } else {
                     // Recipient: the transaction-list disc (40, tint 0.15, 20dp glyph).
                     // A name shows its picture, the name, the OpenAlias name and
                     // every character of the address.
@@ -1403,6 +1532,7 @@ private fun ReviewPhase(
                     }
                     // The notes start at the text column: the 40 dp disc plus the 12 dp gap.
                     openAliasSummary?.let { OpenAliasReviewNotes(it, modifier = Modifier.padding(start = 52.dp)) }
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -1687,7 +1817,12 @@ private fun SendingPhase() {
 }
 
 @Composable
-private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
+private fun SuccessPhase(
+    txHash: String,
+    /** In place of the network line: where a Transfer shows next ("It shows in Savings when you next open that wallet."). */
+    detail: String? = null,
+    onDone: () -> Unit
+) {
     val clipboardManager = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
     // Back to the copy label after 2 s, as on iOS
@@ -1759,7 +1894,7 @@ private fun SuccessPhase(txHash: String, onDone: () -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                tr("Your transaction has been submitted to the network"),
+                detail ?: tr("Your transaction has been submitted to the network"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -2039,7 +2174,7 @@ private fun AddressCheckRow(valid: Boolean, modifier: Modifier = Modifier) {
  * place, it goes at once, so the two never show together.
  */
 @Composable
-private fun AddressCheckSlot(status: LookupStatus) {
+internal fun AddressCheckSlot(status: LookupStatus) {
     val checked = status as? LookupStatus.Address
     // The last row stays in place while it fades out.
     val last = remember { arrayOfNulls<LookupStatus.Address>(1) }

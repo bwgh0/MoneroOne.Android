@@ -24,7 +24,12 @@ class OpenAliasPinStore(
     }
 
     @Serializable
-    private data class Entry(val address: String, val pinnedAt: Long)
+    private data class Entry(
+        val address: String,
+        val pinnedAt: Long,
+        /** The name as the user typed it ("donate@getmonero.org"). Older pins have none. */
+        val display: String? = null
+    )
 
     private val json = Json { ignoreUnknownKeys = true }
     private val serializer = MapSerializer(String.serializer(), Entry.serializer())
@@ -35,10 +40,10 @@ class OpenAliasPinStore(
     }
 
     /** Pins [address] for [query] now. Above the cap, the oldest pins go. */
-    fun record(query: String, address: String, network: Network = Network.MAINNET) {
+    fun record(query: String, address: String, network: Network = Network.MAINNET, display: String? = null) {
         val pins = LinkedHashMap(load(network))
         pins.remove(query)
-        pins[query] = Entry(address, nowSeconds())
+        pins[query] = Entry(address, nowSeconds(), display)
         while (pins.size > OpenAliasConfig.PIN_CAP) {
             val oldest = pins.entries.minByOrNull { it.value.pinnedAt }?.key ?: break
             pins.remove(oldest)
@@ -54,6 +59,14 @@ class OpenAliasPinStore(
     }
 
     fun count(network: Network = Network.MAINNET): Int = load(network).size
+
+    /** Every pin: the query name and the address last paid for it. History names sends with it. */
+    fun pinnedAddresses(network: Network = Network.MAINNET): Map<String, String> =
+        load(network).mapValues { it.value.address }
+
+    /** Every pin's name as the user typed it, by query name; an older pin falls back to the query name. */
+    fun pinnedNames(network: Network = Network.MAINNET): Map<String, String> =
+        load(network).mapValues { it.value.display ?: it.key }
 
     private fun load(network: Network): Map<String, Entry> {
         val raw = prefs.getString(network.key, null) ?: return emptyMap()
@@ -79,6 +92,6 @@ class OpenAliasPinStore(
 fun OpenAliasPinStore.recordAfterSend(state: SendState, summary: OpenAliasSummary?, sentAddress: String): Boolean {
     if (state !is SendState.Success || summary == null || sentAddress.isEmpty()) return false
     if (summary.address != sentAddress) return false
-    record(summary.name.query, sentAddress)
+    record(summary.name.query, sentAddress, display = summary.name.display)
     return true
 }

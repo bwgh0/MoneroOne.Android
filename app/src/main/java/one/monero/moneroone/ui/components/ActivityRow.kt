@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,8 +41,9 @@ import one.monero.moneroone.ui.theme.SuccessGreen
 /**
  * One Activity row (Recent Activity and All Transactions): the direction disc
  * (green ↙ in, orange ↗ out), the title over the date, the [amounts] and a
- * chevron, on a card. A payment link row adds the [linkBadge] to the disc.
- * TalkBack reads [spoken] for the whole row.
+ * chevron, on a card. A payment link row adds the [linkBadge] to the disc; a
+ * send between your wallets adds the [walletBadge]. TalkBack reads [spoken]
+ * for the whole row.
  */
 @Composable
 fun ActivityRow(
@@ -51,6 +54,9 @@ fun ActivityRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     linkBadge: Boolean = false,
+    walletBadge: Boolean = false,
+    /** A send to a contact: the person glyph in the badge. */
+    personBadge: Boolean = false,
     amounts: @Composable () -> Unit
 ) {
     val rowBackground = MaterialTheme.colorScheme.surfaceContainer
@@ -66,7 +72,7 @@ fun ActivityRow(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DirectionDisc(incoming = incoming, linkBadge = linkBadge, rowBackground = rowBackground)
+            DirectionDisc(incoming = incoming, linkBadge = linkBadge, rowBackground = rowBackground, walletBadge = walletBadge, personBadge = personBadge)
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -104,10 +110,10 @@ fun ActivityRow(
  * The 40 direction disc at 15% of its hue. With [linkBadge], an 18 badge sits
  * on its bottom-right corner (4 past the disc): the link glyph in the hue on
  * the hue's 15% tint, opaque over [rowBackground], cut out of the disc by a 2
- * ring of [rowBackground].
+ * ring of [rowBackground]. [walletBadge] is the same badge with the wallet glyph.
  */
 @Composable
-fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color) {
+fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color, walletBadge: Boolean = false, personBadge: Boolean = false) {
     val hue = if (incoming) SuccessGreen else MoneroOrange
     Box {
         Box(
@@ -124,7 +130,7 @@ fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color) {
                 modifier = Modifier.size(20.dp).rotate(45f)
             )
         }
-        if (linkBadge) {
+        if (linkBadge || walletBadge || personBadge) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -138,7 +144,16 @@ fun DirectionDisc(incoming: Boolean, linkBadge: Boolean, rowBackground: Color) {
                     .background(hue.copy(alpha = 0.15f).compositeOver(rowBackground)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Link, contentDescription = null, tint = hue, modifier = Modifier.size(11.dp))
+                Icon(
+                    when {
+                        personBadge -> Icons.Default.Person
+                        walletBadge -> Icons.Default.AccountBalanceWallet
+                        else -> Icons.Default.Link
+                    },
+                    contentDescription = null,
+                    tint = hue,
+                    modifier = Modifier.size(11.dp)
+                )
             }
         }
     }

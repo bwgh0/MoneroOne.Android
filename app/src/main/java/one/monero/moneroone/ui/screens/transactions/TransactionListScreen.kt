@@ -3,6 +3,8 @@ package one.monero.moneroone.ui.screens.transactions
 import one.monero.moneroone.core.locale.pluralTr
 import one.monero.moneroone.core.wallet.ReceiveAddressLogic
 import one.monero.moneroone.core.wallet.addressesOf
+import one.monero.moneroone.core.wallet.SendName
+import one.monero.moneroone.core.wallet.SendNames
 import one.monero.moneroone.data.model.PriceHistory
 import one.monero.moneroone.data.util.MoneyFormat
 import one.monero.moneroone.data.util.XmrFormat
@@ -98,6 +100,7 @@ import one.monero.moneroone.paymentlinks.LinkStatusRules
 import one.monero.moneroone.ui.components.ActivityRow
 import one.monero.moneroone.ui.components.TransactionAmounts
 import one.monero.moneroone.ui.components.amountFiat
+import one.monero.moneroone.ui.components.rememberSendNameLookup
 import one.monero.moneroone.ui.components.fiatAt
 import one.monero.moneroone.ui.components.transactionStatus
 import one.monero.moneroone.paymentlinks.LinkRowAmounts
@@ -152,14 +155,17 @@ fun TransactionListScreen(
     var selectedFilter by rememberSaveable(activeWallet?.id) { mutableStateOf(initialFilter) }
     var searchQuery by remember { mutableStateOf("") }
     val linkIndex = rememberPaymentLinkIndex()
+    val sendNameOf = rememberSendNameLookup(walletViewModel)
 
     // Opened from a past moment in History, the list stops there.
     val transactions = remember(walletState.transactions, asOf) { TransactionHistoryLogic.through(asOf, walletState.transactions) }
     val addressRows = remember(walletState.addresses, transactions, activeWallet?.addressLabels) {
         ReceiveAddressLogic.rows(walletState.addressesOf(activeWallet?.id)?.list.orEmpty(), transactions, activeWallet?.addressLabels.orEmpty())
     }
-    val filteredTransactions = remember(transactions, selectedFilter, searchQuery, receivingIndex, addressRows, linkIndex) {
-        TransactionHistoryLogic.filter(transactions, selectedFilter, receivingIndex, searchQuery, addressRows) { linkIndex.match(it) != null }
+    val filteredTransactions = remember(transactions, selectedFilter, searchQuery, receivingIndex, addressRows, linkIndex, sendNameOf) {
+        TransactionHistoryLogic.filter(transactions, selectedFilter, receivingIndex, searchQuery, addressRows,
+            isLink = { linkIndex.match(it) != null },
+            shownName = { tx -> sendNameOf(tx)?.let(TransactionHistoryLogic::sendNameTitle) })
     }
     val filteredKeys = remember(filteredTransactions) { TransactionHistoryLogic.rowKeys(filteredTransactions) }
     // Under Links (now only, no search), the summary card leads, then Open (the links that still hold
@@ -374,7 +380,8 @@ fun TransactionListScreen(
                             fiatValue = one.monero.moneroone.ui.components.transactionFiat(transaction, priceHistory, currentPrice?.price, currency),
                             fiatOf = { amountFiat(it, transaction.timestamp, priceHistory, currentPrice?.price, currency) },
                             receivedOn = TransactionHistoryLogic.receivedOnName(transaction, addressRows),
-                            onClick = { onTransactionClick(transaction.hash) }
+                            onClick = { onTransactionClick(transaction.hash) },
+                            sendName = sendNameOf(transaction)
                         )
                     }
                     if (linkSections != null) {
@@ -428,23 +435,33 @@ private fun TransactionListItem(
     fiatOf: (Long) -> String?,
     /** The subaddress an incoming payment arrived on, spoken only; null for sends and the main address. */
     receivedOn: String?,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    /** A send between your wallets: "To Savings", "From Daily", "To This Wallet". */
+    sendName: SendName? = null
 ) {
     val isIncoming = transaction.direction == TransactionInfo.Direction.Direction_In
     val date = formatDate(transaction.timestamp * 1000)
     val link = linkRowText(transaction, linkIndex, date, fiatMode, fiatOf, TransactionHistoryLogic.rowStatus(transaction))
+    // A payment link row keeps its name; a send between your wallets names the other wallet.
+    val name = if (link == null) sendName else null
+    val shownAmount = SendNames.shownAmount(name, transaction.amount, transaction.fee)
+    val shownFiat = if (shownAmount == transaction.amount) fiatValue else fiatOf(shownAmount)
     ActivityRow(
         incoming = isIncoming,
-        title = link?.title ?: if (isIncoming) tr("Received") else tr("Sent"),
+        title = link?.title ?: name?.let { TransactionHistoryLogic.sendNameTitle(it) } ?: if (isIncoming) tr("Received") else tr("Sent"),
         subtitle = date,
-        spoken = link?.spoken ?: TransactionHistoryLogic.rowLabel(transaction, fiatMode, fiatValue, date, receivedOn),
+        spoken = link?.spoken
+            ?: name?.let { TransactionHistoryLogic.namedRowLabel(it, transaction, fiatMode, shownFiat, date, receivedOn) }
+            ?: TransactionHistoryLogic.rowLabel(transaction, fiatMode, fiatValue, date, receivedOn),
         onClick = onClick,
-        linkBadge = link != null
+        linkBadge = link != null,
+        walletBadge = name is SendName.ToWallet || name is SendName.FromWallet || name == SendName.ToThisWallet,
+        personBadge = name is SendName.ToContact
     ) {
         if (link != null) {
             LinkRowAmounts(link, transactionStatus(transaction))
         } else {
-            TransactionAmounts(transaction = transaction, fiatMode = fiatMode, fiatValue = fiatValue)
+            TransactionAmounts(transaction = transaction, fiatMode = fiatMode, fiatValue = shownFiat, amount = shownAmount)
         }
     }
 }

@@ -53,6 +53,7 @@ import one.monero.moneroone.ui.screens.receive.AddressPickerScreen
 import one.monero.moneroone.ui.screens.receive.ReceiveScreen
 import one.monero.moneroone.ui.screens.send.QRScannerScreen
 import one.monero.moneroone.ui.screens.send.SendScreen
+import one.monero.moneroone.ui.screens.send.TransferScreen
 import one.monero.moneroone.ui.screens.transactions.TransactionDetailScreen
 import one.monero.moneroone.ui.screens.transactions.TransactionFilter
 import one.monero.moneroone.ui.screens.transactions.TransactionListScreen
@@ -93,22 +94,29 @@ sealed class Screen(val route: String) {
     data object SetupBiometrics : Screen("setup_biometrics")
     data object Unlock : Screen("unlock")
     data object Main : Screen("main")
-    data object Send : Screen("send?address={address}&amount={amount}&source={source}&name={name}") {
-        /** [source]: where a pre-filled amount came from, a [SendPrefillSource] name. */
+    data object Send : Screen("send?address={address}&amount={amount}&source={source}&name={name}&to={to}") {
+        /**
+         * [source]: where a pre-filled amount came from, a [SendPrefillSource] name.
+         * [transferTo]: a Transfer to the wallet with this id (its saved primary address).
+         */
         fun createRoute(
             address: String? = null,
             amount: String? = null,
             source: SendPrefillSource? = null,
-            name: String? = null
+            name: String? = null,
+            transferTo: String? = null
         ): String {
             val params = mutableListOf<String>()
             if (!address.isNullOrBlank()) params.add("address=${android.net.Uri.encode(address)}")
             if (!amount.isNullOrBlank()) params.add("amount=${android.net.Uri.encode(amount)}")
             if (source != null) params.add("source=${source.name}")
             if (!name.isNullOrBlank()) params.add("name=${android.net.Uri.encode(name)}")
+            if (!transferTo.isNullOrBlank()) params.add("to=${android.net.Uri.encode(transferTo)}")
             return if (params.isEmpty()) "send" else "send?${params.joinToString("&")}"
         }
     }
+    /** Transfer between your wallets, from the wallet switcher. */
+    data object Transfer : Screen("transfer")
     data object QRScanner : Screen("qr_scanner")
     data object Receive : Screen("receive")
     data object TransactionDetail : Screen("transaction/{txId}") {
@@ -234,7 +242,7 @@ fun MoneroOneNavHost(
     LaunchedEffect(isLocked) {
         if (isLocked) {
             val route = navController.currentDestination?.route
-            if (route == Screen.Send.route || route == Screen.QRScanner.route) {
+            if (route == Screen.Send.route || route == Screen.QRScanner.route || route == Screen.Transfer.route) {
                 navController.popBackStack(Screen.Main.route, inclusive = false)
             }
         }
@@ -463,6 +471,11 @@ fun MoneroOneNavHost(
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
+                    },
+                    navArgument("to") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
                     }
                 )
             ) { backStackEntry ->
@@ -471,7 +484,9 @@ fun MoneroOneNavHost(
                 val source = backStackEntry.arguments?.getString("source")
                     ?.let { name -> SendPrefillSource.entries.firstOrNull { it.name == name } }
                 val name = backStackEntry.arguments?.getString("name")?.takeIf { it.isNotBlank() }
+                val transferToId = backStackEntry.arguments?.getString("to")?.takeIf { it.isNotBlank() }
                 SendScreen(
+                    transferToId = transferToId,
                     walletViewModel = walletViewModel,
                     initialAddress = address,
                     initialAmount = amount,
@@ -491,6 +506,14 @@ fun MoneroOneNavHost(
                     },
                     paymentLinks = paymentLinks,
                     onClaimLink = { paymentLinks.store.accept(it) }
+                )
+            }
+
+            composable(Screen.Transfer.route) {
+                TransferScreen(
+                    walletViewModel = walletViewModel,
+                    onBack = { navController.popBackStack() },
+                    onPick = { wallet -> navController.navigate(Screen.Send.createRoute(transferTo = wallet.id)) }
                 )
             }
 

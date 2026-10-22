@@ -402,6 +402,8 @@ fun MoneroRefreshIndicator(
  * One line of text that steps its font size down until it fits its width,
  * never below [minScale] of the style's size: the iOS `minimumScaleFactor`.
  * The size is measured before drawing, so the text never flashes at full size.
+ * With [wrapAtFloor], text that is still too wide at [minScale] wraps onto a
+ * second line instead of being clipped, so no character is lost.
  */
 @Composable
 fun ShrinkToFitText(
@@ -409,7 +411,8 @@ fun ShrinkToFitText(
     style: TextStyle,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
-    minScale: Float = 0.7f
+    minScale: Float = 0.7f,
+    wrapAtFloor: Boolean = false
 ) {
     BoxWithConstraints(modifier = modifier) {
         val measurer = rememberTextMeasurer()
@@ -428,12 +431,15 @@ fun ShrinkToFitText(
             }
             candidate
         }
+        val wrap = wrapAtFloor && maxWidth != Constraints.Infinity && remember(text, fitted, maxWidth) {
+            measurer.measure(text, fitted, maxLines = 1, softWrap = false).size.width > maxWidth
+        }
         Text(
             text = text,
             style = fitted,
             color = color,
-            maxLines = 1,
-            softWrap = false
+            maxLines = if (wrap) Int.MAX_VALUE else 1,
+            softWrap = wrap
         )
     }
 }

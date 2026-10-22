@@ -1,5 +1,11 @@
 package one.monero.moneroone.ui.screens.transactions
 
+import one.monero.moneroone.core.contacts.ContactStore
+import one.monero.moneroone.core.wallet.SendName
+import one.monero.moneroone.core.wallet.SendNames
+import one.monero.moneroone.ui.components.rememberSendNameLookup
+import one.monero.moneroone.ui.screens.send.ContactEditorSheet
+import androidx.compose.foundation.clickable
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -44,6 +50,11 @@ fun TransactionDetailScreen(walletViewModel: WalletViewModel, txId: String, onBa
     val price by walletViewModel.currentPrice.collectAsState()
     val currency by walletViewModel.selectedCurrency.collectAsState()
     val transaction = state.transactions.find { it.hash == txId }
+    val sendNameOf = rememberSendNameLookup(walletViewModel)
+    val sendName = transaction?.let(sendNameOf)
+    val wallets by walletViewModel.wallets.collectAsState()
+    val contacts by remember { ContactStore.get(context) }.contacts.collectAsState()
+    var addingContact by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     val rows = remember(state.addresses, state.transactions, wallet) {
         ReceiveAddressLogic.rows(state.addressesOf(wallet?.id)?.list.orEmpty(), state.transactions, wallet?.addressLabels.orEmpty())
     }
@@ -51,12 +62,19 @@ fun TransactionDetailScreen(walletViewModel: WalletViewModel, txId: String, onBa
     var keyLoading by remember(wallet?.id, txId) { mutableStateOf(false) }
     var keyUnavailable by remember(wallet?.id, txId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val toThisWallet = sendName == SendName.ToThisWallet
     val fields = transaction?.let {
         TransactionHistoryLogic.details(it, rows,
             DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it.timestamp * 1000)),
-            transactionFiat(it, history, price?.price, currency),
-            price?.price?.let { live -> MoneyFormat.format(it.amount / 1e12 * live, currency, fractionDigits = 2) }, txKey)
+            // A send to this wallet moved only its fee: both values are the fee's.
+            amountFiat(SendNames.shownAmount(sendName, it.amount, it.fee), it.timestamp, history, price?.price, currency),
+            price?.price?.let { live -> MoneyFormat.format(SendNames.shownAmount(sendName, it.amount, it.fee) / 1e12 * live, currency, fractionDigits = 2) },
+            txKey, sendName)
     }.orEmpty()
+    // "Add to Contacts" (ios-18): a send to one known address that is no contact and none of your wallets.
+    val newContactDestination = transaction?.let { tx ->
+        TransactionHistoryLogic.addToContactsDestination(tx, sendName, contacts) { SendNames.matchWallet(it, wallets) != null }
+    }
 
     fun copy(fieldsToCopy: List<TransactionDetailField>) {
         val text = if (fieldsToCopy.size == 1) fieldsToCopy.single().value else TransactionHistoryLogic.copyAll(fieldsToCopy)
@@ -71,7 +89,8 @@ fun TransactionDetailScreen(walletViewModel: WalletViewModel, txId: String, onBa
     val link = transaction?.let(linkIndex::match)
     TransactionDetailsContent(
         transaction = transaction, fields = fields, onBack = onBack, onCopy = { copy(listOf(it)) },
-        title = link?.title,
+        title = link?.title ?: if (toThisWallet) tr("To This Wallet") else null,
+        onAddToContacts = newContactDestination?.let { destination -> { addingContact = destination } },
         linkRow = link?.let { { PaymentLinkTransactionRow(it) } },
         onCopyAll = { copy(fields) },
         onExplorer = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://xmrchain.net/tx/$txId"))) },
@@ -89,6 +108,9 @@ fun TransactionDetailScreen(walletViewModel: WalletViewModel, txId: String, onBa
             }
         }
     )
+    addingContact?.let { destination ->
+        ContactEditorSheet(contact = null, prefill = destination, onDismiss = { addingContact = null })
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,7 +119,8 @@ internal fun TransactionDetailsContent(
     transaction: TransactionInfo?, fields: List<TransactionDetailField>, onBack: () -> Unit,
     onCopy: (TransactionDetailField) -> Unit, onCopyAll: () -> Unit, onExplorer: () -> Unit,
     keyLoading: Boolean, keyUnavailable: Boolean, onShowKey: () -> Unit,
-    title: String? = null, linkRow: (@Composable () -> Unit)? = null
+    title: String? = null, linkRow: (@Composable () -> Unit)? = null,
+    onAddToContacts: (() -> Unit)? = null
 ) {
     val incoming = transaction?.direction == TransactionInfo.Direction.Direction_In
     Scaffold(
@@ -131,6 +154,18 @@ internal fun TransactionDetailsContent(
                             }
                         }
                         if (index != fields.lastIndex) HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        if (field.label == tr("Sent to") && onAddToContacts != null) {
+                            Text(
+                                tr("Add to Contacts"),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MoneroOrange,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(onClick = onAddToContacts)
+                                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                            )
+                            HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        }
                         if (field.label == tr("Status") && linkRow != null) {
                             linkRow()
                             HorizontalDivider(Modifier.padding(start = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)

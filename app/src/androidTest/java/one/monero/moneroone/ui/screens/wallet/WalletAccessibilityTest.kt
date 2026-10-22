@@ -53,6 +53,21 @@ class WalletAccessibilityTest {
         rule.onNode(hasSetTextAction()).assertExists()
     }
 
+    @Test fun eachDragHandleReadsReorderAndMovesItsRow() {
+        val wallets = listOf(WalletInfo("first", "First"), WalletInfo("second", "Second"))
+        var moved: Pair<String, String?>? = null
+        rule.setContent { MoneroOneTheme {
+            WalletManagerRows(wallets, wallets.first(), "0 XMR", { "0" }, {}, {}, { _, _, _ -> },
+                { id, before -> moved = id to before }, {})
+        } }
+        val handles = rule.onAllNodesWithContentDescription(tr("Reorder"))
+        handles.assertCountEquals(2)
+        handles[1].withCustomActions { actions ->
+            assertTrue(actions.first { it.label == tr("Move up") }.action())
+        }
+        assertEquals("second" to "first", moved)
+    }
+
     @Test fun emojiPickerReadsEachEmojiByNameAsAButton() {
         var picked: String? = null
         rule.setContent { MoneroOneTheme { EmojiPickerGrid(selected = "💰", onSelect = { picked = it }) } }
