@@ -5,7 +5,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.toRect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import one.monero.moneroone.core.username.UsernameBinding
 import one.monero.moneroone.core.username.UsernameConfiguration
@@ -763,12 +766,12 @@ internal fun BalanceCard(
     GlassCard(modifier = Modifier.fillMaxWidth().testTag("wallet.balanceCard").drawWithContent {
         drawContent()
         if (username != null) {
-            val r = 20.dp.toPx()
-            val edge = Path().apply {
-                moveTo(0f, r); quadraticTo(0f, 1.dp.toPx(), r, 1.dp.toPx())
-                lineTo(size.width-r, 1.dp.toPx()); quadraticTo(size.width, 1.dp.toPx(), size.width, r)
-            }
-            drawPath(edge, usernameEdge, style = Stroke(2.dp.toPx()))
+            // The Core edge: a 2 dp band inside the card's top edge that thins to nothing
+            // around the corners (the card shape minus itself moved down), as on iOS.
+            val r = CornerRadius(20.dp.toPx())
+            val card = Path().apply { addRoundRect(RoundRect(size.toRect(), r)) }
+            val below = Path().apply { addRoundRect(RoundRect(size.toRect().translate(0f, 2.dp.toPx()), r)) }
+            drawPath(Path.combine(PathOperation.Difference, card, below), usernameEdge)
         }
     }) {
         Column {
