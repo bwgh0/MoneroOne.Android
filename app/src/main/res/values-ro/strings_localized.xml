@@ -731,6 +731,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Doar acest telefon păstrează nota."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Deschidere"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Deschide Configurări"</string>
+    <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"Deschide cardul tău de nume de utilizator"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Se deschide portofelul de pe dispozitiv…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Deschide selectorul de adrese pentru a schimba adresa de primire"</string>
     <string name="l10n_opens_monero_one_in_your_browser_578efc16" formatted="false">"Deschide monero.one în browser"</string>
@@ -1332,7 +1333,6 @@
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"Cititorul de ecran va citi fraza de recuperare cu voce tare. Oricine o aude îți poate fura fondurile. Folosește căști sau asigură-te că nimeni nu îți poate auzi dispozitivul înainte de a continua."</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"Tranzacție transmisă."</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"Tranzacțiile vor apărea aici după sincronizare"</string>
-    <string name="l10n_your_username_b210fd41" formatted="false">"Numele tău de utilizator"</string>
     <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"Numele tău de utilizator nu a putut fi salvat în siguranță. Deblochează aplicația și încearcă din nou."</string>
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Numele tău de utilizator, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Portofelul tău nu are încă o adresă de primire. Așteaptă să se încarce, apoi încearcă din nou."</string>

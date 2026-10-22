@@ -731,6 +731,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"備註只會儲存在這支手機上。"</string>
     <string name="l10n_open_ed077f3d" formatted="false">"開盤"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"開啟「設定」"</string>
+    <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"打開你的使用者名稱卡片"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"正在開啟裝置錢包⋯"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"開啟位址選擇器來更改收款位址"</string>
     <string name="l10n_opens_monero_one_in_your_browser_578efc16" formatted="false">"在瀏覽器中開啟 monero.one"</string>
@@ -1332,7 +1333,6 @@
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"螢幕報讀器會大聲唸出復原助記詞。任何聽到的人都可能竊取您的資金。繼續前請使用耳機，或確認無人能聽到您的裝置。"</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"交易已廣播。"</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"同步後，你的交易會顯示在這裡"</string>
-    <string name="l10n_your_username_b210fd41" formatted="false">"你的使用者名稱"</string>
     <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"無法安全儲存你的使用者名稱。請解鎖 App 後再試一次。"</string>
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"你的使用者名稱，%1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"你的錢包還沒有收款位址。請等待載入完成，然後再試一次。"</string>

@@ -731,6 +731,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"メモはこの端末にのみ保存されます。"</string>
     <string name="l10n_open_ed077f3d" formatted="false">"始値"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"設定を開く"</string>
+    <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"ユーザ名カードを開く"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"デバイスウォレットを開いています…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"受取アドレスを変更するためのアドレス選択画面を開きます"</string>
     <string name="l10n_opens_monero_one_in_your_browser_578efc16" formatted="false">"ブラウザでmonero.oneを開きます"</string>
@@ -1332,7 +1333,6 @@
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"スクリーンリーダーがリカバリーフレーズを読み上げます。聞いた人は資金を盗むことができます。続行する前にヘッドホンを使うか、端末の音が誰にも聞こえないことを確認してください。"</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"トランザクションをブロードキャストしました。"</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"同期が完了すると、ここにトランザクションが表示されます"</string>
-    <string name="l10n_your_username_b210fd41" formatted="false">"あなたのユーザ名"</string>
     <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"ユーザ名を安全に保存できませんでした。Appのロックを解除して、もう一度お試しください。"</string>
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"あなたのユーザ名、%1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"ウォレットにはまだ受取アドレスがありません。読み込みが終わるまで待ってから、もう一度お試しください。"</string>

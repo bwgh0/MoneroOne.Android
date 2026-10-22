@@ -778,12 +778,21 @@ internal fun BalanceCard(
         if (username != null) {
             // Follows the text size up to 20 (iOS usernameMaxSize); one size for every name length.
             val usernameFontSize = with(LocalDensity.current) { minOf(18.sp.toDp(), 20.dp).toSp() }
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onUsernameTap)
+            // TalkBack reads "Your username, @name" and then "Double-tap to open your username card", as VoiceOver does on iOS.
+            val usernameLabel = tr("Your username, %s", username.shortName)
+            val usernameAction = tr("Open your username card")
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                .clearAndSetSemantics {
+                    contentDescription = usernameLabel
+                    role = Role.Button
+                    onClick(label = usernameAction) { onUsernameTap(); true }
+                }
+                .clickable(onClick = onUsernameTap)
                 .padding(horizontal = 24.dp).testTag("wallet.username"), verticalAlignment = Alignment.CenterVertically) {
                 Text(androidx.compose.ui.text.buildAnnotatedString {
                     pushStyle(androidx.compose.ui.text.SpanStyle(color = usernameEdge)); append("@"); pop(); append(username.displayHandle)
                 }, fontSize = usernameFontSize, letterSpacing = (-0.35).sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, contentDescription = tr("Your username"), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
         }

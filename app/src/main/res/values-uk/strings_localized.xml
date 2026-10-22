@@ -731,6 +731,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Нотатку зберігає лише цей телефон."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Відкриття"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Відкрити Параметри"</string>
+    <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"Відкрити картку вашого імені користувача"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Відкриття гаманця пристрою…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Відкриває вибір адреси, щоб змінити адресу отримання"</string>
     <string name="l10n_opens_monero_one_in_your_browser_578efc16" formatted="false">"Відкриває monero.one у браузері"</string>
@@ -1332,7 +1333,6 @@
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"Екранний читач прочитає фразу відновлення вголос. Кожен, хто її почує, зможе вкрасти ваші кошти. Перш ніж продовжити, скористайтеся навушниками або переконайтеся, що ніхто не чує ваш пристрій."</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"Транзакцію передано в мережу."</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"Транзакції з’являться тут після синхронізації"</string>
-    <string name="l10n_your_username_b210fd41" formatted="false">"Ваше ім’я користувача"</string>
     <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"Не вдалося безпечно зберегти ім’я користувача. Розблокуйте програму і повторіть спробу."</string>
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Ваше ім’я користувача, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"У гаманця ще немає адреси для отримання. Дочекайтеся завантаження й повторіть спробу."</string>

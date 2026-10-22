@@ -98,6 +98,7 @@ class UsernameException(val code: String) : Exception(when (code) {
     "wallet_changed" -> tr("The wallet changed. Open this flow from the wallet you want to use.")
     "name.unavailable" -> tr("This username is unavailable.")
     "device.slot_used" -> tr("A free username isn't available on this phone.")
+    "not_configured" -> tr("Username registration isn't available yet.")
     "pending" -> tr("Finish checking the previous claim before choosing another username.")
     "verification" -> tr("The username response could not be verified. Please try again.")
     "nonce.invalid" -> tr("The request expired. Please claim again.")

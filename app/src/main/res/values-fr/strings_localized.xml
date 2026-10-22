@@ -731,6 +731,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Seul ce téléphone conserve la note."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Ouverture"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Ouvrir Réglages"</string>
+    <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"Ouvrir votre carte de nom d’utilisateur"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Ouverture du portefeuille de l’appareil…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Ouvre le sélecteur d’adresse pour changer l’adresse de réception"</string>
     <string name="l10n_opens_monero_one_in_your_browser_578efc16" formatted="false">"Ouvre monero.one dans votre navigateur"</string>
@@ -1332,7 +1333,6 @@
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"Le lecteur d’écran lira votre phrase de récupération à voix haute. Toute personne qui l’entend peut voler vos fonds. Utilisez un casque ou assurez-vous que personne ne peut entendre votre appareil avant de continuer."</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"Transaction diffusée."</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"Vos transactions apparaîtront ici après la synchronisation"</string>
-    <string name="l10n_your_username_b210fd41" formatted="false">"Votre nom d’utilisateur"</string>
     <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"Votre nom d’utilisateur n’a pas pu être enregistré de façon sécurisée. Déverrouillez l’app et réessayez."</string>
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Votre nom d’utilisateur, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Votre portefeuille n’a pas encore d’adresse de réception. Attendez qu’elle se charge, puis réessayez."</string>

@@ -731,6 +731,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Solo este teléfono guarda la nota."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Apertura"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Abrir Configuración"</string>
+    <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"Abrir tu tarjeta de nombre de usuario"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Abriendo la cartera del dispositivo…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Abre el selector de direcciones para cambiar la dirección de recepción"</string>
     <string name="l10n_opens_monero_one_in_your_browser_578efc16" formatted="false">"Abre monero.one en tu navegador"</string>
@@ -1332,7 +1333,6 @@
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"El lector de pantalla leerá tu frase de recuperación en voz alta. Cualquiera que la oiga puede robar tus fondos. Usa auriculares o asegúrate de que nadie pueda oír tu dispositivo antes de continuar."</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"Transacción transmitida."</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"Tus transacciones aparecerán aquí cuando se sincronicen"</string>
-    <string name="l10n_your_username_b210fd41" formatted="false">"Tu nombre de usuario"</string>
     <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"No se pudo guardar tu nombre de usuario de forma segura. Desbloquea la app e inténtalo de nuevo."</string>
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Tu nombre de usuario, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Tu cartera aún no tiene una dirección de recepción. Espera a que cargue e inténtalo de nuevo."</string>

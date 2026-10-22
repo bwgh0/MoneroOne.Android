@@ -731,6 +731,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Notu yalnızca bu telefon saklar."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Açılış"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Ayarlar\'ı Aç"</string>
+    <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"Kullanıcı adı kartınızı aç"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Aygıt cüzdanı açılıyor…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Alma adresini değiştirmek için adres seçiciyi açar"</string>
     <string name="l10n_opens_monero_one_in_your_browser_578efc16" formatted="false">"monero.one sitesini tarayıcınızda açar"</string>
@@ -1332,7 +1333,6 @@
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"Ekran okuyucu kurtarma ifadenizi sesli okuyacak. Duyan herkes paranızı çalabilir. Devam etmeden önce kulaklık kullanın veya kimsenin cihazınızı duyamadığından emin olun."</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"İşlem yayınlandı."</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"İşlemleriniz eşzamanlandıktan sonra burada görünür"</string>
-    <string name="l10n_your_username_b210fd41" formatted="false">"Kullanıcı adınız"</string>
     <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"Kullanıcı adınız güvenli şekilde kaydedilemedi. Uygulamanın kilidini açıp yeniden deneyin."</string>
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Kullanıcı adınız, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Cüzdanınızın henüz bir alma adresi yok. Yüklenmesini bekleyin, ardından yeniden deneyin."</string>

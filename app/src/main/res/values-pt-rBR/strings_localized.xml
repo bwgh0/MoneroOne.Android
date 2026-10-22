@@ -731,6 +731,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Somente este celular guarda a nota."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Abertura"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Abrir Ajustes"</string>
+    <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"Abrir seu cartão de nome de usuário"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Abrindo a carteira do dispositivo…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Abre o seletor de endereços para trocar o endereço de recebimento"</string>
     <string name="l10n_opens_monero_one_in_your_browser_578efc16" formatted="false">"Abre monero.one no navegador"</string>
@@ -1332,7 +1333,6 @@
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"O leitor de tela lerá sua frase de recuperação em voz alta. Quem ouvir poderá roubar seus fundos. Use fones de ouvido ou certifique-se de que ninguém possa ouvir seu dispositivo antes de continuar."</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"Transação transmitida."</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"Suas transações aparecerão aqui após a sincronização"</string>
-    <string name="l10n_your_username_b210fd41" formatted="false">"Seu nome de usuário"</string>
     <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"Não foi possível salvar seu nome de usuário com segurança. Desbloqueie o app e tente novamente."</string>
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Seu nome de usuário, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Sua carteira ainda não tem um endereço de recebimento. Aguarde o carregamento e tente novamente."</string>
