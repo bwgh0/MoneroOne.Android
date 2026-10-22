@@ -14,6 +14,21 @@ data class TransactionDetailField(val label: String, val value: String, val secr
 
 object TransactionHistoryLogic {
     /**
+     * Lazy list keys for transaction rows, one per row and all different.
+     * wallet2 can list one transaction more than once (an incoming one paid
+     * to two of this wallet's addresses, or a pending row next to its mined
+     * one), and a repeated key crashes LazyColumn. A repeat gets a number.
+     */
+    fun rowKeys(transactions: List<TransactionInfo>): List<String> {
+        val seen = HashMap<String, Int>()
+        return transactions.map { tx ->
+            val key = "${tx.direction}:${tx.hash}"
+            val repeat = seen.merge(key, 1, Int::plus)!! - 1
+            if (repeat == 0) key else "$key#$repeat"
+        }
+    }
+
+    /**
      * Transactions up to [asOfMs], inclusive, for a past moment picked in
      * History; every transaction for null. Shared by recent activity and
      * See All, so both stop at the same moment.

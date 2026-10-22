@@ -228,6 +228,7 @@ fun WalletScreen(
         if (asOf == null) sortedTransactions.take(5)
         else sortedTransactions.asSequence().filter { it.timestamp * 1000 <= asOf }.take(5).toList()
     }
+    val recentKeys = remember(recentTransactions) { TransactionHistoryLogic.rowKeys(recentTransactions) }
 
     // Links that still hold money: a line in the balance card (spec Round 3). A new block can expire one.
     val linkStore = PaymentLinkStore.get(LocalContext.current)
@@ -579,9 +580,10 @@ fun WalletScreen(
             }
         } else {
             items(
-                items = recentTransactions,
-                key = { it.hash }
-            ) { transaction ->
+                count = recentTransactions.size,
+                key = { recentKeys[it] }
+            ) { index ->
+                val transaction = recentTransactions[index]
                 TransactionCard(
                     transaction = transaction,
                     linkIndex = linkIndex,

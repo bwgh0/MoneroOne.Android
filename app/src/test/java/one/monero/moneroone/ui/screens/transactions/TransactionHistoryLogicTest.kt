@@ -29,6 +29,14 @@ class TransactionHistoryLogicTest {
         val sent = tx(false).apply { transfers = listOf(Transfer(1000, "recipient-address")) }
         assertEquals(listOf(sent), TransactionHistoryLogic.filter(listOf(sent), TransactionFilter.ALL, null, "recipient", rows))
     }
+    @Test fun `row keys stay unique when wallet2 lists a transaction twice`() {
+        val paidTwice = tx(index = 1)
+        val sameHash = tx(index = 2).apply { hash = paidTwice.hash }
+        val sent = tx(false).apply { hash = paidTwice.hash }
+        val keys = TransactionHistoryLogic.rowKeys(listOf(paidTwice, sameHash, sent, tx(index = 3)))
+        assertEquals(keys.size, keys.toSet().size)
+        assertEquals(keys, TransactionHistoryLogic.rowKeys(listOf(paidTwice, sameHash, sent, tx(index = 3))))
+    }
     @Test fun `failed transaction never appears as pending`() {
         val failed = tx(failed = true).apply { confirmations = 0; isPending = true }
         assertTrue(TransactionHistoryLogic.filter(listOf(failed), TransactionFilter.PENDING, null, "", emptyList()).isEmpty())
