@@ -25,7 +25,7 @@ data class NotesVersion(val major: Int, val minor: Int) : Comparable<NotesVersio
 }
 
 /** The glyph on a highlight's tile. */
-enum class WhatsNewGlyph { LINK, AT, KEY }
+enum class WhatsNewGlyph { TRANSFER, LINK, AT, KEY }
 
 /** One highlight row: English source strings, translated with `tr` when shown. */
 data class WhatsNewHighlight(val glyph: WhatsNewGlyph, val title: String, val text: String)
@@ -43,6 +43,11 @@ object WhatsNewNotes {
         WhatsNewEntry(
             version = NotesVersion(1, 1),
             highlights = listOf(
+                WhatsNewHighlight(
+                    WhatsNewGlyph.TRANSFER,
+                    "Transfer between your wallets",
+                    "Move XMR from one of your wallets to another. Tap the wallet name at the top, then Transfer."
+                ),
                 WhatsNewHighlight(
                     WhatsNewGlyph.LINK,
                     "Send XMR as a link",
@@ -64,6 +69,8 @@ object WhatsNewNotes {
                 "Rounded QR codes.",
                 "New wallets are created faster.",
                 "Fixes for custom node logins.",
+                "With the Tor proxy on, OpenAlias name lookups also go through Tor.",
+                "Fixed a crash when you create a wallet or set a wallet birthday with some phone languages.",
                 "General stability improvements and bug fixes."
             )
         )
