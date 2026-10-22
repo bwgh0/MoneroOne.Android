@@ -3,6 +3,7 @@ package one.monero.moneroone.core.wallet
 import one.monero.moneroone.core.network.isOnionNode
 import org.junit.Assert.*
 import org.junit.Test
+import kotlin.random.Random
 
 /** As on iOS, only the user's own choice selects an onion node. */
 class DefaultNodesTest {
@@ -26,5 +27,15 @@ class DefaultNodesTest {
     @Test fun turningTorOffUnderAnOnionNodeMovesToTheFirstDefault() {
         assertEquals("node.monero.one:443", DefaultNodes.TOR_OFF_FALLBACK)
         assertFalse(isOnionNode(DefaultNodes.TOR_OFF_FALLBACK))
+    }
+    @Test fun firstRunCanPickEveryDefaultIncludingMoneroOne() {
+        val picks = (0 until 200).map { DefaultNodes.initial(FakeSharedPreferences(), Random(it)) }.toSet()
+        assertTrue("node.monero.one:443" in picks)
+        assertEquals(DefaultNodes.URIS.toSet(), picks)
+    }
+    @Test fun firstRunPickIsKeptOnLaterLaunches() {
+        val prefs = FakeSharedPreferences()
+        val first = DefaultNodes.initial(prefs, Random(1))
+        repeat(20) { assertEquals(first, DefaultNodes.initial(prefs, Random(it + 2))) }
     }
 }

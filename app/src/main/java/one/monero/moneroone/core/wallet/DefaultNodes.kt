@@ -1,6 +1,7 @@
 package one.monero.moneroone.core.wallet
 
 import android.content.Context
+import android.content.SharedPreferences
 import one.monero.moneroone.core.network.isOnionNode
 import kotlin.random.Random
 
@@ -48,24 +49,18 @@ object DefaultNodes {
      * Node used before the user (or auto-select) has ever picked one, drawn once
      * per install and then persisted so it stays stable across launches.
      *
-     * Not restricted to [isTls] entries on purpose: node.monero.one is currently
-     * the only TLS default and its certificate is expired, so preferring TLS here
-     * would start every install on a node that cannot connect. Restore the TLS
-     * filter once that certificate is renewed.
+     * Drawn from every entry in [ALL], TLS (node.monero.one) and cleartext alike.
      */
-    fun initial(context: Context): String {
-        val prefs = context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE)
+    fun initial(context: Context): String =
+        initial(context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE))
+
+    internal fun initial(prefs: SharedPreferences, random: Random = Random): String {
         prefs.getString(KEY_INITIAL_NODE, null)?.let { return it }
 
-        val candidates = ALL.filterNot { it.uri in FIRST_RUN_EXCLUDED }.ifEmpty { ALL }
-        val picked = candidates[Random.nextInt(candidates.size)].uri
+        val picked = ALL[random.nextInt(ALL.size)].uri
         prefs.edit().putString(KEY_INITIAL_NODE, picked).apply()
         return picked
     }
-
-    // node.monero.one's certificate expired 2026-05-26; until it is renewed a
-    // first-run install pointed there cannot sync. Still selectable manually.
-    private val FIRST_RUN_EXCLUDED = setOf("node.monero.one:443")
 
     private const val KEY_INITIAL_NODE = "initial_node"
 }
