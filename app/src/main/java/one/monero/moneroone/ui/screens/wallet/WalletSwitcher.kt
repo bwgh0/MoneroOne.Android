@@ -73,7 +73,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -522,7 +525,9 @@ fun WalletRowCard(
                 }
                 if (username != null) {
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(username, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    // The "@" in brand, as on Home and the card.
+                    Text(buildAnnotatedString { withStyle(SpanStyle(color = MoneroOrange)) { append("@") }; append(username.removePrefix("@")) },
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 } else address?.let {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(

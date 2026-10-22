@@ -18,6 +18,8 @@ import one.monero.moneroone.core.username.UsernameBinding
 import one.monero.moneroone.ui.screens.wallet.BalanceCard
 import one.monero.moneroone.ui.screens.wallet.BalanceHistoryState
 import one.monero.moneroone.ui.screens.wallet.UsernameCard
+import one.monero.moneroone.ui.screens.wallet.WalletRowCard
+import one.monero.moneroone.ui.screens.wallet.WalletRowCheck
 import one.monero.moneroone.ui.theme.MoneroOneTheme
 
 /** Renders the real native components without keys, a wallet engine or registry calls. */
@@ -43,6 +45,9 @@ class UsernamePreviewActivity : AppCompatActivity() {
                         ) { }
                         Text("Your Username", style = MaterialTheme.typography.titleLarge)
                         UsernameCard(binding.displayHandle, binding.externalAddress, still = true)
+                        Text("Switcher Row", style = MaterialTheme.typography.titleLarge)
+                        WalletRowCard(emoji = "\uD83D\uDCB0", name = "Everyday", address = null, username = binding.shortName,
+                            balanceText = "12.4826 XMR", isActive = true) { WalletRowCheck(true) }
                     }
                 }
             }
