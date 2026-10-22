@@ -1,8 +1,12 @@
 package one.monero.moneroone.core.node
 
 sealed interface NodeInput {
-    /** [uri] is always bare host:port; inline `user:pass@` input lands in [credentials]. */
-    data class Valid(val uri: String, val credentials: NodeCredentials? = null) : NodeInput
+    /**
+     * [uri] is always bare host:port; inline `user:pass@` input lands in [credentials].
+     * [tls]: the input began with https:// or uses port 443, as on iOS, where the
+     * https:// scheme marks a TLS node on any port.
+     */
+    data class Valid(val uri: String, val credentials: NodeCredentials? = null, val tls: Boolean = false) : NodeInput
     data class Invalid(val message: String) : NodeInput
 }
 
@@ -79,11 +83,7 @@ fun parseNodeInput(raw: String): NodeInput {
 
     val port = if (portText.all { it.isDigit() }) portText.toIntOrNull() else null
     if (port == null || port !in 1..65535) return NodeInput.Invalid("Port must be between 1 and 65535")
-    // MoneroKit only speaks TLS on port 443, so any other https:// input would
-    // silently downgrade to cleartext — reject instead.
-    if (https && port != 443) return NodeInput.Invalid("TLS nodes must use port 443")
-
-    return NodeInput.Valid("$hostPart:$port", credentials)
+    return NodeInput.Valid("$hostPart:$port", credentials, tls = https || port == 443)
 }
 
 /**
