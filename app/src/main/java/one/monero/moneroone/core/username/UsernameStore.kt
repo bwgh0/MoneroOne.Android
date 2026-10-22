@@ -1,5 +1,6 @@
 package one.monero.moneroone.core.username
 
+import one.monero.moneroone.core.locale.tr
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -93,13 +94,13 @@ class UsernameStore(private val persistence: UsernamePersistence) {
 }
 
 class UsernameException(val code: String) : Exception(when (code) {
-    "storage" -> "Your username could not be saved securely. Unlock the app and try again."
-    "wallet_changed" -> "The wallet changed. Open this flow from the wallet you want to use."
-    "name.unavailable" -> "This username is unavailable."
-    "device.slot_used" -> "A free username isn't available on this phone."
-    "pending" -> "Finish checking the previous claim before choosing another username."
-    "verification" -> "The username response could not be verified. Please try again."
-    "nonce.invalid" -> "The request expired. Please claim again."
-    "handle.blocked", "handle.reserved" -> "This username is reserved to protect users from scams."
-    else -> "The username service couldn't complete the request. Please try again."
+    "storage" -> tr("Your username could not be saved securely. Unlock the app and try again.")
+    "wallet_changed" -> tr("The wallet changed. Open this flow from the wallet you want to use.")
+    "name.unavailable" -> tr("This username is unavailable.")
+    "device.slot_used" -> tr("A free username isn't available on this phone.")
+    "pending" -> tr("Finish checking the previous claim before choosing another username.")
+    "verification" -> tr("The username response could not be verified. Please try again.")
+    "nonce.invalid" -> tr("The request expired. Please claim again.")
+    "handle.blocked", "handle.reserved" -> tr("This username is reserved to protect users from scams.")
+    else -> tr("The username service couldn't complete the request. Please try again.")
 })

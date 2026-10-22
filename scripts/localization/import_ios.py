@@ -51,6 +51,8 @@ def main():
     for source, item in catalog.items():
         locs = item.get('localizations', {})
         # Plurals are imported separately once callers provide explicit counts.
+        # Explicit iOS keys such as username.claiming are not English text. Android has its own resource for them.
+        if re.fullmatch(r'[a-z]+(\.[a-z]+)+', source): continue
         if source and all('stringUnit' in locs.get(lang, {}) for lang in LANGUAGES):
             entries[re.sub(r'%\d+\$s', '%s', format_string(source))] = {lang: format_string(locs[lang]['stringUnit']['value']) for lang in LANGUAGES}
     for source, target in aliases.items():

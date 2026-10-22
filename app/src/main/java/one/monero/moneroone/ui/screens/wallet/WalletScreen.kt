@@ -368,7 +368,7 @@ fun WalletScreen(
             )
             if (offersUsername && !switcherExpanded) {
                 TextButton(onClick = { activeWallet?.let { usernames.open(it); shownUsername = null; showUsername = true } }) {
-                    Text("Get Your Username", color = MoneroOrange)
+                    Text(tr("Get Your Username"), color = MoneroOrange)
                 }
             }
 
@@ -783,7 +783,7 @@ internal fun BalanceCard(
                 Text(androidx.compose.ui.text.buildAnnotatedString {
                     pushStyle(androidx.compose.ui.text.SpanStyle(color = usernameEdge)); append("@"); pop(); append(username.displayHandle)
                 }, fontSize = usernameFontSize, letterSpacing = (-0.35).sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, contentDescription = "Your username", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.ChevronRight, contentDescription = tr("Your username"), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
         }

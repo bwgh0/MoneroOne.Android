@@ -24,6 +24,7 @@
     <string name="l10n_s_to_claim_4a220b89" formatted="false">"%1$s 받을 수 있음"</string>
     <string name="l10n_s_s_ffad8427" formatted="false">"%1$s · %2$s"</string>
     <string name="l10n_s_s_open_dfdb7ceb" formatted="false">"%1$s · 미수령 %2$s개"</string>
+    <string name="l10n_s_other_apps_80bd14fe" formatted="false">"%1$s · 다른 앱"</string>
     <string name="l10n_s_connecting_to_monero_network_70d08cc4" formatted="false">"%s — Monero 네트워크에 연결 중"</string>
     <string name="l10n_s_syncing_s_04b3ee90" formatted="false">"%s — 동기화 중 %s%%"</string>
     <string name="l10n_s_live_62e53b9a" formatted="false">"%1$s • 연결됨"</string>
@@ -34,6 +35,7 @@
     <string name="l10n_s_s_tap_to_sync_sent_transactions_7e21a236" formatted="false">"%1$s%2$s. 보낸 거래를 동기화하려면 탭하세요."</string>
     <string name="l10n_s_s_of_s_digits_entered_9845c446" formatted="false">"%1$s, %3$s자리 중 %2$s자리 입력됨"</string>
     <string name="l10n_s_s_s_of_s_021f204a" formatted="false">"%1$s, %2$s, %4$s개 중 %3$s번째"</string>
+    <string name="l10n_s_monero_one_username_card_s_029403b7" formatted="false">"%1$s, Monero One 사용자 이름 카드. %2$s"</string>
     <string name="l10n_s_disabled_for_view_only_wallet_a7817a74" formatted="false">"%1$s, 보기 전용 지갑에서는 사용할 수 없음"</string>
     <string name="l10n_s_portfolio_s_f99d40f6" formatted="false">"%1$s, 포트폴리오 %2$s"</string>
     <string name="l10n_s_subaddress_s_8258744c" formatted="false">"%1$s, 하위 주소 %2$s"</string>
@@ -74,6 +76,8 @@
     <string name="l10n_24h_29905ab7" formatted="false">"24시간"</string>
     <string name="l10n_24h_change_66f9b755" formatted="false">"24시간 변동"</string>
     <string name="l10n_2km_7c15492a" formatted="false">"2km"</string>
+    <string name="l10n_3_15_characters_availability_is_checked_when_you_claim_d8d87494" formatted="false">"3~15자. 등록할 때 사용 가능 여부를 확인합니다."</string>
+    <string name="l10n_3_15_characters_letters_numbers_and_f01f1d02" formatted="false">"3~15자. 영문자, 숫자, _를 사용할 수 있습니다."</string>
     <string name="l10n_4_digits_8c09c57b" formatted="false">"4자리"</string>
     <string name="l10n_4_digit_pin_s_3ad16dcc" formatted="false">"4자리 PIN. %1$s"</string>
     <string name="l10n_5_minutes_3170543c" formatted="false">"5분"</string>
@@ -81,6 +85,8 @@
     <string name="l10n_6_digits_e0efd043" formatted="false">"6자리"</string>
     <string name="l10n_6_digit_pin_recommended_s_61cc2218" formatted="false">"6자리 PIN, 권장. %1$s"</string>
     <string name="l10n_64_lowercase_hex_characters_ee749803" formatted="false">"소문자 16진수 64자"</string>
+    <string name="l10n_a_free_username_isn_t_available_on_this_phone_af0664c0" formatted="false">"이 휴대폰에서는 무료 사용자 이름을 사용할 수 없습니다."</string>
+    <string name="l10n_a_short_username_people_can_use_to_pay_you_bf719743" formatted="false">"다른 사람이 나에게 결제할 때 쓸 수 있는 짧은 사용자 이름입니다."</string>
     <string name="l10n_about_4efca0d1" formatted="false">"정보"</string>
     <string name="l10n_about_s_xmr_e24cc9d7" formatted="false">"약 %1$s XMR"</string>
     <string name="l10n_above_80792346" formatted="false">"이상"</string>
@@ -113,6 +119,7 @@
     <string name="l10n_address_doesn_t_look_valid_for_mainnet_027a2baf" formatted="false">"메인넷에 유효한 주소가 아닌 것 같습니다."</string>
     <string name="l10n_address_doesn_t_look_valid_for_testnet_e4c3a7a2" formatted="false">"테스트넷에 유효한 주소가 아닌 것 같습니다."</string>
     <string name="l10n_address_found_for_s_0af31ca9" formatted="false">"%1$s의 주소를 찾았습니다"</string>
+    <string name="l10n_address_username_or_openalias_d3d7245d" formatted="false">"주소, @사용자 이름 또는 OpenAlias"</string>
     <string name="l10n_address_fa0882e2" formatted="false">"주소:"</string>
     <string name="l10n_adjust_to_explore_the_balance_and_activity_at_each_time_fc6ccd58" formatted="false">"조정하여 각 시점의 잔액과 활동을 살펴보세요. ‘지금’으로 돌아가면 현재 지갑이 표시됩니다."</string>
     <string name="l10n_after_a_payment_arrives_receive_shows_a_new_address_old_579be71c" formatted="false">"결제를 받으면 받기에 새 주소가 표시됩니다. 이전 주소도 계속 사용할 수 있습니다."</string>
@@ -209,6 +216,7 @@
     <string name="l10n_chart_mode_9b19d23e" formatted="false">"차트 모드"</string>
     <string name="l10n_check_again_32e60e73" formatted="false">"다시 확인"</string>
     <string name="l10n_check_screen_time_or_device_management_c63dba08" formatted="false">"스크린 타임 또는 기기 관리를 확인하세요."</string>
+    <string name="l10n_check_username_13eb7265" formatted="false">"사용자 이름 확인"</string>
     <string name="l10n_check_word_s_90eb1a05" formatted="false">"단어 %s 확인"</string>
     <string name="l10n_check_words_s_23e605da" formatted="false">"단어 %s 확인"</string>
     <string name="l10n_checking_latency_544be1ed" formatted="false">"지연 시간 확인 중"</string>
@@ -217,13 +225,16 @@
     <string name="l10n_checking_2e5f79bb" formatted="false">"확인 중..."</string>
     <string name="l10n_chinese_yuan_e689570a" formatted="false">"중국 위안화"</string>
     <string name="l10n_choose_icon_4060e90f" formatted="false">"아이콘 선택"</string>
+    <string name="l10n_choose_my_username_100415f9" formatted="false">"내 사용자 이름 선택"</string>
     <string name="l10n_choose_restore_method_5f66994c" formatted="false">"복원 방법 선택"</string>
     <string name="l10n_choose_seed_format_d1699775" formatted="false">"시드 형식 선택"</string>
+    <string name="l10n_choose_your_username_0a3ee390" formatted="false">"사용자 이름을 선택하세요"</string>
     <string name="l10n_choose_a_new_6_digit_pin_c2846426" formatted="false">"새 PIN"</string>
     <string name="l10n_choose_a_wallet_d1157c4d" formatted="false">"지갑 선택"</string>
     <string name="l10n_choose_another_date_d8c80c56" formatted="false">"다른 날짜 선택"</string>
     <string name="l10n_choose_your_preferred_app_appearance_9f795e99" formatted="false">"화면 모드"</string>
     <string name="l10n_claim_4ca41db0" formatted="false">"받기"</string>
+    <string name="l10n_claim_s_3545e872" formatted="false">"@%1$s 등록"</string>
     <string name="l10n_claim_by_aff685c9" formatted="false">"받기 기한"</string>
     <string name="l10n_claim_by_s_4bc68146" formatted="false">"%1$s까지 받기"</string>
     <string name="l10n_claim_fee_reserve_0d0fd617" formatted="false">"받기 수수료 예비금"</string>
@@ -258,6 +269,7 @@
     <string name="l10n_confirm_the_transaction_on_your_trezor_c899d398" formatted="false">"Trezor에서 거래를 확인하세요"</string>
     <string name="l10n_confirm_this_transaction_14bfcca1" formatted="false">"이 거래 확인"</string>
     <string name="l10n_confirm_transaction_44a3e7d3" formatted="false">"이 거래 확인"</string>
+    <string name="l10n_confirm_with_the_recipient_that_s_is_their_username_bef_6366e61a" formatted="false">"첫 결제 전에 수신자의 사용자 이름이 “%1$s”인지 수신자에게 확인하세요."</string>
     <string name="l10n_confirm_you_have_written_down_your_seed_phrase_to_conti_48409d82" formatted="false">"계속하려면 시드 문구를 적어 두었는지 확인하세요"</string>
     <string name="l10n_confirmations_5dfa99a6" formatted="false">"확인 수"</string>
     <string name="l10n_confirmations_s_1dfca167" formatted="false">"확인 수: %1$s"</string>
@@ -481,6 +493,7 @@
     <string name="l10n_fee_s_xmr_9efa7208" formatted="false">"수수료: %1$s XMR"</string>
     <string name="l10n_fetching_price_f74cc78c" formatted="false">"가격 가져오는 중..."</string>
     <string name="l10n_filter_transactions_00d87315" formatted="false">"거래 필터"</string>
+    <string name="l10n_finish_checking_the_previous_claim_before_choosing_anot_525aa63b" formatted="false">"다른 사용자 이름을 선택하기 전에 이전 등록 확인을 완료하세요."</string>
     <string name="l10n_first_payment_to_this_name_check_the_address_with_the_r_5e52f2f6" formatted="false">"이 이름으로 처음 보내는 결제입니다. 받는 사람에게 주소를 확인하세요."</string>
     <string name="l10n_first_time_sync_can_take_a_few_minutes_2b7fc90b" formatted="false">"처음 동기화할 때는 몇 분 정도 걸릴 수 있습니다."</string>
     <string name="l10n_forgot_pin_74ad27db" formatted="false">"PIN 분실"</string>
@@ -493,6 +506,8 @@
     <string name="l10n_full_wallet_you_can_send_and_receive_adca402c" formatted="false">"전체 기능 지갑 — 보내기와 받기가 모두 가능합니다."</string>
     <string name="l10n_funding_transaction_c2006a3f" formatted="false">"입금 거래"</string>
     <string name="l10n_generating_49286f33" formatted="false">"불러오는 중..."</string>
+    <string name="l10n_get_your_username_6ee3ef92" formatted="false">"사용자 이름 받기"</string>
+    <string name="l10n_get_your_username_e62eb872" formatted="false">"사용자 이름을 받으세요."</string>
     <string name="l10n_get_notified_on_price_changes_1a5ab92c" formatted="false">"가격 알림 보기 및 관리"</string>
     <string name="l10n_get_notified_when_xmr_crosses_a_price_you_set_92aed39f" formatted="false">"XMR이 설정한 가격에 도달하면 알림을 받습니다."</string>
     <string name="l10n_good_afternoon_6638425f" formatted="false">"좋은 오후입니다"</string>
@@ -547,6 +562,7 @@
     <string name="l10n_invalid_seed_phrase_3a8da7cf" formatted="false">"유효하지 않은 시드 문구"</string>
     <string name="l10n_invalid_seed_phrase_please_check_your_words_and_try_aga_48aabf18" formatted="false">"유효하지 않은 시드 문구입니다. 단어를 확인하고 다시 시도하세요."</string>
     <string name="l10n_it_checks_again_every_few_seconds_while_this_screen_is__aa8d210f" formatted="false">"이 화면이 열려 있는 동안 몇 초마다 다시 확인합니다."</string>
+    <string name="l10n_it_s_yours_c338d63b" formatted="false">"이제 내 것입니다."</string>
     <string name="l10n_item_not_found_in_keychain_cc73af45" formatted="false">"키체인에서 항목을 찾을 수 없음"</string>
     <string name="l10n_japanese_yen_fa53dbe5" formatted="false">"일본 엔화"</string>
     <string name="l10n_keep_your_seed_safe_cdc03cc8" formatted="false">"시드 문구를 보호하세요"</string>
@@ -681,6 +697,7 @@
     <string name="l10n_none_dc937b59" formatted="false">"없음"</string>
     <string name="l10n_norwegian_krone_66f55f57" formatted="false">"노르웨이 크로네"</string>
     <string name="l10n_not_configured_bbea960e" formatted="false">"설정되지 않음"</string>
+    <string name="l10n_not_now_ccb4c324" formatted="false">"나중에"</string>
     <string name="l10n_not_set_8290035d" formatted="false">"설정 안 됨"</string>
     <string name="l10n_not_available_67a926f7" formatted="false">"사용할 수 없음"</string>
     <string name="l10n_not_available_for_transactions_sent_before_this_wallet__47e02c54" formatted="false">"이 지갑을 복원하기 전에 보낸 거래에는 사용할 수 없음"</string>
@@ -693,6 +710,7 @@
     <string name="l10n_not_in_the_word_list_f182a51f" formatted="false">"단어 목록에 없음"</string>
     <string name="l10n_not_selected_df12aeba" formatted="false">"선택 안 됨"</string>
     <string name="l10n_not_synced_87cde3ef" formatted="false">"오프라인"</string>
+    <string name="l10n_not_yet_in_the_public_log_92abbbee" formatted="false">"아직 공개 로그에 없음"</string>
     <string name="l10n_note_d8da2c49" formatted="false">"메모"</string>
     <string name="l10n_note_s_3deb4f9b" formatted="false">"메모, %1$s"</string>
     <string name="l10n_note_none_961e1a78" formatted="false">"메모, 없음"</string>
@@ -730,6 +748,7 @@
     <string name="l10n_opens_the_transaction_in_an_in_app_browser_88c02a39" formatted="false">"앱 내 브라우저에서 거래를 엽니다"</string>
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"돈이 들어갈 지갑을 선택할 수 있도록 지갑 목록을 엽니다"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"지갑을 전환하거나 이름을 변경하거나 추가할 수 있는 지갑 목록을 엽니다"</string>
+    <string name="l10n_opens_your_username_card_9482da3c" formatted="false">"내 사용자 이름 카드를 엽니다"</string>
     <string name="l10n_optic_id_650eb5d4" formatted="false">"Optic ID"</string>
     <string name="l10n_other_wallets_show_their_last_known_balance_e3e5aca7" formatted="false">"다른 지갑에는 마지막으로 확인된 잔액이 표시됩니다."</string>
     <string name="l10n_outgoing_transactions_may_be_out_of_date_179823e2" formatted="false">"보낸 거래 정보가 최신이 아닐 수 있습니다"</string>
@@ -750,6 +769,7 @@
     <string name="l10n_payment_link_bc7c1f6c" formatted="false">"결제 링크"</string>
     <string name="l10n_payment_link_7f3bd7d2" formatted="false">"결제 링크"</string>
     <string name="l10n_payment_link_s_eb335677" formatted="false">"결제 링크: %1$s"</string>
+    <string name="l10n_payments_go_to_76dfba49" formatted="false">"결제 받는 곳"</string>
     <string name="l10n_payments_to_your_main_address_can_be_linked_together_50d87ace" formatted="false">"기본 주소로 받은 결제는 서로 연결될 수 있습니다."</string>
     <string name="l10n_pending_331551b0" formatted="false">"대기 중"</string>
     <string name="l10n_pending_s_s_5f9a06f7" formatted="false">"대기 중 %1$s/%2$s"</string>
@@ -978,8 +998,10 @@
     <string name="l10n_share_qr_code_ffbb0902" formatted="false">"QR 코드 공유"</string>
     <string name="l10n_share_address_a4e12428" formatted="false">"주소 공유"</string>
     <string name="l10n_share_again_8fb3b8e2" formatted="false">"다시 공유"</string>
+    <string name="l10n_share_link_712a4823" formatted="false">"링크 공유"</string>
     <string name="l10n_share_the_link_b0c1ec20" formatted="false">"링크 공유"</string>
     <string name="l10n_share_the_link_again_ca22671a" formatted="false">"링크 다시 공유"</string>
+    <string name="l10n_share_username_9fd1b91c" formatted="false">"사용자 이름 공유"</string>
     <string name="l10n_share_view_only_wallet_keys_e0bb1306" formatted="false">"보기 전용 지갑 키 공유"</string>
     <string name="l10n_show_s_first_cc3cb868" formatted="false">"%1$s 먼저 표시"</string>
     <string name="l10n_show_balance_transactions_bf96c0cc" formatted="false">"잔액 및 거래 표시"</string>
@@ -998,11 +1020,13 @@
     <string name="l10n_shows_your_balance_over_time_40113f92" formatted="false">"시간에 따른 잔액을 표시합니다"</string>
     <string name="l10n_shows_your_payment_links_a6c313d0" formatted="false">"결제 링크를 표시합니다"</string>
     <string name="l10n_sign_with_trezor_63d35e0b" formatted="false">"Trezor로 서명"</string>
+    <string name="l10n_signature_checked_1217e3f5" formatted="false">"서명 확인됨"</string>
     <string name="l10n_simple_private_secure_9cc5a4a5" formatted="false">"간단하게. 비공개로. 안전하게."</string>
     <string name="l10n_skip_for_now_1e157fdf" formatted="false">"나중에 하기"</string>
     <string name="l10n_something_went_wrong_ab827e3f" formatted="false">"문제가 발생했습니다"</string>
     <string name="l10n_south_korean_won_9c88b386" formatted="false">"대한민국 원"</string>
     <string name="l10n_standard_ef669154" formatted="false">"표준"</string>
+    <string name="l10n_start_with_a_letter_25aa573c" formatted="false">"영문자로 시작하세요."</string>
     <string name="l10n_statistics_a656107e" formatted="false">"통계"</string>
     <string name="l10n_status_920e413c" formatted="false">"상태"</string>
     <string name="l10n_status_s_8c0b936b" formatted="false">"상태: %1$s"</string>
@@ -1066,20 +1090,30 @@
     <string name="l10n_the_address_for_s_s_is_different_from_the_address_you_p_3cdf352c" formatted="false">"%1$s(%2$s)의 주소가 %3$s에 결제한 주소와 다릅니다. 받는 사람에게 새 주소를 확인하세요."</string>
     <string name="l10n_the_address_for_s_is_different_from_the_address_you_pai_b51afe25" formatted="false">"%1$s의 주소가 %2$s에 결제한 주소와 다릅니다. 받는 사람에게 새 주소를 확인하세요."</string>
     <string name="l10n_the_amount_in_this_link_is_not_a_valid_xmr_amount_16fc0795" formatted="false">"이 링크의 금액은 유효한 XMR 금액이 아닙니다."</string>
+    <string name="l10n_the_card_couldn_t_be_shared_please_try_again_3fe46438" formatted="false">"카드를 공유하지 못했습니다. 다시 시도하세요."</string>
+    <string name="l10n_the_claim_could_not_be_completed_please_try_again_d1492550" formatted="false">"등록을 완료하지 못했습니다. 다시 시도하세요."</string>
     <string name="l10n_the_clipboard_clears_in_s_0329e50d" formatted="false">"클립보드는 %1$s 후에 지워집니다."</string>
     <string name="l10n_the_lookup_took_too_long_bae6d149" formatted="false">"조회 시간이 너무 오래 걸렸습니다"</string>
     <string name="l10n_the_payment_could_not_be_confirmed_if_it_went_through_t_9543d69a" formatted="false">"결제를 확인할 수 없습니다. 결제가 완료되었다면 링크가 활동에 표시됩니다."</string>
     <string name="l10n_the_payment_link_failed_its_safety_check_nothing_was_se_9e2a494f" formatted="false">"결제 링크가 보안 검사를 통과하지 못했습니다. 아무것도 전송되지 않았습니다."</string>
     <string name="l10n_the_price_feed_has_no_s_quote_0b226e88" formatted="false">"가격 피드에 %1$s 시세가 없습니다."</string>
+    <string name="l10n_the_public_username_records_are_too_old_for_a_first_pay_d892e8c0" formatted="false">"공개 사용자 이름 기록이 너무 오래되어 첫 결제를 할 수 없습니다. 나중에 다시 시도하세요."</string>
     <string name="l10n_the_record_holds_an_address_for_another_network_31f49873" formatted="false">"레코드에 다른 네트워크의 주소가 있습니다"</string>
     <string name="l10n_the_record_holds_an_invalid_monero_address_18a56b6b" formatted="false">"레코드에 유효하지 않은 Monero 주소가 있습니다"</string>
+    <string name="l10n_the_request_expired_please_claim_again_77c2e839" formatted="false">"요청이 만료되었습니다. 다시 등록하세요."</string>
+    <string name="l10n_the_username_changed_since_your_review_look_it_up_again_f704b732" formatted="false">"확인한 이후 사용자 이름이 변경되었습니다. 보내기 전에 다시 조회하세요."</string>
+    <string name="l10n_the_username_response_could_not_be_verified_please_try__b7b3ed13" formatted="false">"사용자 이름 응답을 확인하지 못했습니다. 다시 시도하세요."</string>
+    <string name="l10n_the_username_service_couldn_t_complete_the_request_plea_e5815445" formatted="false">"사용자 이름 서비스에서 요청을 완료하지 못했습니다. 다시 시도하세요."</string>
     <string name="l10n_the_value_of_monero_can_fluctuate_significantly_only_us_284367aa" formatted="false">"Monero의 가치는 크게 변동할 수 있습니다. 잃어도 괜찮은 자금만 사용하세요."</string>
+    <string name="l10n_the_wallet_changed_open_this_flow_from_the_wallet_you_w_bd9e816b" formatted="false">"지갑이 변경되었습니다. 사용하려는 지갑에서 이 과정을 다시 시작하세요."</string>
+    <string name="l10n_the_wallet_changed_review_the_payment_again_f67e5e29" formatted="false">"지갑이 변경되었습니다. 결제를 다시 확인하세요."</string>
     <string name="l10n_the_wallet_couldn_t_load_its_keys_so_no_receive_address_97a33f75" formatted="false">"지갑 키를 불러올 수 없어 받기 주소를 표시할 수 없습니다. 이 문제가 해결될 때까지 이 앱에 표시된 어떤 주소로도 자금을 보내지 마세요. 앱을 강제 종료한 후 다시 여세요. 문제가 계속되면 시드로 지갑을 복원하세요."</string>
     <string name="l10n_the_wallet_stays_unlocked_until_the_app_is_force_closed_eb3ed2b1" formatted="false">"앱을 강제 종료할 때까지 지갑이 잠금 해제 상태로 유지됩니다"</string>
     <string name="l10n_this_polyseed_uses_a_passphrase_monero_one_does_not_sup_2d07f5e0" formatted="false">"이 Polyseed는 암호 문구를 사용합니다. Monero One은 아직 Polyseed 암호 문구를 지원하지 않습니다."</string>
     <string name="l10n_this_device_does_not_support_biometric_authentication_y_60fadc72" formatted="false">"이 기기는 생체 인증을 지원하지 않습니다. 기기에 생체 인증을 설정하면 나중에 설정에서 활성화할 수 있습니다."</string>
     <string name="l10n_this_helps_speed_up_transaction_scanning_by_skipping_bl_ff8147d6" formatted="false">"지갑이 생성되기 전의 블록을 건너뛰어 거래 스캔 속도를 높입니다."</string>
     <string name="l10n_this_iphone_was_set_up_from_a_device_backup_wallet_keys_86cd3cbf" formatted="false">"이 iPhone은 기기 백업으로 설정되었습니다. 지갑 키는 이전 iPhone에 남아 있으므로 Monero One에서 여기에 복원해야 합니다."</string>
+    <string name="l10n_this_is_a_local_development_claim_3a627df1" formatted="false">"로컬 개발용 등록입니다."</string>
     <string name="l10n_this_is_not_a_monero_one_payment_link_42e38dce" formatted="false">"Monero One 결제 링크가 아닙니다."</string>
     <string name="l10n_this_is_not_a_valid_monero_payment_link_cd32d925" formatted="false">"유효한 Monero 결제 링크가 아닙니다."</string>
     <string name="l10n_this_is_the_only_way_to_recover_your_wallet_store_it_sa_be62bce0" formatted="false">"지갑을 복구할 수 있는 유일한 방법입니다. 오프라인에 안전하게 보관하세요."</string>
@@ -1104,6 +1138,10 @@
     <string name="l10n_this_removes_wallet_data_from_this_device_only_your_wal_e09970ba" formatted="false">"이 기기에서 지갑을 제거합니다. 시드 문구로 복구할 수 있습니다."</string>
     <string name="l10n_this_seed_phrase_is_already_used_by_s_5d2ed787" formatted="false">"이 시드 문구는 이미 “%1$s” 지갑에서 사용 중입니다"</string>
     <string name="l10n_this_software_is_provided_as_is_while_we_strive_for_sec_aec10f71" formatted="false">"이 소프트웨어는 있는 그대로 제공됩니다. 보안과 안정성을 위해 노력하지만 소프트웨어에 버그가 없다고 보장할 수는 없습니다."</string>
+    <string name="l10n_this_username_is_not_in_the_public_log_yet_the_payment__1a004955" formatted="false">"이 사용자 이름은 아직 공개 로그에 없습니다. 결제 한도는 0.1 XMR입니다."</string>
+    <string name="l10n_this_username_is_reserved_to_protect_users_from_scams_d15d52ef" formatted="false">"이 사용자 이름은 사기로부터 사용자를 보호하기 위해 예약되어 있습니다."</string>
+    <string name="l10n_this_username_is_unavailable_5b9ace3d" formatted="false">"이 사용자 이름은 사용할 수 없습니다"</string>
+    <string name="l10n_this_username_is_unavailable_44a84491" formatted="false">"이 사용자 이름은 사용할 수 없습니다."</string>
     <string name="l10n_this_wallet_is_view_only_and_cannot_send_d1c7e692" formatted="false">"이 지갑은 보기 전용이므로 보낼 수 없습니다"</string>
     <string name="l10n_this_wallet_is_view_only_and_cannot_send_switch_to_a_wa_90c60f19" formatted="false">"이 지갑은 보기 전용이므로 보낼 수 없습니다. 보낼 수 있는 지갑으로 전환한 다음 링크를 다시 여십시오."</string>
     <string name="l10n_this_wallet_scans_again_from_its_restore_height_transac_722eee0c" formatted="false">"이 지갑을 복원 높이부터 다시 스캔합니다. 지난 송금의 거래 키는 삭제됩니다."</string>
@@ -1193,11 +1231,22 @@
     <string name="l10n_use_pin_3e03ee29" formatted="false">"PIN 사용"</string>
     <string name="l10n_use_tor_proxy_89445203" formatted="false">"Tor 프록시 사용"</string>
     <string name="l10n_use_an_ip_address_and_port_for_example_127_0_0_1_9050_2e0d26ba" formatted="false">"IP 주소와 포트를 사용하세요. 예: 127.0.0.1:9050."</string>
+    <string name="l10n_use_at_least_3_characters_c86f08b9" formatted="false">"3자 이상 입력하세요."</string>
     <string name="l10n_use_biometrics_7827a57f" formatted="false">"생체 인식"</string>
     <string name="l10n_use_fingerprint_or_face_to_unlock_5fdb5d2e" formatted="false">"지문 또는 얼굴로 잠금 해제"</string>
+    <string name="l10n_use_no_more_than_15_characters_f91e9726" formatted="false">"15자 이하로 입력하세요."</string>
     <string name="l10n_use_one_of_your_unused_addresses_first_a_restore_from_t_d80d64ec" formatted="false">"먼저 사용하지 않은 주소 중 하나를 사용하십시오. 시드 문구로 복원하면 새 주소로 받은 결제를 놓칩니다."</string>
+    <string name="l10n_use_only_a_z_0_9_and_b771261d" formatted="false">"a–z, 0–9, _만 사용할 수 있습니다."</string>
+    <string name="l10n_use_only_one_in_a_row_be19d70b" formatted="false">"_는 연속으로 하나만 사용할 수 있습니다."</string>
     <string name="l10n_use_wallet_creation_date_0285cef8" formatted="false">"지갑 생성 날짜 사용"</string>
     <string name="l10n_username_e3b89e9d" formatted="false">"사용자 이름"</string>
+    <string name="l10n_username_payments_aren_t_available_yet_8c9ff4b9" formatted="false">"사용자 이름으로 결제는 아직 사용할 수 없습니다"</string>
+    <string name="l10n_username_records_are_out_of_date_1faf1d01" formatted="false">"사용자 이름 기록이 오래되었습니다"</string>
+    <string name="l10n_username_records_are_out_of_date_the_payment_limit_is_0_e13a7638" formatted="false">"사용자 이름 기록이 오래되었습니다. 결제 한도는 0.1 XMR입니다."</string>
+    <string name="l10n_username_registration_isn_t_available_yet_b5686202" formatted="false">"사용자 이름 등록은 아직 사용할 수 없습니다."</string>
+    <string name="l10n_username_signature_check_failed_do_not_send_to_this_add_f578e341" formatted="false">"사용자 이름 서명 확인에 실패했습니다. 이 주소로 보내지 마세요."</string>
+    <string name="l10n_usernames_are_permanent_86694470" formatted="false">"사용자 이름은 영구적입니다."</string>
+    <string name="l10n_using_a_previously_checked_username_8a426bca" formatted="false">"이전에 확인한 사용자 이름 사용 중"</string>
     <string name="l10n_valid_address_7b8c82b2" formatted="false">"유효한 주소"</string>
     <string name="l10n_valid_seed_phrase_7ec83780" formatted="false">"유효한 시드 문구"</string>
     <string name="l10n_value_8e37953d" formatted="false">"값"</string>
@@ -1276,12 +1325,16 @@
     <string name="l10n_your_pin_is_required_to_access_your_recovery_phrase_636df823" formatted="false">"복구 문구에 접근하려면 PIN이 필요합니다"</string>
     <string name="l10n_your_payment_link_d7e13524" formatted="false">"내 결제 링크"</string>
     <string name="l10n_your_seed_phrase_dd4949d6" formatted="false">"시드 문구"</string>
+    <string name="l10n_your_username_fa1f5937" formatted="false">"내 사용자 이름"</string>
     <string name="l10n_your_history_starts_here_9357da77" formatted="false">"여기서 기록이 시작됩니다"</string>
     <string name="l10n_your_location_data_stays_on_your_device_it_s_only_used__e37b3c21" formatted="false">"위치 데이터는 기기에만 남습니다. 신뢰 구역 안에 있는지 확인하는 데만 사용되며, 어디에도 저장, 기록 또는 전송되지 않습니다."</string>
     <string name="l10n_your_screen_reader_will_read_your_recovery_phrase_out_l_5b850931" formatted="false">"스크린 리더가 복구 문구를 소리 내어 읽습니다. 이를 들은 사람은 자금을 훔칠 수 있습니다. 계속하기 전에 헤드폰을 사용하거나 아무도 기기 소리를 들을 수 없는지 확인하세요."</string>
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"스크린 리더가 복구 문구를 소리 내어 읽습니다. 이를 들은 사람은 자금을 훔칠 수 있습니다. 계속하기 전에 헤드폰을 사용하거나 아무도 기기 소리를 들을 수 없는지 확인하세요."</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"거래가 전송되었습니다."</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"동기화가 완료되면 거래가 여기에 표시됩니다"</string>
+    <string name="l10n_your_username_b210fd41" formatted="false">"내 사용자 이름"</string>
+    <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"사용자 이름을 안전하게 저장하지 못했습니다. 앱 잠금을 해제하고 다시 시도하세요."</string>
+    <string name="l10n_your_username_s_3932c5a7" formatted="false">"내 사용자 이름, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"지갑에 아직 받는 주소가 없습니다. 불러오기가 끝날 때까지 기다린 뒤 다시 시도하세요."</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"지갑이 사용 중입니다. 잠시 후 다시 시도하세요."</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"지갑이 신뢰할 수 없는 위치에서 동기화 중입니다. 의도한 것이라면 설정에서 이 위치를 신뢰할 수 있는 위치로 추가하세요."</string>
@@ -1313,6 +1366,7 @@
     <string name="l10n_unused_febe1d74" formatted="false">"미사용"</string>
     <string name="l10n_up_75a288c0" formatted="false">"상승"</string>
     <string name="l10n_up_s_2fa9bc08" formatted="false">"%1$s%% 상승"</string>
+    <string name="l10n_username_16f78a7d" formatted="false">"사용자 이름"</string>
     <string name="l10n_view_only_8479be81" formatted="false">"보기 전용"</string>
     <string name="l10n_s_xmr_6ddc67de" formatted="false">"~%1$s XMR"</string>
     <string name="l10n_s_scans_again_from_its_restore_height_transaction_keys__89c5af9a" formatted="false">"‘%1$s’ 지갑을 복원 높이부터 다시 스캔합니다. 지난 송금의 거래 키는 삭제됩니다."</string>

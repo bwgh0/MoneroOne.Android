@@ -2,6 +2,7 @@ package one.monero.moneroone.core.locale
 
 import android.content.Context
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 
 object AppStrings {
@@ -26,6 +27,9 @@ object AppStrings {
         return formatTranslation(translated, args)
     }
 
+    /** A resource of the app's language, for copy whose English text is already another message's key. */
+    fun resource(@StringRes id: Int, fallback: String): String = localized()?.getString(id) ?: fallback
+
     fun quantity(source: String, count: Int): String {
         val context = localized()
         val translated = localizedPlurals[source]?.let { context?.resources?.getQuantityString(it, count) }
@@ -36,6 +40,7 @@ object AppStrings {
 
 /** Localize UI copy only. Call at display time, never when persisting user data. */
 fun tr(source: String, vararg args: Any?): String = AppStrings.text(source, *args)
+fun trRes(@StringRes id: Int, fallback: String): String = AppStrings.resource(id, fallback)
 fun pluralTr(source: String, count: Int): String = AppStrings.quantity(source, count)
 
 /** One substitution pass: values containing percent signs are never reinterpreted. */

@@ -24,6 +24,7 @@
     <string name="l10n_s_to_claim_4a220b89" formatted="false">"%1$s можно забрать"</string>
     <string name="l10n_s_s_ffad8427" formatted="false">"%1$s · %2$s"</string>
     <string name="l10n_s_s_open_dfdb7ceb" formatted="false">"%1$s · открытых: %2$s"</string>
+    <string name="l10n_s_other_apps_80bd14fe" formatted="false">"%1$s · Другие приложения"</string>
     <string name="l10n_s_connecting_to_monero_network_70d08cc4" formatted="false">"%s — подключение к сети Monero"</string>
     <string name="l10n_s_syncing_s_04b3ee90" formatted="false">"%s — синхронизация %s %%"</string>
     <string name="l10n_s_live_62e53b9a" formatted="false">"%1$s • В сети"</string>
@@ -34,6 +35,7 @@
     <string name="l10n_s_s_tap_to_sync_sent_transactions_7e21a236" formatted="false">"%1$s%2$s. Коснитесь, чтобы синхронизировать отправленные транзакции."</string>
     <string name="l10n_s_s_of_s_digits_entered_9845c446" formatted="false">"%1$s, введено цифр: %2$s из %3$s"</string>
     <string name="l10n_s_s_s_of_s_021f204a" formatted="false">"%1$s, %2$s, %3$s из %4$s"</string>
+    <string name="l10n_s_monero_one_username_card_s_029403b7" formatted="false">"%1$s, карточка имени пользователя Monero One. %2$s"</string>
     <string name="l10n_s_disabled_for_view_only_wallet_a7817a74" formatted="false">"%1$s, недоступно в кошельке только для просмотра"</string>
     <string name="l10n_s_portfolio_s_f99d40f6" formatted="false">"%1$s, портфель: %2$s"</string>
     <string name="l10n_s_subaddress_s_8258744c" formatted="false">"%1$s, субадрес %2$s"</string>
@@ -74,6 +76,8 @@
     <string name="l10n_24h_29905ab7" formatted="false">"24 ч"</string>
     <string name="l10n_24h_change_66f9b755" formatted="false">"Изменение за 24 ч"</string>
     <string name="l10n_2km_7c15492a" formatted="false">"2 км"</string>
+    <string name="l10n_3_15_characters_availability_is_checked_when_you_claim_d8d87494" formatted="false">"3–15 символов. Доступность проверяется при регистрации."</string>
+    <string name="l10n_3_15_characters_letters_numbers_and_f01f1d02" formatted="false">"3–15 символов. Буквы, цифры и _."</string>
     <string name="l10n_4_digits_8c09c57b" formatted="false">"4 цифры"</string>
     <string name="l10n_4_digit_pin_s_3ad16dcc" formatted="false">"PIN-код из 4 цифр. %1$s"</string>
     <string name="l10n_5_minutes_3170543c" formatted="false">"5 минут"</string>
@@ -81,6 +85,8 @@
     <string name="l10n_6_digits_e0efd043" formatted="false">"6 цифр"</string>
     <string name="l10n_6_digit_pin_recommended_s_61cc2218" formatted="false">"PIN-код из 6 цифр, рекомендуется. %1$s"</string>
     <string name="l10n_64_lowercase_hex_characters_ee749803" formatted="false">"64 шестнадцатеричных символа в нижнем регистре"</string>
+    <string name="l10n_a_free_username_isn_t_available_on_this_phone_af0664c0" formatted="false">"На этом телефоне бесплатное имя пользователя недоступно."</string>
+    <string name="l10n_a_short_username_people_can_use_to_pay_you_bf719743" formatted="false">"Короткое имя пользователя, по которому вам смогут платить."</string>
     <string name="l10n_about_4efca0d1" formatted="false">"О приложении"</string>
     <string name="l10n_about_s_xmr_e24cc9d7" formatted="false">"Около %1$s XMR"</string>
     <string name="l10n_above_80792346" formatted="false">"Выше"</string>
@@ -113,6 +119,7 @@
     <string name="l10n_address_doesn_t_look_valid_for_mainnet_027a2baf" formatted="false">"Адрес недействителен для основной сети."</string>
     <string name="l10n_address_doesn_t_look_valid_for_testnet_e4c3a7a2" formatted="false">"Адрес недействителен для тестовой сети."</string>
     <string name="l10n_address_found_for_s_0af31ca9" formatted="false">"Адрес для %1$s найден"</string>
+    <string name="l10n_address_username_or_openalias_d3d7245d" formatted="false">"Адрес, @имя пользователя или OpenAlias"</string>
     <string name="l10n_address_fa0882e2" formatted="false">"Адрес:"</string>
     <string name="l10n_adjust_to_explore_the_balance_and_activity_at_each_time_fc6ccd58" formatted="false">"Изменяйте значение, чтобы посмотреть баланс и активность в любой момент. Вернитесь к «Сейчас», чтобы увидеть текущий кошелёк."</string>
     <string name="l10n_after_a_payment_arrives_receive_shows_a_new_address_old_579be71c" formatted="false">"После поступления платежа на экране «Получить» появится новый адрес. Старые адреса продолжат работать."</string>
@@ -209,6 +216,7 @@
     <string name="l10n_chart_mode_9b19d23e" formatted="false">"Режим графика"</string>
     <string name="l10n_check_again_32e60e73" formatted="false">"Проверить ещё раз"</string>
     <string name="l10n_check_screen_time_or_device_management_c63dba08" formatted="false">"Проверьте «Экранное время» или управление устройством."</string>
+    <string name="l10n_check_username_13eb7265" formatted="false">"Проверьте имя пользователя"</string>
     <string name="l10n_check_word_s_90eb1a05" formatted="false">"Проверьте слово %s"</string>
     <string name="l10n_check_words_s_23e605da" formatted="false">"Проверьте слова %s"</string>
     <string name="l10n_checking_latency_544be1ed" formatted="false">"Проверка задержки"</string>
@@ -217,13 +225,16 @@
     <string name="l10n_checking_2e5f79bb" formatted="false">"Проверка..."</string>
     <string name="l10n_chinese_yuan_e689570a" formatted="false">"Китайский юань"</string>
     <string name="l10n_choose_icon_4060e90f" formatted="false">"Выбрать значок"</string>
+    <string name="l10n_choose_my_username_100415f9" formatted="false">"Выбрать имя пользователя"</string>
     <string name="l10n_choose_restore_method_5f66994c" formatted="false">"Выберите способ восстановления"</string>
     <string name="l10n_choose_seed_format_d1699775" formatted="false">"Выберите формат мнемонической фразы"</string>
+    <string name="l10n_choose_your_username_0a3ee390" formatted="false">"Выберите имя пользователя"</string>
     <string name="l10n_choose_a_new_6_digit_pin_c2846426" formatted="false">"Новый PIN-код"</string>
     <string name="l10n_choose_a_wallet_d1157c4d" formatted="false">"Выбрать кошелёк"</string>
     <string name="l10n_choose_another_date_d8c80c56" formatted="false">"Выбрать другую дату"</string>
     <string name="l10n_choose_your_preferred_app_appearance_9f795e99" formatted="false">"Оформление"</string>
     <string name="l10n_claim_4ca41db0" formatted="false">"Забрать"</string>
+    <string name="l10n_claim_s_3545e872" formatted="false">"Зарегистрировать @%1$s"</string>
     <string name="l10n_claim_by_aff685c9" formatted="false">"Забрать до"</string>
     <string name="l10n_claim_by_s_4bc68146" formatted="false">"Забрать до %1$s"</string>
     <string name="l10n_claim_fee_reserve_0d0fd617" formatted="false">"Резерв на комиссию за получение"</string>
@@ -258,6 +269,7 @@
     <string name="l10n_confirm_the_transaction_on_your_trezor_c899d398" formatted="false">"Подтвердите транзакцию на Trezor"</string>
     <string name="l10n_confirm_this_transaction_14bfcca1" formatted="false">"Подтвердите эту транзакцию"</string>
     <string name="l10n_confirm_transaction_44a3e7d3" formatted="false">"Подтвердите эту транзакцию"</string>
+    <string name="l10n_confirm_with_the_recipient_that_s_is_their_username_bef_6366e61a" formatted="false">"Перед первым платежом убедитесь у получателя, что %1$s является его именем пользователя."</string>
     <string name="l10n_confirm_you_have_written_down_your_seed_phrase_to_conti_48409d82" formatted="false">"Подтвердите, что записали мнемоническую фразу, чтобы продолжить"</string>
     <string name="l10n_confirmations_5dfa99a6" formatted="false">"Подтверждения"</string>
     <string name="l10n_confirmations_s_1dfca167" formatted="false">"Подтверждений: %1$s"</string>
@@ -481,6 +493,7 @@
     <string name="l10n_fee_s_xmr_9efa7208" formatted="false">"Комиссия: %1$s XMR"</string>
     <string name="l10n_fetching_price_f74cc78c" formatted="false">"Получение цены..."</string>
     <string name="l10n_filter_transactions_00d87315" formatted="false">"Фильтр транзакций"</string>
+    <string name="l10n_finish_checking_the_previous_claim_before_choosing_anot_525aa63b" formatted="false">"Завершите проверку предыдущей регистрации, прежде чем выбирать другое имя пользователя."</string>
     <string name="l10n_first_payment_to_this_name_check_the_address_with_the_r_5e52f2f6" formatted="false">"Первый платёж на это имя. Сверьте адрес с получателем."</string>
     <string name="l10n_first_time_sync_can_take_a_few_minutes_2b7fc90b" formatted="false">"Первая синхронизация может занять несколько минут."</string>
     <string name="l10n_forgot_pin_74ad27db" formatted="false">"Забыли PIN-код"</string>
@@ -493,6 +506,8 @@
     <string name="l10n_full_wallet_you_can_send_and_receive_adca402c" formatted="false">"Полный кошелёк — можно отправлять и получать."</string>
     <string name="l10n_funding_transaction_c2006a3f" formatted="false">"Транзакция пополнения"</string>
     <string name="l10n_generating_49286f33" formatted="false">"Загрузка..."</string>
+    <string name="l10n_get_your_username_6ee3ef92" formatted="false">"Получите имя пользователя"</string>
+    <string name="l10n_get_your_username_e62eb872" formatted="false">"Получите имя пользователя."</string>
     <string name="l10n_get_notified_on_price_changes_1a5ab92c" formatted="false">"Просмотр ценовых оповещений и управление ими"</string>
     <string name="l10n_get_notified_when_xmr_crosses_a_price_you_set_92aed39f" formatted="false">"Получайте уведомление, когда XMR достигнет заданной вами цены."</string>
     <string name="l10n_good_afternoon_6638425f" formatted="false">"Добрый день"</string>
@@ -547,6 +562,7 @@
     <string name="l10n_invalid_seed_phrase_3a8da7cf" formatted="false">"Недействительная мнемоническая фраза"</string>
     <string name="l10n_invalid_seed_phrase_please_check_your_words_and_try_aga_48aabf18" formatted="false">"Недействительная мнемоническая фраза. Проверьте слова и повторите попытку."</string>
     <string name="l10n_it_checks_again_every_few_seconds_while_this_screen_is__aa8d210f" formatted="false">"Пока этот экран открыт, проверка повторяется каждые несколько секунд."</string>
+    <string name="l10n_it_s_yours_c338d63b" formatted="false">"Оно ваше."</string>
     <string name="l10n_item_not_found_in_keychain_cc73af45" formatted="false">"Элемент не найден в связке ключей"</string>
     <string name="l10n_japanese_yen_fa53dbe5" formatted="false">"Японская иена"</string>
     <string name="l10n_keep_your_seed_safe_cdc03cc8" formatted="false">"Защитите мнемоническую фразу"</string>
@@ -681,6 +697,7 @@
     <string name="l10n_none_dc937b59" formatted="false">"Нет"</string>
     <string name="l10n_norwegian_krone_66f55f57" formatted="false">"Норвежская крона"</string>
     <string name="l10n_not_configured_bbea960e" formatted="false">"Не настроено"</string>
+    <string name="l10n_not_now_ccb4c324" formatted="false">"Не сейчас"</string>
     <string name="l10n_not_set_8290035d" formatted="false">"Не задано"</string>
     <string name="l10n_not_available_67a926f7" formatted="false">"Недоступно"</string>
     <string name="l10n_not_available_for_transactions_sent_before_this_wallet__47e02c54" formatted="false">"Недоступно для транзакций, отправленных до восстановления этого кошелька"</string>
@@ -693,6 +710,7 @@
     <string name="l10n_not_in_the_word_list_f182a51f" formatted="false">"Нет в списке слов"</string>
     <string name="l10n_not_selected_df12aeba" formatted="false">"Не выбрано"</string>
     <string name="l10n_not_synced_87cde3ef" formatted="false">"Офлайн"</string>
+    <string name="l10n_not_yet_in_the_public_log_92abbbee" formatted="false">"Ещё нет в публичном журнале"</string>
     <string name="l10n_note_d8da2c49" formatted="false">"Заметка"</string>
     <string name="l10n_note_s_3deb4f9b" formatted="false">"Заметка, %1$s"</string>
     <string name="l10n_note_none_961e1a78" formatted="false">"Заметка, нет"</string>
@@ -730,6 +748,7 @@
     <string name="l10n_opens_the_transaction_in_an_in_app_browser_88c02a39" formatted="false">"Открывает транзакцию во встроенном браузере"</string>
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"Открывает список кошельков, чтобы выбрать, куда поступят деньги"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"Открывает список кошельков, где можно переключать, переименовывать и добавлять кошельки"</string>
+    <string name="l10n_opens_your_username_card_9482da3c" formatted="false">"Открывает карточку вашего имени пользователя"</string>
     <string name="l10n_optic_id_650eb5d4" formatted="false">"Optic ID"</string>
     <string name="l10n_other_wallets_show_their_last_known_balance_e3e5aca7" formatted="false">"Для других кошельков показан последний известный баланс."</string>
     <string name="l10n_outgoing_transactions_may_be_out_of_date_179823e2" formatted="false">"Исходящие транзакции могут быть неактуальны"</string>
@@ -750,6 +769,7 @@
     <string name="l10n_payment_link_bc7c1f6c" formatted="false">"Платёжная ссылка"</string>
     <string name="l10n_payment_link_7f3bd7d2" formatted="false">"Платёжная ссылка"</string>
     <string name="l10n_payment_link_s_eb335677" formatted="false">"Платёжная ссылка: %1$s"</string>
+    <string name="l10n_payments_go_to_76dfba49" formatted="false">"Платежи поступают в"</string>
     <string name="l10n_payments_to_your_main_address_can_be_linked_together_50d87ace" formatted="false">"Платежи на основной адрес можно связать между собой."</string>
     <string name="l10n_pending_331551b0" formatted="false">"Ожидает"</string>
     <string name="l10n_pending_s_s_5f9a06f7" formatted="false">"Ожидает %1$s/%2$s"</string>
@@ -978,8 +998,10 @@
     <string name="l10n_share_qr_code_ffbb0902" formatted="false">"Поделиться QR-кодом"</string>
     <string name="l10n_share_address_a4e12428" formatted="false">"Поделиться адресом"</string>
     <string name="l10n_share_again_8fb3b8e2" formatted="false">"Поделиться ещё раз"</string>
+    <string name="l10n_share_link_712a4823" formatted="false">"Поделиться ссылкой"</string>
     <string name="l10n_share_the_link_b0c1ec20" formatted="false">"Поделиться ссылкой"</string>
     <string name="l10n_share_the_link_again_ca22671a" formatted="false">"Поделиться ссылкой ещё раз"</string>
+    <string name="l10n_share_username_9fd1b91c" formatted="false">"Поделиться именем пользователя"</string>
     <string name="l10n_share_view_only_wallet_keys_e0bb1306" formatted="false">"Поделиться ключами кошелька только для просмотра"</string>
     <string name="l10n_show_s_first_cc3cb868" formatted="false">"Сначала показывать %1$s"</string>
     <string name="l10n_show_balance_transactions_bf96c0cc" formatted="false">"Показывать баланс и транзакции"</string>
@@ -998,11 +1020,13 @@
     <string name="l10n_shows_your_balance_over_time_40113f92" formatted="false">"Показывает изменение баланса со временем"</string>
     <string name="l10n_shows_your_payment_links_a6c313d0" formatted="false">"Показывает ваши платёжные ссылки"</string>
     <string name="l10n_sign_with_trezor_63d35e0b" formatted="false">"Подписать на Trezor"</string>
+    <string name="l10n_signature_checked_1217e3f5" formatted="false">"Подпись проверена"</string>
     <string name="l10n_simple_private_secure_9cc5a4a5" formatted="false">"Просто. Приватно. Надёжно."</string>
     <string name="l10n_skip_for_now_1e157fdf" formatted="false">"Не сейчас"</string>
     <string name="l10n_something_went_wrong_ab827e3f" formatted="false">"Что-то пошло не так"</string>
     <string name="l10n_south_korean_won_9c88b386" formatted="false">"Южнокорейская вона"</string>
     <string name="l10n_standard_ef669154" formatted="false">"Стандартный"</string>
+    <string name="l10n_start_with_a_letter_25aa573c" formatted="false">"Начните с буквы."</string>
     <string name="l10n_statistics_a656107e" formatted="false">"Статистика"</string>
     <string name="l10n_status_920e413c" formatted="false">"Статус"</string>
     <string name="l10n_status_s_8c0b936b" formatted="false">"Статус: %1$s"</string>
@@ -1066,20 +1090,30 @@
     <string name="l10n_the_address_for_s_s_is_different_from_the_address_you_p_3cdf352c" formatted="false">"Адрес для %1$s (%2$s) отличается от адреса, на который вы платили %3$s. Сверьте новый адрес с получателем."</string>
     <string name="l10n_the_address_for_s_is_different_from_the_address_you_pai_b51afe25" formatted="false">"Адрес для %1$s отличается от адреса, на который вы платили %2$s. Сверьте новый адрес с получателем."</string>
     <string name="l10n_the_amount_in_this_link_is_not_a_valid_xmr_amount_16fc0795" formatted="false">"Сумма в этой ссылке не является допустимой суммой XMR."</string>
+    <string name="l10n_the_card_couldn_t_be_shared_please_try_again_3fe46438" formatted="false">"Не удалось поделиться карточкой. Повторите попытку."</string>
+    <string name="l10n_the_claim_could_not_be_completed_please_try_again_d1492550" formatted="false">"Не удалось завершить регистрацию. Повторите попытку."</string>
     <string name="l10n_the_clipboard_clears_in_s_0329e50d" formatted="false">"Буфер обмена очистится через %1$s."</string>
     <string name="l10n_the_lookup_took_too_long_bae6d149" formatted="false">"Поиск занял слишком много времени"</string>
     <string name="l10n_the_payment_could_not_be_confirmed_if_it_went_through_t_9543d69a" formatted="false">"Не удалось подтвердить платёж. Если он прошёл, ссылка появится в списке операций."</string>
     <string name="l10n_the_payment_link_failed_its_safety_check_nothing_was_se_9e2a494f" formatted="false">"Платёжная ссылка не прошла проверку безопасности. Ничего не отправлено."</string>
     <string name="l10n_the_price_feed_has_no_s_quote_0b226e88" formatted="false">"В источнике цен нет котировки %1$s."</string>
+    <string name="l10n_the_public_username_records_are_too_old_for_a_first_pay_d892e8c0" formatted="false">"Публичные записи имён пользователей слишком старые для первого платежа. Повторите попытку позже."</string>
     <string name="l10n_the_record_holds_an_address_for_another_network_31f49873" formatted="false">"Запись содержит адрес для другой сети"</string>
     <string name="l10n_the_record_holds_an_invalid_monero_address_18a56b6b" formatted="false">"Запись содержит недействительный адрес Monero"</string>
+    <string name="l10n_the_request_expired_please_claim_again_77c2e839" formatted="false">"Срок запроса истёк. Зарегистрируйте имя ещё раз."</string>
+    <string name="l10n_the_username_changed_since_your_review_look_it_up_again_f704b732" formatted="false">"Имя пользователя изменилось после вашей проверки. Найдите его ещё раз перед отправкой."</string>
+    <string name="l10n_the_username_response_could_not_be_verified_please_try__b7b3ed13" formatted="false">"Не удалось проверить ответ по имени пользователя. Повторите попытку."</string>
+    <string name="l10n_the_username_service_couldn_t_complete_the_request_plea_e5815445" formatted="false">"Сервис имён пользователей не смог выполнить запрос. Повторите попытку."</string>
     <string name="l10n_the_value_of_monero_can_fluctuate_significantly_only_us_284367aa" formatted="false">"Стоимость Monero может сильно колебаться. Используйте только те средства, потерю которых можете себе позволить."</string>
+    <string name="l10n_the_wallet_changed_open_this_flow_from_the_wallet_you_w_bd9e816b" formatted="false">"Кошелёк изменился. Откройте этот процесс из кошелька, который хотите использовать."</string>
+    <string name="l10n_the_wallet_changed_review_the_payment_again_f67e5e29" formatted="false">"Кошелёк изменился. Проверьте платёж ещё раз."</string>
     <string name="l10n_the_wallet_couldn_t_load_its_keys_so_no_receive_address_97a33f75" formatted="false">"Кошелёк не смог загрузить ключи, поэтому адрес для получения показать нельзя. Не отправляйте средства ни на какой адрес из этого приложения, пока проблема не устранена. Принудительно закройте и снова откройте приложение; если проблема сохранится, восстановите кошелёк по мнемонической фразе."</string>
     <string name="l10n_the_wallet_stays_unlocked_until_the_app_is_force_closed_eb3ed2b1" formatted="false">"Кошелёк остаётся разблокированным до принудительного закрытия приложения"</string>
     <string name="l10n_this_polyseed_uses_a_passphrase_monero_one_does_not_sup_2d07f5e0" formatted="false">"Этот Polyseed использует парольную фразу. Monero One пока не поддерживает парольные фразы Polyseed."</string>
     <string name="l10n_this_device_does_not_support_biometric_authentication_y_60fadc72" formatted="false">"Устройство не поддерживает биометрическую аутентификацию. Её можно включить позже в настройках, если настроить биометрию на устройстве."</string>
     <string name="l10n_this_helps_speed_up_transaction_scanning_by_skipping_bl_ff8147d6" formatted="false">"Это ускоряет сканирование транзакций: блоки, созданные до появления кошелька, пропускаются."</string>
     <string name="l10n_this_iphone_was_set_up_from_a_device_backup_wallet_keys_86cd3cbf" formatted="false">"Этот iPhone настроен из резервной копии устройства. Ключи кошельков остались на старом iPhone, поэтому Monero One нужно восстановить их здесь."</string>
+    <string name="l10n_this_is_a_local_development_claim_3a627df1" formatted="false">"Это локальная регистрация для разработки."</string>
     <string name="l10n_this_is_not_a_monero_one_payment_link_42e38dce" formatted="false">"Это не платёжная ссылка Monero One."</string>
     <string name="l10n_this_is_not_a_valid_monero_payment_link_cd32d925" formatted="false">"Это недействительная платёжная ссылка Monero."</string>
     <string name="l10n_this_is_the_only_way_to_recover_your_wallet_store_it_sa_be62bce0" formatted="false">"Это ЕДИНСТВЕННЫЙ способ восстановить кошелёк. Храните фразу в надёжном месте офлайн."</string>
@@ -1104,6 +1138,10 @@
     <string name="l10n_this_removes_wallet_data_from_this_device_only_your_wal_e09970ba" formatted="false">"Кошелёк будет удалён с этого устройства. Его можно восстановить по мнемонической фразе."</string>
     <string name="l10n_this_seed_phrase_is_already_used_by_s_5d2ed787" formatted="false">"Эта мнемоническая фраза уже используется кошельком «%1$s»"</string>
     <string name="l10n_this_software_is_provided_as_is_while_we_strive_for_sec_aec10f71" formatted="false">"Программа предоставляется «как есть». Мы стремимся к безопасности и надёжности, но не можем гарантировать, что в программе нет ошибок."</string>
+    <string name="l10n_this_username_is_not_in_the_public_log_yet_the_payment__1a004955" formatted="false">"Этого имени пользователя ещё нет в публичном журнале. Лимит платежа составляет 0.1 XMR."</string>
+    <string name="l10n_this_username_is_reserved_to_protect_users_from_scams_d15d52ef" formatted="false">"Это имя пользователя зарезервировано, чтобы защитить пользователей от мошенников."</string>
+    <string name="l10n_this_username_is_unavailable_5b9ace3d" formatted="false">"Это имя пользователя недоступно"</string>
+    <string name="l10n_this_username_is_unavailable_44a84491" formatted="false">"Это имя пользователя недоступно."</string>
     <string name="l10n_this_wallet_is_view_only_and_cannot_send_d1c7e692" formatted="false">"Этот кошелёк только для просмотра и не может отправлять"</string>
     <string name="l10n_this_wallet_is_view_only_and_cannot_send_switch_to_a_wa_90c60f19" formatted="false">"Этот кошелёк только для просмотра и не может отправлять. Переключитесь на кошелёк, который может отправлять, и откройте ссылку снова."</string>
     <string name="l10n_this_wallet_scans_again_from_its_restore_height_transac_722eee0c" formatted="false">"Этот кошелёк будет заново просканирован с высоты восстановления. Ключи транзакций прошлых отправок будут удалены."</string>
@@ -1193,11 +1231,22 @@
     <string name="l10n_use_pin_3e03ee29" formatted="false">"Ввести PIN-код"</string>
     <string name="l10n_use_tor_proxy_89445203" formatted="false">"Использовать прокси Tor"</string>
     <string name="l10n_use_an_ip_address_and_port_for_example_127_0_0_1_9050_2e0d26ba" formatted="false">"Укажите IP-адрес и порт, например 127.0.0.1:9050."</string>
+    <string name="l10n_use_at_least_3_characters_c86f08b9" formatted="false">"Используйте не менее 3 символов."</string>
     <string name="l10n_use_biometrics_7827a57f" formatted="false">"Биометрия"</string>
     <string name="l10n_use_fingerprint_or_face_to_unlock_5fdb5d2e" formatted="false">"Разблокировать отпечатком пальца или лицом"</string>
+    <string name="l10n_use_no_more_than_15_characters_f91e9726" formatted="false">"Используйте не более 15 символов."</string>
     <string name="l10n_use_one_of_your_unused_addresses_first_a_restore_from_t_d80d64ec" formatted="false">"Сначала используйте один из неиспользованных адресов. При восстановлении из мнемонической фразы платежи на новые будут пропущены."</string>
+    <string name="l10n_use_only_a_z_0_9_and_b771261d" formatted="false">"Используйте только a–z, 0–9 и _."</string>
+    <string name="l10n_use_only_one_in_a_row_be19d70b" formatted="false">"Используйте только один _ подряд."</string>
     <string name="l10n_use_wallet_creation_date_0285cef8" formatted="false">"Использовать дату создания кошелька"</string>
     <string name="l10n_username_e3b89e9d" formatted="false">"Имя пользователя"</string>
+    <string name="l10n_username_payments_aren_t_available_yet_8c9ff4b9" formatted="false">"Платежи на имена пользователей пока недоступны"</string>
+    <string name="l10n_username_records_are_out_of_date_1faf1d01" formatted="false">"Записи имён пользователей устарели"</string>
+    <string name="l10n_username_records_are_out_of_date_the_payment_limit_is_0_e13a7638" formatted="false">"Записи имён пользователей устарели. Лимит платежа составляет 0.1 XMR."</string>
+    <string name="l10n_username_registration_isn_t_available_yet_b5686202" formatted="false">"Регистрация имён пользователей пока недоступна."</string>
+    <string name="l10n_username_signature_check_failed_do_not_send_to_this_add_f578e341" formatted="false">"Не удалось проверить подпись имени пользователя. Не отправляйте на этот адрес."</string>
+    <string name="l10n_usernames_are_permanent_86694470" formatted="false">"Имена пользователей постоянны."</string>
+    <string name="l10n_using_a_previously_checked_username_8a426bca" formatted="false">"Используется ранее проверенное имя пользователя"</string>
     <string name="l10n_valid_address_7b8c82b2" formatted="false">"Действительный адрес"</string>
     <string name="l10n_valid_seed_phrase_7ec83780" formatted="false">"Действительная мнемоническая фраза"</string>
     <string name="l10n_value_8e37953d" formatted="false">"Значение"</string>
@@ -1276,12 +1325,16 @@
     <string name="l10n_your_pin_is_required_to_access_your_recovery_phrase_636df823" formatted="false">"Для доступа к фразе восстановления нужен PIN"</string>
     <string name="l10n_your_payment_link_d7e13524" formatted="false">"Ваша платёжная ссылка"</string>
     <string name="l10n_your_seed_phrase_dd4949d6" formatted="false">"Ваша мнемоническая фраза"</string>
+    <string name="l10n_your_username_fa1f5937" formatted="false">"Ваше имя пользователя"</string>
     <string name="l10n_your_history_starts_here_9357da77" formatted="false">"Здесь начинается ваша история"</string>
     <string name="l10n_your_location_data_stays_on_your_device_it_s_only_used__e37b3c21" formatted="false">"Данные о геопозиции остаются на вашем устройстве. Они используются только для проверки, находитесь ли вы в доверенной зоне, и никогда не сохраняются, не записываются в журнал и никуда не передаются."</string>
     <string name="l10n_your_screen_reader_will_read_your_recovery_phrase_out_l_5b850931" formatted="false">"Экранный диктор прочитает фразу восстановления вслух. Любой, кто её услышит, сможет украсть ваши средства. Перед продолжением используйте наушники или убедитесь, что никто не слышит ваше устройство."</string>
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"Экранный диктор прочитает фразу восстановления вслух. Любой, кто её услышит, сможет украсть ваши средства. Перед продолжением используйте наушники или убедитесь, что никто не слышит ваше устройство."</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"Транзакция отправлена в сеть."</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"Транзакции появятся здесь после синхронизации"</string>
+    <string name="l10n_your_username_b210fd41" formatted="false">"Ваше имя пользователя"</string>
+    <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"Не удалось надёжно сохранить имя пользователя. Разблокируйте приложение и повторите попытку."</string>
+    <string name="l10n_your_username_s_3932c5a7" formatted="false">"Ваше имя пользователя, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"У кошелька ещё нет адреса для получения. Дождитесь загрузки и повторите попытку."</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"Кошелёк занят. Повторите попытку через минуту."</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"Кошелёк синхронизируется из недоверенного места. Если это сделано намеренно, добавьте это место в доверенные в Настройках."</string>
@@ -1313,6 +1366,7 @@
     <string name="l10n_unused_febe1d74" formatted="false">"не использован"</string>
     <string name="l10n_up_75a288c0" formatted="false">"рост"</string>
     <string name="l10n_up_s_2fa9bc08" formatted="false">"рост на %1$s %%"</string>
+    <string name="l10n_username_16f78a7d" formatted="false">"имя пользователя"</string>
     <string name="l10n_view_only_8479be81" formatted="false">"только для просмотра"</string>
     <string name="l10n_s_xmr_6ddc67de" formatted="false">"~%1$s XMR"</string>
     <string name="l10n_s_scans_again_from_its_restore_height_transaction_keys__89c5af9a" formatted="false">"Кошелёк «%1$s» будет заново просканирован с высоты восстановления. Ключи транзакций прошлых отправок будут удалены."</string>

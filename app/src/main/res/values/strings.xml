@@ -112,4 +112,7 @@
     <!-- Widgets -->
     <string name="widget_description">Shows the current Monero price and 24h change</string>
     <string name="wallet_widget_description">Shows your Monero balance and recent transactions</string>
+
+    <!-- Username -->
+    <string name="username_claiming">Claiming…</string>
 </resources>

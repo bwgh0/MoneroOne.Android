@@ -1,5 +1,6 @@
 package one.monero.moneroone.core.username
 
+import one.monero.moneroone.core.locale.tr
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -44,7 +45,7 @@ class UsernameViewModel(application: Application) : AndroidViewModel(application
             } catch (e: Exception) {
                 if (generation == attempt) mutable.value = mutable.value.copy(
                     stage = if ((e as? UsernameException)?.code == "device.slot_used") UsernameStage.NO_FREE_CLAIM else UsernameStage.CONFIRM,
-                    error = if (e is UsernameException) e.message else "The claim could not be completed. Please try again.")
+                    error = if (e is UsernameException) e.message else tr("The claim could not be completed. Please try again."))
             }
         }
     }

@@ -24,6 +24,7 @@
     <string name="l10n_s_to_claim_4a220b89" formatted="false">"%1$s 待领取"</string>
     <string name="l10n_s_s_ffad8427" formatted="false">"%1$s · %2$s"</string>
     <string name="l10n_s_s_open_dfdb7ceb" formatted="false">"%1$s · %2$s 个未领取"</string>
+    <string name="l10n_s_other_apps_80bd14fe" formatted="false">"%1$s · 其他 App"</string>
     <string name="l10n_s_connecting_to_monero_network_70d08cc4" formatted="false">"%s — 正在连接 Monero 网络"</string>
     <string name="l10n_s_syncing_s_04b3ee90" formatted="false">"%s — 正在同步 %s%%"</string>
     <string name="l10n_s_live_62e53b9a" formatted="false">"%1$s • 已连接"</string>
@@ -34,6 +35,7 @@
     <string name="l10n_s_s_tap_to_sync_sent_transactions_7e21a236" formatted="false">"%1$s%2$s。轻点以同步已发送交易。"</string>
     <string name="l10n_s_s_of_s_digits_entered_9845c446" formatted="false">"%1$s，已输入 %2$s 位数字，共 %3$s 位"</string>
     <string name="l10n_s_s_s_of_s_021f204a" formatted="false">"%1$s，%2$s，第 %3$s 项，共 %4$s 项"</string>
+    <string name="l10n_s_monero_one_username_card_s_029403b7" formatted="false">"%1$s，Monero One 用户名卡片。%2$s"</string>
     <string name="l10n_s_disabled_for_view_only_wallet_a7817a74" formatted="false">"%1$s，只读钱包不可用"</string>
     <string name="l10n_s_portfolio_s_f99d40f6" formatted="false">"%1$s，资产组合 %2$s"</string>
     <string name="l10n_s_subaddress_s_8258744c" formatted="false">"%1$s，子地址 %2$s"</string>
@@ -74,6 +76,8 @@
     <string name="l10n_24h_29905ab7" formatted="false">"24小时"</string>
     <string name="l10n_24h_change_66f9b755" formatted="false">"24小时涨跌"</string>
     <string name="l10n_2km_7c15492a" formatted="false">"2 公里"</string>
+    <string name="l10n_3_15_characters_availability_is_checked_when_you_claim_d8d87494" formatted="false">"3–15 个字符。注册时会检查是否可用。"</string>
+    <string name="l10n_3_15_characters_letters_numbers_and_f01f1d02" formatted="false">"3–15 个字符。可使用字母、数字和 _。"</string>
     <string name="l10n_4_digits_8c09c57b" formatted="false">"4 位数字"</string>
     <string name="l10n_4_digit_pin_s_3ad16dcc" formatted="false">"4 位 PIN 码。%1$s"</string>
     <string name="l10n_5_minutes_3170543c" formatted="false">"5 分钟"</string>
@@ -81,6 +85,8 @@
     <string name="l10n_6_digits_e0efd043" formatted="false">"6 位数字"</string>
     <string name="l10n_6_digit_pin_recommended_s_61cc2218" formatted="false">"6 位 PIN 码，推荐。%1$s"</string>
     <string name="l10n_64_lowercase_hex_characters_ee749803" formatted="false">"64 个小写十六进制字符"</string>
+    <string name="l10n_a_free_username_isn_t_available_on_this_phone_af0664c0" formatted="false">"此手机无法获得免费用户名。"</string>
+    <string name="l10n_a_short_username_people_can_use_to_pay_you_bf719743" formatted="false">"一个简短的用户名，别人可以用它向你付款。"</string>
     <string name="l10n_about_4efca0d1" formatted="false">"关于"</string>
     <string name="l10n_about_s_xmr_e24cc9d7" formatted="false">"约 %1$s XMR"</string>
     <string name="l10n_above_80792346" formatted="false">"高于"</string>
@@ -113,6 +119,7 @@
     <string name="l10n_address_doesn_t_look_valid_for_mainnet_027a2baf" formatted="false">"此地址似乎不适用于主网。"</string>
     <string name="l10n_address_doesn_t_look_valid_for_testnet_e4c3a7a2" formatted="false">"此地址似乎不适用于测试网。"</string>
     <string name="l10n_address_found_for_s_0af31ca9" formatted="false">"已找到 %1$s 的地址"</string>
+    <string name="l10n_address_username_or_openalias_d3d7245d" formatted="false">"地址、@用户名或 OpenAlias"</string>
     <string name="l10n_address_fa0882e2" formatted="false">"地址："</string>
     <string name="l10n_adjust_to_explore_the_balance_and_activity_at_each_time_fc6ccd58" formatted="false">"调整即可查看每个时间点的余额和活动。返回“现在”可显示当前钱包。"</string>
     <string name="l10n_after_a_payment_arrives_receive_shows_a_new_address_old_579be71c" formatted="false">"收到付款后，“收款”会显示新地址。旧地址仍然可用。"</string>
@@ -209,6 +216,7 @@
     <string name="l10n_chart_mode_9b19d23e" formatted="false">"图表模式"</string>
     <string name="l10n_check_again_32e60e73" formatted="false">"再次检查"</string>
     <string name="l10n_check_screen_time_or_device_management_c63dba08" formatted="false">"请检查“屏幕使用时间”或设备管理。"</string>
+    <string name="l10n_check_username_13eb7265" formatted="false">"核对用户名"</string>
     <string name="l10n_check_word_s_90eb1a05" formatted="false">"请检查第 %s 个单词"</string>
     <string name="l10n_check_words_s_23e605da" formatted="false">"请检查第 %s 个单词"</string>
     <string name="l10n_checking_latency_544be1ed" formatted="false">"正在检测延迟"</string>
@@ -217,13 +225,16 @@
     <string name="l10n_checking_2e5f79bb" formatted="false">"正在检查…"</string>
     <string name="l10n_chinese_yuan_e689570a" formatted="false">"人民币"</string>
     <string name="l10n_choose_icon_4060e90f" formatted="false">"选择图标"</string>
+    <string name="l10n_choose_my_username_100415f9" formatted="false">"选择我的用户名"</string>
     <string name="l10n_choose_restore_method_5f66994c" formatted="false">"选择恢复方式"</string>
     <string name="l10n_choose_seed_format_d1699775" formatted="false">"选择助记词格式"</string>
+    <string name="l10n_choose_your_username_0a3ee390" formatted="false">"选择你的用户名"</string>
     <string name="l10n_choose_a_new_6_digit_pin_c2846426" formatted="false">"新 PIN 码"</string>
     <string name="l10n_choose_a_wallet_d1157c4d" formatted="false">"选择钱包"</string>
     <string name="l10n_choose_another_date_d8c80c56" formatted="false">"选择其他日期"</string>
     <string name="l10n_choose_your_preferred_app_appearance_9f795e99" formatted="false">"外观"</string>
     <string name="l10n_claim_4ca41db0" formatted="false">"领取"</string>
+    <string name="l10n_claim_s_3545e872" formatted="false">"注册 @%1$s"</string>
     <string name="l10n_claim_by_aff685c9" formatted="false">"领取截止时间"</string>
     <string name="l10n_claim_by_s_4bc68146" formatted="false">"请在 %1$s 前领取"</string>
     <string name="l10n_claim_fee_reserve_0d0fd617" formatted="false">"领取手续费预留"</string>
@@ -258,6 +269,7 @@
     <string name="l10n_confirm_the_transaction_on_your_trezor_c899d398" formatted="false">"在你的 Trezor 上确认交易"</string>
     <string name="l10n_confirm_this_transaction_14bfcca1" formatted="false">"确认此交易"</string>
     <string name="l10n_confirm_transaction_44a3e7d3" formatted="false">"确认此交易"</string>
+    <string name="l10n_confirm_with_the_recipient_that_s_is_their_username_bef_6366e61a" formatted="false">"首次付款前，请向收款人确认 %1$s 是其用户名。"</string>
     <string name="l10n_confirm_you_have_written_down_your_seed_phrase_to_conti_48409d82" formatted="false">"请确认你已写下助记词，然后继续"</string>
     <string name="l10n_confirmations_5dfa99a6" formatted="false">"确认数"</string>
     <string name="l10n_confirmations_s_1dfca167" formatted="false">"确认数：%1$s"</string>
@@ -481,6 +493,7 @@
     <string name="l10n_fee_s_xmr_9efa7208" formatted="false">"手续费：%1$s XMR"</string>
     <string name="l10n_fetching_price_f74cc78c" formatted="false">"正在获取价格…"</string>
     <string name="l10n_filter_transactions_00d87315" formatted="false">"筛选交易"</string>
+    <string name="l10n_finish_checking_the_previous_claim_before_choosing_anot_525aa63b" formatted="false">"请先完成对上一次注册的检查，再选择其他用户名。"</string>
     <string name="l10n_first_payment_to_this_name_check_the_address_with_the_r_5e52f2f6" formatted="false">"首次向此名称付款。请与收款人核对地址。"</string>
     <string name="l10n_first_time_sync_can_take_a_few_minutes_2b7fc90b" formatted="false">"首次同步可能需要几分钟。"</string>
     <string name="l10n_forgot_pin_74ad27db" formatted="false">"忘记 PIN 码"</string>
@@ -493,6 +506,8 @@
     <string name="l10n_full_wallet_you_can_send_and_receive_adca402c" formatted="false">"完整钱包：可以发送和收款。"</string>
     <string name="l10n_funding_transaction_c2006a3f" formatted="false">"注资交易"</string>
     <string name="l10n_generating_49286f33" formatted="false">"正在载入…"</string>
+    <string name="l10n_get_your_username_6ee3ef92" formatted="false">"获取你的用户名"</string>
+    <string name="l10n_get_your_username_e62eb872" formatted="false">"获取你的用户名。"</string>
     <string name="l10n_get_notified_on_price_changes_1a5ab92c" formatted="false">"查看和管理价格提醒"</string>
     <string name="l10n_get_notified_when_xmr_crosses_a_price_you_set_92aed39f" formatted="false">"当 XMR 达到你设定的价格时收到通知。"</string>
     <string name="l10n_good_afternoon_6638425f" formatted="false">"下午好"</string>
@@ -547,6 +562,7 @@
     <string name="l10n_invalid_seed_phrase_3a8da7cf" formatted="false">"助记词无效"</string>
     <string name="l10n_invalid_seed_phrase_please_check_your_words_and_try_aga_48aabf18" formatted="false">"助记词无效。请检查单词，然后重试。"</string>
     <string name="l10n_it_checks_again_every_few_seconds_while_this_screen_is__aa8d210f" formatted="false">"此屏幕打开期间，会每隔几秒重新检查一次。"</string>
+    <string name="l10n_it_s_yours_c338d63b" formatted="false">"它是你的了。"</string>
     <string name="l10n_item_not_found_in_keychain_cc73af45" formatted="false">"在钥匙串中找不到该项目"</string>
     <string name="l10n_japanese_yen_fa53dbe5" formatted="false">"日元"</string>
     <string name="l10n_keep_your_seed_safe_cdc03cc8" formatted="false">"保护你的助记词"</string>
@@ -681,6 +697,7 @@
     <string name="l10n_none_dc937b59" formatted="false">"无"</string>
     <string name="l10n_norwegian_krone_66f55f57" formatted="false">"挪威克朗"</string>
     <string name="l10n_not_configured_bbea960e" formatted="false">"未配置"</string>
+    <string name="l10n_not_now_ccb4c324" formatted="false">"暂不"</string>
     <string name="l10n_not_set_8290035d" formatted="false">"未设置"</string>
     <string name="l10n_not_available_67a926f7" formatted="false">"不可用"</string>
     <string name="l10n_not_available_for_transactions_sent_before_this_wallet__47e02c54" formatted="false">"不适用于此钱包恢复之前发送的交易"</string>
@@ -693,6 +710,7 @@
     <string name="l10n_not_in_the_word_list_f182a51f" formatted="false">"不在单词表中"</string>
     <string name="l10n_not_selected_df12aeba" formatted="false">"未选定"</string>
     <string name="l10n_not_synced_87cde3ef" formatted="false">"离线"</string>
+    <string name="l10n_not_yet_in_the_public_log_92abbbee" formatted="false">"尚未进入公开日志"</string>
     <string name="l10n_note_d8da2c49" formatted="false">"备注"</string>
     <string name="l10n_note_s_3deb4f9b" formatted="false">"备注，%1$s"</string>
     <string name="l10n_note_none_961e1a78" formatted="false">"备注，无"</string>
@@ -730,6 +748,7 @@
     <string name="l10n_opens_the_transaction_in_an_in_app_browser_88c02a39" formatted="false">"在 App 内浏览器中打开此交易"</string>
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"打开钱包列表，选择款项转入哪个钱包"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"打开钱包列表，你可以在其中切换、重新命名或添加钱包"</string>
+    <string name="l10n_opens_your_username_card_9482da3c" formatted="false">"打开你的用户名卡片"</string>
     <string name="l10n_optic_id_650eb5d4" formatted="false">"Optic ID"</string>
     <string name="l10n_other_wallets_show_their_last_known_balance_e3e5aca7" formatted="false">"其他钱包显示最后已知的余额。"</string>
     <string name="l10n_outgoing_transactions_may_be_out_of_date_179823e2" formatted="false">"已发送交易可能不是最新"</string>
@@ -750,6 +769,7 @@
     <string name="l10n_payment_link_bc7c1f6c" formatted="false">"付款链接"</string>
     <string name="l10n_payment_link_7f3bd7d2" formatted="false">"付款链接"</string>
     <string name="l10n_payment_link_s_eb335677" formatted="false">"付款链接：%1$s"</string>
+    <string name="l10n_payments_go_to_76dfba49" formatted="false">"付款将发送到"</string>
     <string name="l10n_payments_to_your_main_address_can_be_linked_together_50d87ace" formatted="false">"发送到你主地址的付款可能被相互关联。"</string>
     <string name="l10n_pending_331551b0" formatted="false">"待确认"</string>
     <string name="l10n_pending_s_s_5f9a06f7" formatted="false">"待确认 %1$s/%2$s"</string>
@@ -978,8 +998,10 @@
     <string name="l10n_share_qr_code_ffbb0902" formatted="false">"共享二维码"</string>
     <string name="l10n_share_address_a4e12428" formatted="false">"共享地址"</string>
     <string name="l10n_share_again_8fb3b8e2" formatted="false">"再次共享"</string>
+    <string name="l10n_share_link_712a4823" formatted="false">"共享链接"</string>
     <string name="l10n_share_the_link_b0c1ec20" formatted="false">"共享链接"</string>
     <string name="l10n_share_the_link_again_ca22671a" formatted="false">"再次共享链接"</string>
+    <string name="l10n_share_username_9fd1b91c" formatted="false">"共享用户名"</string>
     <string name="l10n_share_view_only_wallet_keys_e0bb1306" formatted="false">"共享只读钱包密钥"</string>
     <string name="l10n_show_s_first_cc3cb868" formatted="false">"优先显示 %1$s"</string>
     <string name="l10n_show_balance_transactions_bf96c0cc" formatted="false">"显示余额和交易"</string>
@@ -998,11 +1020,13 @@
     <string name="l10n_shows_your_balance_over_time_40113f92" formatted="false">"显示余额随时间的变化"</string>
     <string name="l10n_shows_your_payment_links_a6c313d0" formatted="false">"显示你的付款链接"</string>
     <string name="l10n_sign_with_trezor_63d35e0b" formatted="false">"使用 Trezor 签名"</string>
+    <string name="l10n_signature_checked_1217e3f5" formatted="false">"签名已验证"</string>
     <string name="l10n_simple_private_secure_9cc5a4a5" formatted="false">"简单。私密。安全。"</string>
     <string name="l10n_skip_for_now_1e157fdf" formatted="false">"暂时跳过"</string>
     <string name="l10n_something_went_wrong_ab827e3f" formatted="false">"出了点问题"</string>
     <string name="l10n_south_korean_won_9c88b386" formatted="false">"韩元"</string>
     <string name="l10n_standard_ef669154" formatted="false">"标准"</string>
+    <string name="l10n_start_with_a_letter_25aa573c" formatted="false">"请以字母开头。"</string>
     <string name="l10n_statistics_a656107e" formatted="false">"统计"</string>
     <string name="l10n_status_920e413c" formatted="false">"状态"</string>
     <string name="l10n_status_s_8c0b936b" formatted="false">"状态：%1$s"</string>
@@ -1066,20 +1090,30 @@
     <string name="l10n_the_address_for_s_s_is_different_from_the_address_you_p_3cdf352c" formatted="false">"%1$s（%2$s）的地址与你在 %3$s 付款时的地址不同。请与收款人核对新地址。"</string>
     <string name="l10n_the_address_for_s_is_different_from_the_address_you_pai_b51afe25" formatted="false">"%1$s 的地址与你在 %2$s 付款时的地址不同。请与收款人核对新地址。"</string>
     <string name="l10n_the_amount_in_this_link_is_not_a_valid_xmr_amount_16fc0795" formatted="false">"此链接中的金额不是有效的 XMR 金额。"</string>
+    <string name="l10n_the_card_couldn_t_be_shared_please_try_again_3fe46438" formatted="false">"无法共享卡片。请重试。"</string>
+    <string name="l10n_the_claim_could_not_be_completed_please_try_again_d1492550" formatted="false">"无法完成注册。请重试。"</string>
     <string name="l10n_the_clipboard_clears_in_s_0329e50d" formatted="false">"剪贴板将在 %1$s后清除。"</string>
     <string name="l10n_the_lookup_took_too_long_bae6d149" formatted="false">"查询超时"</string>
     <string name="l10n_the_payment_could_not_be_confirmed_if_it_went_through_t_9543d69a" formatted="false">"无法确认这笔付款。如果付款已完成，链接会显示在活动中。"</string>
     <string name="l10n_the_payment_link_failed_its_safety_check_nothing_was_se_9e2a494f" formatted="false">"付款链接未通过安全检查。未发送任何款项。"</string>
     <string name="l10n_the_price_feed_has_no_s_quote_0b226e88" formatted="false">"价格源没有 %1$s 报价。"</string>
+    <string name="l10n_the_public_username_records_are_too_old_for_a_first_pay_d892e8c0" formatted="false">"公开的用户名记录过旧，无法用于首次付款。请稍后重试。"</string>
     <string name="l10n_the_record_holds_an_address_for_another_network_31f49873" formatted="false">"记录中的地址属于其他网络"</string>
     <string name="l10n_the_record_holds_an_invalid_monero_address_18a56b6b" formatted="false">"记录中的 Monero 地址无效"</string>
+    <string name="l10n_the_request_expired_please_claim_again_77c2e839" formatted="false">"请求已过期。请重新注册。"</string>
+    <string name="l10n_the_username_changed_since_your_review_look_it_up_again_f704b732" formatted="false">"自你检查后，该用户名已发生变化。发送前请重新查找。"</string>
+    <string name="l10n_the_username_response_could_not_be_verified_please_try__b7b3ed13" formatted="false">"无法验证用户名响应。请重试。"</string>
+    <string name="l10n_the_username_service_couldn_t_complete_the_request_plea_e5815445" formatted="false">"用户名服务无法完成请求。请重试。"</string>
     <string name="l10n_the_value_of_monero_can_fluctuate_significantly_only_us_284367aa" formatted="false">"Monero 的价值可能大幅波动。请只使用你能承受损失的资金。"</string>
+    <string name="l10n_the_wallet_changed_open_this_flow_from_the_wallet_you_w_bd9e816b" formatted="false">"钱包已更改。请从你要使用的钱包重新打开此流程。"</string>
+    <string name="l10n_the_wallet_changed_review_the_payment_again_f67e5e29" formatted="false">"钱包已更改。请重新检查这笔付款。"</string>
     <string name="l10n_the_wallet_couldn_t_load_its_keys_so_no_receive_address_97a33f75" formatted="false">"钱包无法载入其密钥，因此无法显示收款地址。在问题解决之前，请勿向此 App 显示的任何地址发送资金。请强制退出并重新打开 App；如果问题仍然存在，请用助记词恢复钱包。"</string>
     <string name="l10n_the_wallet_stays_unlocked_until_the_app_is_force_closed_eb3ed2b1" formatted="false">"钱包将保持解锁状态，直到应用被强制关闭"</string>
     <string name="l10n_this_polyseed_uses_a_passphrase_monero_one_does_not_sup_2d07f5e0" formatted="false">"此 Polyseed 使用了密码短语。Monero One 暂不支持 Polyseed 密码短语。"</string>
     <string name="l10n_this_device_does_not_support_biometric_authentication_y_60fadc72" formatted="false">"此设备不支持生物识别验证。在设备上设置生物识别后，可稍后在设置中启用。"</string>
     <string name="l10n_this_helps_speed_up_transaction_scanning_by_skipping_bl_ff8147d6" formatted="false">"这会跳过钱包创建之前的区块，从而加快交易扫描。"</string>
     <string name="l10n_this_iphone_was_set_up_from_a_device_backup_wallet_keys_86cd3cbf" formatted="false">"此 iPhone 是通过设备备份设置的。钱包密钥仍在旧 iPhone 上，所以 Monero One 需要在此恢复它们。"</string>
+    <string name="l10n_this_is_a_local_development_claim_3a627df1" formatted="false">"这是本地开发环境的注册。"</string>
     <string name="l10n_this_is_not_a_monero_one_payment_link_42e38dce" formatted="false">"这不是 Monero One 的付款链接。"</string>
     <string name="l10n_this_is_not_a_valid_monero_payment_link_cd32d925" formatted="false">"这不是有效的 Monero 付款链接。"</string>
     <string name="l10n_this_is_the_only_way_to_recover_your_wallet_store_it_sa_be62bce0" formatted="false">"这是恢复钱包的唯一方式。请离线妥善保管。"</string>
@@ -1104,6 +1138,10 @@
     <string name="l10n_this_removes_wallet_data_from_this_device_only_your_wal_e09970ba" formatted="false">"这会从此设备移除该钱包。你可以用助记词恢复它。"</string>
     <string name="l10n_this_seed_phrase_is_already_used_by_s_5d2ed787" formatted="false">"此助记词已被“%1$s”使用"</string>
     <string name="l10n_this_software_is_provided_as_is_while_we_strive_for_sec_aec10f71" formatted="false">"本软件按“原样”提供。尽管我们力求安全可靠，但无法保证软件没有缺陷。"</string>
+    <string name="l10n_this_username_is_not_in_the_public_log_yet_the_payment__1a004955" formatted="false">"此用户名尚未进入公开日志。付款上限为 0.1 XMR。"</string>
+    <string name="l10n_this_username_is_reserved_to_protect_users_from_scams_d15d52ef" formatted="false">"此用户名已被保留，以保护用户免受诈骗。"</string>
+    <string name="l10n_this_username_is_unavailable_5b9ace3d" formatted="false">"此用户名不可用"</string>
+    <string name="l10n_this_username_is_unavailable_44a84491" formatted="false">"此用户名不可用。"</string>
     <string name="l10n_this_wallet_is_view_only_and_cannot_send_d1c7e692" formatted="false">"此钱包为只读钱包，无法发送"</string>
     <string name="l10n_this_wallet_is_view_only_and_cannot_send_switch_to_a_wa_90c60f19" formatted="false">"此钱包为只读钱包，无法发送。请切换到可以发送的钱包，然后重新打开链接。"</string>
     <string name="l10n_this_wallet_scans_again_from_its_restore_height_transac_722eee0c" formatted="false">"此钱包将从恢复高度重新扫描。过去发送的交易密钥将被删除。"</string>
@@ -1193,11 +1231,22 @@
     <string name="l10n_use_pin_3e03ee29" formatted="false">"使用 PIN 码"</string>
     <string name="l10n_use_tor_proxy_89445203" formatted="false">"使用 Tor 代理"</string>
     <string name="l10n_use_an_ip_address_and_port_for_example_127_0_0_1_9050_2e0d26ba" formatted="false">"请使用 IP 地址和端口，例如 127.0.0.1:9050。"</string>
+    <string name="l10n_use_at_least_3_characters_c86f08b9" formatted="false">"请至少使用 3 个字符。"</string>
     <string name="l10n_use_biometrics_7827a57f" formatted="false">"生物识别"</string>
     <string name="l10n_use_fingerprint_or_face_to_unlock_5fdb5d2e" formatted="false">"使用指纹或面部解锁"</string>
+    <string name="l10n_use_no_more_than_15_characters_f91e9726" formatted="false">"请最多使用 15 个字符。"</string>
     <string name="l10n_use_one_of_your_unused_addresses_first_a_restore_from_t_d80d64ec" formatted="false">"请先使用一个未使用的地址。用助记词恢复时，会漏掉发送到新地址的付款。"</string>
+    <string name="l10n_use_only_a_z_0_9_and_b771261d" formatted="false">"仅可使用 a–z、0–9 和 _。"</string>
+    <string name="l10n_use_only_one_in_a_row_be19d70b" formatted="false">"不能连续使用多个 _。"</string>
     <string name="l10n_use_wallet_creation_date_0285cef8" formatted="false">"使用钱包创建日期"</string>
     <string name="l10n_username_e3b89e9d" formatted="false">"用户名"</string>
+    <string name="l10n_username_payments_aren_t_available_yet_8c9ff4b9" formatted="false">"暂不支持向用户名付款"</string>
+    <string name="l10n_username_records_are_out_of_date_1faf1d01" formatted="false">"用户名记录已过期"</string>
+    <string name="l10n_username_records_are_out_of_date_the_payment_limit_is_0_e13a7638" formatted="false">"用户名记录已过期。付款上限为 0.1 XMR。"</string>
+    <string name="l10n_username_registration_isn_t_available_yet_b5686202" formatted="false">"用户名注册暂不可用。"</string>
+    <string name="l10n_username_signature_check_failed_do_not_send_to_this_add_f578e341" formatted="false">"用户名签名检查失败。请勿向此地址发送。"</string>
+    <string name="l10n_usernames_are_permanent_86694470" formatted="false">"用户名是永久性的。"</string>
+    <string name="l10n_using_a_previously_checked_username_8a426bca" formatted="false">"正在使用之前已验证的用户名"</string>
     <string name="l10n_valid_address_7b8c82b2" formatted="false">"地址有效"</string>
     <string name="l10n_valid_seed_phrase_7ec83780" formatted="false">"助记词有效"</string>
     <string name="l10n_value_8e37953d" formatted="false">"数值"</string>
@@ -1276,12 +1325,16 @@
     <string name="l10n_your_pin_is_required_to_access_your_recovery_phrase_636df823" formatted="false">"需要输入 PIN 才能查看恢复短语"</string>
     <string name="l10n_your_payment_link_d7e13524" formatted="false">"你的付款链接"</string>
     <string name="l10n_your_seed_phrase_dd4949d6" formatted="false">"你的助记词"</string>
+    <string name="l10n_your_username_fa1f5937" formatted="false">"你的用户名"</string>
     <string name="l10n_your_history_starts_here_9357da77" formatted="false">"你的历史从这里开始"</string>
     <string name="l10n_your_location_data_stays_on_your_device_it_s_only_used__e37b3c21" formatted="false">"你的位置数据会保留在你的设备上，仅用于检查你是否在可信区域内，绝不会被存储、记录或传输到任何地方。"</string>
     <string name="l10n_your_screen_reader_will_read_your_recovery_phrase_out_l_5b850931" formatted="false">"屏幕阅读器将大声读出恢复短语。任何听到的人都可能窃取您的资金。继续前请使用耳机，或确保无人能听到您的设备。"</string>
     <string name="l10n_your_screen_reader_will_read_your_seed_phrase_out_loud__68a1d49e" formatted="false">"屏幕阅读器将大声读出恢复短语。任何听到的人都可能窃取您的资金。继续前请使用耳机，或确保无人能听到您的设备。"</string>
     <string name="l10n_your_transaction_has_been_submitted_to_the_network_fde69ecb" formatted="false">"交易已广播。"</string>
     <string name="l10n_your_transactions_will_appear_here_once_synced_cfb34a10" formatted="false">"同步后，你的交易将显示在这里"</string>
+    <string name="l10n_your_username_b210fd41" formatted="false">"你的用户名"</string>
+    <string name="l10n_your_username_could_not_be_saved_securely_unlock_the_ap_b65abf08" formatted="false">"无法安全保存你的用户名。请解锁 App 后重试。"</string>
+    <string name="l10n_your_username_s_3932c5a7" formatted="false">"你的用户名，%1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"你的钱包还没有收款地址。请等待加载完成，然后重试。"</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"你的钱包正忙。请稍后重试。"</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"你的钱包正在从不可信位置同步。如果这是有意为之，请在“设置”中将此位置添加为可信位置。"</string>
@@ -1313,6 +1366,7 @@
     <string name="l10n_unused_febe1d74" formatted="false">"未使用"</string>
     <string name="l10n_up_75a288c0" formatted="false">"上涨"</string>
     <string name="l10n_up_s_2fa9bc08" formatted="false">"上涨 %1$s%%"</string>
+    <string name="l10n_username_16f78a7d" formatted="false">"用户名"</string>
     <string name="l10n_view_only_8479be81" formatted="false">"只读"</string>
     <string name="l10n_s_xmr_6ddc67de" formatted="false">"~%1$s XMR"</string>
     <string name="l10n_s_scans_again_from_its_restore_height_transaction_keys__89c5af9a" formatted="false">"“%1$s”将从恢复高度重新扫描。过去发送的交易密钥将被删除。"</string>

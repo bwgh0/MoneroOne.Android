@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import one.monero.moneroone.R
+import one.monero.moneroone.core.locale.tr
+import one.monero.moneroone.core.locale.trRes
 import one.monero.moneroone.core.username.*
 import one.monero.moneroone.core.wallet.WalletInfo
 import one.monero.moneroone.core.wallet.WalletViewModel
@@ -83,7 +85,7 @@ fun UsernameCard(handle: String, externalAddress: String, modifier: Modifier = M
     BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(1000f / 600f).graphicsLayer {
         rotationY = tilt.x * 3; rotationX = -tilt.y * 2
     }.clearAndSetSemantics {
-        contentDescription = "$handle, Monero One username card. $externalAddress"
+        contentDescription = tr("%s, Monero One username card. %s", handle, externalAddress)
     }) {
         val s = maxWidth.value / 1000f
         // Type follows the card width, not the text size, as on iOS: the card is a picture of a card.
@@ -187,53 +189,53 @@ fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, m
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 if (binding == null && state.stage == UsernameStage.CONFIRM && model.store.state.value.pending == null) {
-                    TextButton(onClick = model::choose) { Text("Back") }
+                    TextButton(onClick = model::choose) { Text(tr("Back")) }
                 } else Spacer(Modifier.width(48.dp))
-                TextButton(onClick = onDismiss, enabled = !busy) { Text("Done") }
+                TextButton(onClick = onDismiss, enabled = !busy) { Text(tr("Done")) }
             }
             if (binding != null) {
-                Text("Your Username", style = MaterialTheme.typography.titleLarge)
+                Text(tr("Your Username"), style = MaterialTheme.typography.titleLarge)
                 UsernameCard(binding.displayHandle, binding.externalAddress, cardCapture)
                 UsernameWalletNote(wallet)
                 UsernameActions(binding, shareCard)
             } else when (state.stage) {
                 UsernameStage.WELCOME -> {
                     Icon(Icons.Default.AlternateEmail, null, tint = MoneroOrange, modifier = Modifier.padding(top = 24.dp).size(100.dp))
-                    Text("Get Your Username.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                    Text("A short username people can use to pay you.", color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                    UsernamePrimary("Choose My Username", action = model::choose)
-                    TextButton(onClick = onDismiss) { Text("Not Now") }
+                    Text(tr("Get Your Username."), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Text(tr("A short username people can use to pay you."), color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                    UsernamePrimary(tr("Choose My Username"), action = model::choose)
+                    TextButton(onClick = onDismiss) { Text(tr("Not Now")) }
                 }
                 UsernameStage.CHOOSE -> {
-                    Text("Choose Your Username", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    Text(tr("Choose Your Username"), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                     val valid = remember(state.input) { runCatching { OahCore.normalize(state.input) }.isSuccess }
                     OutlinedTextField(state.input, model::input, modifier = Modifier.fillMaxWidth(), prefix = { Text("@", color = MoneroOrange) },
                         singleLine = true, textStyle = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii),
-                        placeholder = { Text("username") })
+                        placeholder = { Text(tr("username")) })
                     Text(usernameValidation(state.input), style = MaterialTheme.typography.bodySmall, color = if (valid || state.input.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MoneroOrange)
                     UsernameWalletNote(wallet)
-                    UsernamePrimary("Continue", enabled = valid, action = model::confirm)
+                    UsernamePrimary(tr("Continue"), enabled = valid, action = model::confirm)
                 }
                 UsernameStage.NO_FREE_CLAIM -> {
-                    Text("A free username isn't available on this phone.", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
-                    UsernamePrimary("Done", action = onDismiss)
+                    Text(tr("A free username isn't available on this phone."), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                    UsernamePrimary(tr("Done"), action = onDismiss)
                 }
                 else -> {
                     val claimed = state.binding
-                    if (state.stage == UsernameStage.REVEALED) Text("It's Yours.", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    if (state.stage == UsernameStage.REVEALED) Text(tr("It's Yours."), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                     UsernameCard(claimed?.displayHandle ?: state.input, claimed?.externalAddress ?: "${state.input.lowercase(java.util.Locale.ROOT)}@monero.one", cardCapture, still = busy)
                     UsernameWalletNote(wallet)
                     if (busy) {
                         CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(24.dp))
-                        Text("Claiming…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(trRes(R.string.username_claiming, "Claiming…"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else if (claimed != null) {
                         UsernameActions(claimed, shareCard)
-                        UsernamePrimary("Done", action = onDismiss)
+                        UsernamePrimary(tr("Done"), action = onDismiss)
                     } else {
-                        Text("Usernames are permanent.")
-                        Text("This is a local development claim.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        UsernamePrimary("Claim @${state.input}") { model.claim(wallet, session, wallets) }
+                        Text(tr("Usernames are permanent."))
+                        Text(tr("This is a local development claim."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        UsernamePrimary(tr("Claim @%s", state.input)) { model.claim(wallet, session, wallets) }
                     }
                 }
             }
@@ -246,7 +248,7 @@ fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, m
 
 @Composable private fun UsernameWalletNote(wallet: WalletInfo) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Payments go to", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(tr("Payments go to"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("${wallet.emoji} ${wallet.name}", fontWeight = FontWeight.Medium)
     }
 }
@@ -271,12 +273,12 @@ fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, m
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.weight(1f)) {
                 OutlinedButton(onClick = { menu = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp)) {
-                    Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Copy")
+                    Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(tr("Copy"))
                 }
                 DropdownMenu(menu, { menu = false }) {
                     DropdownMenuItem(text = { Text("${binding.shortName} · Monero One") }, onClick = { copy(binding.shortName) })
-                    DropdownMenuItem(text = { Text("${binding.externalAddress} · Other apps") }, onClick = { copy(binding.externalAddress) })
-                    DropdownMenuItem(text = { Text("Share link") }, onClick = { copy(binding.shareUrl) })
+                    DropdownMenuItem(text = { Text(tr("%s · Other apps", binding.externalAddress)) }, onClick = { copy(binding.externalAddress) })
+                    DropdownMenuItem(text = { Text(tr("Share link")) }, onClick = { copy(binding.shareUrl) })
                 }
             }
             OutlinedButton(onClick = {
@@ -295,16 +297,16 @@ fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, m
                             putExtra(Intent.EXTRA_TEXT, "${binding.shortName}\n${binding.externalAddress}\n${binding.shareUrl}")
                             clipData = ClipData.newUri(context.contentResolver, "Username card", uri)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }, "Share username"))
+                        }, tr("Share username")))
                     } catch (_: Exception) { shareError = true }
                     finally { sharing = false }
                 }
             }, enabled = !sharing, modifier = Modifier.weight(1f).heightIn(min = 54.dp)) {
-                Icon(Icons.Default.IosShare, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Share")
+                Icon(Icons.Default.IosShare, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(tr("Share"))
             }
         }
-        if (copied) Text("Copied", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (shareError) Text("The card couldn't be shared. Please try again.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        if (copied) Text(tr("Copied"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (shareError) Text(tr("The card couldn't be shared. Please try again."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
 }
 
@@ -342,14 +344,14 @@ fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, m
     return tilt
 }
 private fun usernameValidation(input: String): String {
-    if (input.isEmpty()) return "3–15 characters. Letters, numbers and _."
-    return try { OahCore.normalize(input); "3–15 characters. Availability is checked when you claim." }
+    if (input.isEmpty()) return tr("3–15 characters. Letters, numbers and _.")
+    return try { OahCore.normalize(input); tr("3–15 characters. Availability is checked when you claim.") }
     catch (e: OahException) { when (e.code) {
-        "handle.too_short" -> "Use at least 3 characters."
-        "handle.too_long" -> "Use no more than 15 characters."
-        "handle.first_not_letter" -> "Start with a letter."
-        "handle.double_underscore" -> "Use only one _ in a row."
-        "handle.blocked" -> "This username is reserved to protect users from scams."
-        else -> "Use only a–z, 0–9 and _."
+        "handle.too_short" -> tr("Use at least 3 characters.")
+        "handle.too_long" -> tr("Use no more than 15 characters.")
+        "handle.first_not_letter" -> tr("Start with a letter.")
+        "handle.double_underscore" -> tr("Use only one _ in a row.")
+        "handle.blocked" -> tr("This username is reserved to protect users from scams.")
+        else -> tr("Use only a–z, 0–9 and _.")
     } }
 }
