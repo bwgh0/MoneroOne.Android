@@ -92,6 +92,19 @@ class OpenAliasTest {
     }
 
     @Test
+    fun usernameFormsUseTheSignaturePath() {
+        for (input in listOf("@Joe", "joe@monero.one", "joe.monero.one")) {
+            val result = OpenAlias.classify(input) as RecipientInput.Name
+            assertEquals("@joe", result.name.display)
+            assertTrue(result.name.isUsername)
+        }
+        assertEquals("@work.joe", (OpenAlias.classify("@work.Joe") as RecipientInput.Name).name.display)
+        for (input in listOf("@jo", "@abcdefghijklmnop", "@joe__smith", "@jóe", "@@joe", "@joe/path")) {
+            assertEquals(RecipientInput.InvalidName, OpenAlias.classify(input))
+        }
+    }
+
+    @Test
     fun classifyNames() {
         assertName("donate@getmonero.org", "donate.getmonero.org", "donate@getmonero.org")
         assertName(" Donate@GetMonero.org ", "donate.getmonero.org", "donate@getmonero.org")
@@ -118,7 +131,7 @@ class OpenAliasTest {
 
     @Test
     fun classifyReserved() {
-        for (input in listOf("@joe", "joe@monero.one", "monero.one", "a.b.monero.one", "MONERO.ONE")) {
+        for (input in listOf("monero.one", "a.b.monero.one", "MONERO.ONE")) {
             assertEquals(input, RecipientInput.Reserved, OpenAlias.classify(input))
         }
     }
@@ -130,7 +143,7 @@ class OpenAliasTest {
             assertEquals(input, donate, OpenAlias.classify(input))
         }
         // Only the name@monero.one form, and only the names on the list.
-        for (input in listOf("joe@monero.one", "donate.monero.one", "donate@pay.monero.one", "xdonate@monero.one", "donatex@monero.one", "@donate")) {
+        for (input in listOf("donate.monero.one", "donate@pay.monero.one", "@donate")) {
             assertEquals(input, RecipientInput.Reserved, OpenAlias.classify(input))
         }
     }
@@ -142,7 +155,7 @@ class OpenAliasTest {
         val longName = "a".repeat(63) + "." + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(58) + ".com"
         assertEquals(254, longName.length)
         val invalid = listOf(
-            "@getmonero.org", "joe@", "a@b@c.com",
+            "@ab.org", "joe@", "a@b@c.com",
             "dоnate@getmonero.org", // Cyrillic "о"
             "-pay.example.com", "a..b.com", "pay.example.123",
             "pay.onion", "joe@localhost",

@@ -2400,6 +2400,32 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return walletMutationMutex.withLock { createSubaddressLocked(walletId, manual = true) }
     }
 
+    suspend fun createUsernameSubaddress(expectedSession: Long): String = walletMutationMutex.withLock {
+        val info = _activeWallet.value ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        val kit = WalletManager.kit ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        val shown = _walletState.value.addressesOf(info.id)
+        if (_isLocked.value || _walletSessionId.value != expectedSession || info.isViewOnly || info.deviceWalletId != null ||
+            WalletManager.currentWalletId != info.derivedWalletId || shown == null || !shown.complete || shown.blocked) {
+            throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        }
+        val created = withContext(Dispatchers.IO) { kit.addSubaddress() }
+            ?: throw one.monero.moneroone.core.username.UsernameException("server")
+        mergeWalletUpdate(info.id) { it.copy(userCreatedSubaddressIndices = (it.userCreatedSubaddressIndices + (created.addressIndex + 1)).distinct()) }
+        publishAddresses(info, kit)
+        if (_isLocked.value || _walletSessionId.value != expectedSession) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        created.address
+    }
+
+    suspend fun signUsername(message: String, subaddress: String, expectedSession: Long): String = walletMutationMutex.withLock {
+        val info = _activeWallet.value ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        val kit = WalletManager.kit ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        if (_isLocked.value || _walletSessionId.value != expectedSession || info.isViewOnly || info.deviceWalletId != null ||
+            WalletManager.currentWalletId != info.derivedWalletId) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        val signature = withContext(Dispatchers.IO) { kit.signMessage(message, subaddress) }
+        if (_isLocked.value || _walletSessionId.value != expectedSession) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        signature
+    }
+
     private suspend fun createSubaddressLocked(walletId: String, manual: Boolean): Boolean {
         val info = _activeWallet.value?.takeIf { it.id == walletId } ?: return false
         val kit = WalletManager.kit ?: return false

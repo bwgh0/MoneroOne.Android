@@ -14,6 +14,8 @@ import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.text.BreakIterator
 import java.util.Locale
+import one.monero.moneroone.core.username.UsernameRecipient
+import one.monero.moneroone.core.username.UsernameTrust
 
 /** Tunables of the OpenAlias send flow, kept in one place (spec section 3.6). */
 object OpenAliasConfig {
@@ -50,7 +52,9 @@ sealed class RecipientInput {
 }
 
 /** [display]: as typed, in lowercase, with its `@` kept. [query]: the DNS name to look up. */
-data class OpenAliasName(val display: String, val query: String)
+data class OpenAliasName(val display: String, val query: String) {
+    val isUsername get() = query.endsWith(".monero.one") && !OpenAlias.isOperatorName(display)
+}
 
 enum class AddressCheck { VALID, OTHER_NETWORK, INVALID }
 
@@ -58,7 +62,7 @@ enum class DnssecStatus { VALID, OFF }
 
 enum class OpenAliasFailure {
     NO_RECORD, SEVERAL_ADDRESSES, PAYMENT_ID, INVALID_ADDRESS, WRONG_NETWORK,
-    DNSSEC_FAILED, TIMEOUT, NETWORK, TOR;
+    DNSSEC_FAILED, TIMEOUT, NETWORK, TOR, USERNAME_UNAVAILABLE, USERNAME_VERIFICATION, USERNAME_STALE, USERNAME_NOT_CONFIGURED;
 
     /** The errors that a second try can fix. */
     val canRetry: Boolean get() = this == TIMEOUT || this == NETWORK || this == TOR
@@ -74,6 +78,7 @@ data class OpenAliasResult(
     val recipientName: String?,
     val dnssec: DnssecStatus,
     val txDescription: String? = null,
+    val usernameTrust: UsernameTrust? = null,
 )
 
 /** [pinnedAt] is in Unix seconds. */
@@ -98,6 +103,7 @@ data class OpenAliasSummary(
     val recipientName: String? = null,
     /** The sanitized `tx_description` of the record. */
     val txDescription: String? = null,
+    val usernameTrust: UsernameTrust? = null,
 ) {
     /**
      * The Monero One logo in place of the monogram: for Monero One's own names,
@@ -134,8 +140,15 @@ object OpenAlias {
         if (trimmed.isEmpty()) return RecipientInput.Empty
         if (trimmed.startsWith("monero:", ignoreCase = true)) return RecipientInput.Address(trimmed)
         if ('.' !in trimmed && '@' !in trimmed) return RecipientInput.Address(trimmed)
-        if (trimmed.startsWith('@') && '.' !in trimmed) return RecipientInput.Reserved
         if (trimmed.any { it.code !in 0x21..0x7E }) return RecipientInput.InvalidName
+
+        if (!isOperatorName(trimmed.lowercase(Locale.ROOT))) {
+            UsernameRecipient.localPart(trimmed)?.let { local ->
+                if (isOperatorName("$local@monero.one")) return RecipientInput.Reserved
+                return RecipientInput.Name(OpenAliasName("@$local", "$local.monero.one"))
+            }
+        }
+        if (trimmed.startsWith('@')) return RecipientInput.InvalidName
 
         val display = trimmed.lowercase(Locale.ROOT).removeSuffix(".")
         val query = when (display.count { it == '@' }) {
