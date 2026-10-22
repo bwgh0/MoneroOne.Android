@@ -21,15 +21,24 @@ internal class FakeRegistryApi : UsernameRegistryApi {
     var loseReply = false
     var claimError: String? = null
     var claims = 0
+    /** Runs after each records lookup, to change the registry between two lookups. */
+    var afterRecords: (() -> Unit)? = null
+    /** The pending claim saved on the phone when the POST went out. */
+    var savedAtPost: PendingUsernameClaim? = null
+    var store: UsernameStore? = null
     private var nonces = 0
 
     private fun reach() { if (unreachable) throw IOException("test registry unreachable") }
     override suspend fun checkedRules(network: String): String { reach(); return "rules" }
-    override suspend fun records(handle: String): List<String>? { reach(); return handles[handle] }
+    override suspend fun records(handle: String): List<String>? {
+        reach()
+        return handles[handle].also { afterRecords?.invoke() }
+    }
     override suspend fun nonce(handle: String, subaddress: String): String { reach(); return "nonce-${++nonces}" }
     override suspend fun claim(pending: PendingUsernameClaim, deviceProof: String): Pair<String, String> {
         reach()
         claims++
+        savedAtPost = store?.state?.value?.pending
         claimError?.let { throw UsernameException(it) }
         if (pending.handle in handles) throw UsernameException("name.unavailable")
         val record = "admitted:${pending.recordHash}"
@@ -49,5 +58,5 @@ internal object FakeClaimCore : UsernameClaimCore {
 
 internal val testConfiguration = UsernameConfiguration("http://localhost:8787", "a".repeat(64), "b".repeat(64))
 
-internal fun testRegistry(api: FakeRegistryApi, configuration: UsernameConfiguration = testConfiguration) =
-    UsernameRegistry(configuration, api, FakeClaimCore, developmentClaims = true)
+internal fun testRegistry(api: FakeRegistryApi, configuration: UsernameConfiguration = testConfiguration, developmentClaims: Boolean = true) =
+    UsernameRegistry(configuration, api, FakeClaimCore, developmentClaims)
