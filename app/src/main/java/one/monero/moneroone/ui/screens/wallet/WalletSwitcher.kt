@@ -527,7 +527,8 @@ fun WalletRowCard(
                     Spacer(modifier = Modifier.height(2.dp))
                     // The "@" in brand, as on Home and the card.
                     Text(buildAnnotatedString { withStyle(SpanStyle(color = MoneroOrange)) { append("@") }; append(username.removePrefix("@")) },
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
                 } else address?.let {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(

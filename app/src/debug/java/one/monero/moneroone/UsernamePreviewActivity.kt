@@ -22,6 +22,9 @@ import one.monero.moneroone.ui.screens.wallet.rememberUsernameCardShare
 import one.monero.moneroone.ui.screens.wallet.WalletRowCard
 import one.monero.moneroone.ui.screens.wallet.WalletRowCheck
 import one.monero.moneroone.ui.theme.MoneroOneTheme
+import one.monero.moneroone.ui.theme.MoneroTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 
 /** Renders the real native components without keys, a wallet engine or registry calls. */
 class UsernamePreviewActivity : AppCompatActivity() {
@@ -58,7 +61,13 @@ class UsernamePreviewActivity : AppCompatActivity() {
                         }
                         Text("Switcher Row", style = MaterialTheme.typography.titleLarge)
                         WalletRowCard(emoji = "\uD83D\uDCB0", name = "Everyday", address = null, username = binding.shortName,
-                            balanceText = "12.4826 XMR", isActive = true) { WalletRowCheck(true) }
+                            balanceText = "12.4826 XMR", isActive = true) {
+                            // The switcher's trailing slot: rename, then the check.
+                            IconButton(onClick = {}) {
+                                Icon(Icons.Default.Edit, null, tint = MoneroTheme.colors.labelTertiary, modifier = Modifier.size(18.dp))
+                            }
+                            WalletRowCheck(true)
+                        }
                     }
                 }
             }
