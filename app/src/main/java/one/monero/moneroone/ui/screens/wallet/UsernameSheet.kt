@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.toRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -34,6 +35,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -137,15 +142,34 @@ fun UsernameCard(handle: String, externalAddress: String, modifier: Modifier = M
 @Composable
 internal fun rememberUsernameCardShare(): Pair<Modifier, suspend () -> android.graphics.Bitmap> {
     val layer = rememberGraphicsLayer()
-    return remember(layer) {
+    val shareLayer = rememberGraphicsLayer()
+    val density = LocalDensity.current
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    return remember(layer, shareLayer, density, dark) {
+        var card = Size.Zero
+        var margin = 0f
         val capture = Modifier.drawWithContent {
-            val margin = (size.width * 0.04f).roundToInt().toFloat()
+            margin = (size.width * 0.04f).roundToInt().toFloat()
+            card = size
             layer.record(IntSize((size.width + 2 * margin).roundToInt(), (size.height + 2 * margin).roundToInt())) {
                 translate(margin, margin) { this@drawWithContent.drawContent() }
             }
             translate(-margin, -margin) { drawLayer(layer) }
         }
-        capture to suspend { layer.toImageBitmap().asAndroidBitmap() }
+        capture to suspend {
+            // The card's Modifier.shadow does not reach the bitmap, so the share image draws the
+            // iOS card shadow under it: black 15% (35% dark), radius 14, y 12 on a 1000-wide card.
+            val s = card.width / 1000f
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = (if (dark) Color(0xFF262C30) else Color(0xFFE4E7E8)).toArgb()
+                setShadowLayer(14 * s, 0f, 12 * s, Color.Black.copy(alpha = if (dark) 0.35f else 0.15f).toArgb())
+            }
+            shareLayer.record(density, LayoutDirection.Ltr, layer.size) {
+                drawIntoCanvas { it.nativeCanvas.drawRoundRect(margin, margin, margin + card.width, margin + card.height, 30 * s, 30 * s, paint) }
+                drawLayer(layer)
+            }
+            shareLayer.toImageBitmap().asAndroidBitmap()
+        }
     }
 }
 
