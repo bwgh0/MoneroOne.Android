@@ -24,10 +24,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.toRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -67,6 +71,7 @@ fun UsernameCard(handle: String, externalAddress: String, modifier: Modifier = M
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val ink = if (dark) Color(0xFFECEDEF) else Color(0xFF363C40)
     val secondary = if (dark) Color(0xFFADB4B9) else Color(0xFF687176)
+    val lip = if (dark) Color(0xFFA5410B) else Color(0xFFB74C17)
     BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(1000f / 600f).graphicsLayer {
         rotationY = tilt.x * 3; rotationX = -tilt.y * 2
     }.clearAndSetSemantics {
@@ -77,7 +82,14 @@ fun UsernameCard(handle: String, externalAddress: String, modifier: Modifier = M
         val density = LocalDensity.current
         fun cardSp(n: Float) = with(density) { (n * s).dp.toSp() }
         val shape = RoundedCornerShape((30*s).dp)
-        Box(Modifier.fillMaxSize().shadow((14*s).dp, shape).clip(shape)
+        Box(Modifier.fillMaxSize().drawWithContent {
+            drawContent()
+            // Core's darker underside: a lip just below the bottom edge, over the shadow (iOS 4f1966e).
+            val r = CornerRadius((30*s).dp.toPx())
+            val card = Path().apply { addRoundRect(RoundRect(size.toRect(), r)) }
+            val below = Path().apply { addRoundRect(RoundRect(size.toRect().translate(0f, (3*s).dp.toPx()), r)) }
+            drawPath(Path.combine(PathOperation.Difference, below, card), lip)
+        }.shadow((14*s).dp, shape).clip(shape)
             .background(Brush.linearGradient(if (dark) listOf(Color(0xFF343B3F), Color(0xFF262C30), Color(0xFF1A2025))
                 else listOf(Color(0xFFF0F2F2), Color(0xFFE4E7E8), Color(0xFFD5DADD))))
             .border((1.5f*s).dp, Color.White.copy(alpha = if (dark) 0.12f else 0.6f), shape)) {
