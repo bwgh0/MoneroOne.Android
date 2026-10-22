@@ -31,7 +31,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
@@ -44,8 +46,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import one.monero.moneroone.core.locale.tr
@@ -55,6 +59,7 @@ import one.monero.moneroone.ui.components.successHaptic
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.exp
 
 private const val TAG = "LinkEnvelope"
@@ -77,6 +82,22 @@ private const val SWEEP_AT_MS = 880L
 private const val SWEEP_MS = 1200
 /** Reduce Motion: one cross-fade, half out and half in, with the success haptic in its middle. */
 private const val HALF_FADE_MS = Motion.CROSS_FADE_MS / 2
+
+// The check's light: the sweep's band crosses the sealed envelope again and again while the link is
+// checked (the shine on a Wallet pass). A check that ends mid-pass fades the band out as it goes on.
+private const val SHINE_PASS_MS = 1600
+private const val SHINE_REST_MS = 800L
+private const val SHINE_FADE_OUT_MS = 300
+/** Reduce Motion: no travel; the band stays here, on the seal, and only fades in and out. */
+private const val SHINE_STILL_AT = 0.5f
+
+/**
+ * Reduce Motion is Android's Remove animations (animator scale 0), which ends every Compose animation
+ * at once. The check's light still fades under it, as on iOS, so it runs at the normal scale.
+ */
+private object UnscaledMotion : MotionDurationScale {
+    override val scaleFactor = 1f
+}
 
 // The tilt: the light's rest place on the 0..1 tilt scale, and how far the phone turns for the full scale.
 private val REST_TILT = Offset(
@@ -125,6 +146,12 @@ internal class EnvelopeMotion {
     val drop = Animatable(0f)
     val rise = Animatable(0f)
     val sweep = Animatable(-1f)
+    /** The band's strength, 0 to 1: the check's light fades out with it (Reduce Motion: it only fades). */
+    val sweepAlpha = Animatable(1f)
+    /** True while the link is checked: the light crosses the sealed envelope ([shine]). */
+    var checking by mutableStateOf(false)
+    /** A pass of the check's light is on the envelope: the opening waits for it to leave. */
+    private var shining by mutableStateOf(false)
     var split by mutableStateOf(false)
         private set
     var opened by mutableStateOf(false)
@@ -152,6 +179,8 @@ internal class EnvelopeMotion {
         entered.await()
         val wait = enteredAt + CRACK_AFTER_ENTRANCE_MS - SystemClock.uptimeMillis()
         if (wait > 0) delay(wait)
+        // The check's light leaves first (it fades out within SHINE_FADE_OUT_MS).
+        snapshotFlow { shining }.first { !it }
         opened = true
         if (reduceMotion) {
             fade.animateTo(0f, tween(HALF_FADE_MS, easing = Motion.EaseInOut))
@@ -177,6 +206,60 @@ internal class EnvelopeMotion {
         sweep.snapTo(-0.35f)
         sweep.animateTo(1.35f, tween(SWEEP_MS, easing = Motion.EaseInOut))
         sweep.snapTo(-1f)
+    }
+
+    /**
+     * The check's light, for as long as the sheet shows: once the entrance has landed, while [checking]
+     * and sealed, the sweep's band crosses the envelope (SHINE_PASS_MS easeInOut, then SHINE_REST_MS
+     * off). When the check ends mid-pass, the band keeps moving and fades out; nothing stops mid-envelope.
+     * Reduce Motion: the band stays on the seal and fades in and out at the same cadence.
+     */
+    suspend fun shine(reduceMotion: Boolean) = withContext(if (reduceMotion) UnscaledMotion else EmptyCoroutineContext) {
+        entered.await()
+        snapshotFlow { !entrance.isRunning && entrance.value >= 1f }.first { it }
+        try {
+            shineLoop(reduceMotion)
+        } finally {
+            // Cancelled mid-pass (the sheet left): no band stays behind, and no opening waits for it.
+            if (shining) {
+                shining = false
+                withContext(NonCancellable) { sweep.snapTo(-1f); sweepAlpha.snapTo(1f) }
+            }
+        }
+    }
+
+    private suspend fun shineLoop(reduceMotion: Boolean) {
+        while (true) {
+            snapshotFlow { checking && !opened }.first { it }
+            shining = true
+            coroutineScope {
+                val pass = launch {
+                    if (reduceMotion) {
+                        sweepAlpha.snapTo(0f)
+                        sweep.snapTo(SHINE_STILL_AT)
+                        sweepAlpha.animateTo(1f, tween(SHINE_PASS_MS / 2, easing = Motion.EaseInOut))
+                        sweepAlpha.animateTo(0f, tween(SHINE_PASS_MS / 2, easing = Motion.EaseInOut))
+                    } else {
+                        sweep.snapTo(-0.35f)
+                        sweep.animateTo(1.35f, tween(SHINE_PASS_MS, easing = Motion.EaseInOut))
+                    }
+                }
+                var fading = false
+                val stop = launch {
+                    snapshotFlow { checking }.first { !it }
+                    fading = true
+                    // Under Reduce Motion this takes over the pass's own fade, from where it is.
+                    sweepAlpha.animateTo(0f, tween(SHINE_FADE_OUT_MS, easing = Motion.EaseOut))
+                    pass.cancel()
+                }
+                pass.join()
+                if (fading) stop.join() else stop.cancel()
+            }
+            sweep.snapTo(-1f)
+            sweepAlpha.snapTo(1f)
+            shining = false
+            delay(SHINE_REST_MS)
+        }
     }
 
     /** Back to sealed (the link stopped holding money): one cross-fade, no haptic. */
@@ -256,6 +339,7 @@ internal fun LinkEnvelopeHero(
             lightX = 0.08f + 0.84f * t.x,
             lightY = 0.05f + 0.7f * t.y,
             sweep = motion.sweep.value,
+            sweepAlpha = motion.sweepAlpha.value.coerceIn(0f, 1f),
         )
         drawIntoCanvas { canvas ->
             val native = canvas.nativeCanvas

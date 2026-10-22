@@ -263,6 +263,9 @@ private fun ClaimSheet(
     val showsEnvelope = ui !is ClaimUi.Done && ui != ClaimUi.Missing
     val reduceMotion = rememberReduceMotion()
     val motion = remember(id) { EnvelopeMotion() }
+    // While the link is checked, the light crosses the sealed envelope.
+    val checking = ui is ClaimUi.Checking
+    SideEffect { motion.checking = checking }
 
     val ready = ui is ClaimUi.Ready
     val sweeping = current?.phase == EnvelopeSession.Phase.SWEEPING
@@ -306,6 +309,7 @@ private fun ClaimSheet(
         LaunchedEffect(motion, opens) {
             if (opens) motion.open(view, reduceMotion) else motion.seal()
         }
+        LaunchedEffect(motion) { motion.shine(reduceMotion) }
         // The list slides in from the trailing edge and the sheet's height follows (iOS pushes it).
         AnimatedContent(
             targetState = showList,

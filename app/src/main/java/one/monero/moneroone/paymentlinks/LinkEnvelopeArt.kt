@@ -85,8 +85,10 @@ internal data class EnvelopePose(
     val crackGlint: Float = 0f,
     val lightX: Float = EnvelopeGeometry.REST_LX,
     val lightY: Float = EnvelopeGeometry.REST_LY,
-    /** The one light sweep: -1 before, -0.35 to 1.35 while it runs. */
+    /** The light sweep: -1 before, -0.35 to 1.35 while it runs. */
     val sweep: Float = -1f,
+    /** The sweep's strength, 0 to 1 (the check's light fades with it). */
+    val sweepAlpha: Float = 1f,
 )
 
 private object EnvelopePaths {
@@ -338,7 +340,7 @@ internal class EnvelopeArt private constructor(
             canvas.clipRect(rect)
             paint.shader = sweepShader(
                 rect.left, rect.top, g.CARD_W, g.CARD_H,
-                (pose.sweep - 0.16f) * length, pose.sweep * length, (pose.sweep + 0.16f) * length, White.withAlpha(0.16f)
+                (pose.sweep - 0.16f) * length, pose.sweep * length, (pose.sweep + 0.16f) * length, White.withAlpha(0.16f * pose.sweepAlpha)
             )
             paint.xfermode = screen
             canvas.drawRect(rect, paint)
@@ -362,7 +364,7 @@ internal class EnvelopeArt private constructor(
             val length = sweepLength(g.W, g.H)
             paint.shader = sweepShader(
                 0f, 0f, g.W, g.H,
-                (pose.sweep - 0.16f) * length, pose.sweep * length, (pose.sweep + 0.16f) * length, White.withAlpha(0.09f)
+                (pose.sweep - 0.16f) * length, pose.sweep * length, (pose.sweep + 0.16f) * length, White.withAlpha(0.09f * pose.sweepAlpha)
             )
             canvas.drawRect(0f, 0f, g.W, g.H, paint)
         }
@@ -370,7 +372,7 @@ internal class EnvelopeArt private constructor(
         canvas.restore()
     }
 
-    /** The light on the closed flap (its own box, 1000 x 310). */
+    /** The light on the closed flap (its own box, 1000 x 310), and the sweep, in line with the pocket's. */
     private fun drawFlapLight(canvas: Canvas, pose: EnvelopePose) {
         val g = EnvelopeGeometry
         canvas.save()
@@ -380,6 +382,14 @@ internal class EnvelopeArt private constructor(
             intArrayOf(White.withAlpha(0.08f), White.withAlpha(0f)), floatArrayOf(0f, 0.7f)
         )
         canvas.drawRect(0f, 0f, g.W, g.FLAP_H, paint)
+        if (pose.sweep > -0.5f && pose.sweep < 1.5f) {
+            val length = sweepLength(g.W, g.H)
+            paint.shader = sweepShader(
+                0f, 0f, g.W, g.H,
+                (pose.sweep - 0.16f) * length, pose.sweep * length, (pose.sweep + 0.16f) * length, White.withAlpha(0.09f * pose.sweepAlpha)
+            )
+            canvas.drawRect(0f, 0f, g.W, g.FLAP_H, paint)
+        }
         paint.shader = null
         canvas.restore()
     }
@@ -404,7 +414,7 @@ internal class EnvelopeArt private constructor(
         if (pose.sweep > -0.5f && pose.sweep < 1.5f) {
             // The sweep crosses the seal at the envelope's own place (background-position -402px).
             val at = pose.sweep * g.W
-            paint.shader = sweepShader(-g.SEAL_X, 0f, g.W, g.SEAL, at - 90f, at, at + 90f, LinkEnvelopeColors.WaxSweep.withAlpha(0.42f))
+            paint.shader = sweepShader(-g.SEAL_X, 0f, g.W, g.SEAL, at - 90f, at, at + 90f, LinkEnvelopeColors.WaxSweep.withAlpha(0.42f * pose.sweepAlpha))
             canvas.drawRect(0f, 0f, g.SEAL, g.SEAL, paint)
         }
         paint.shader = null
