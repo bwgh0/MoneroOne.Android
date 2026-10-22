@@ -28,10 +28,12 @@ class DefaultNodesTest {
         assertEquals("node.monero.one:443", DefaultNodes.TOR_OFF_FALLBACK)
         assertFalse(isOnionNode(DefaultNodes.TOR_OFF_FALLBACK))
     }
-    @Test fun firstRunCanPickEveryDefaultIncludingMoneroOne() {
-        val picks = (0 until 200).map { DefaultNodes.initial(FakeSharedPreferences(), Random(it)) }.toSet()
-        assertTrue("node.monero.one:443" in picks)
-        assertEquals(DefaultNodes.URIS.toSet(), picks)
+    @Test fun firstRunAlwaysPicksTheTlsNodeMoneroOne() {
+        repeat(200) {
+            val pick = DefaultNodes.initial(FakeSharedPreferences(), Random(it))
+            assertEquals("node.monero.one:443", pick)
+            assertTrue(DefaultNodes.isTls(pick))
+        }
     }
     @Test fun firstRunPickIsKeptOnLaterLaunches() {
         val prefs = FakeSharedPreferences()

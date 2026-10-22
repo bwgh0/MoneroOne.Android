@@ -41,15 +41,16 @@ object DefaultNodes {
     // is cleartext HTTP. Keep this predicate in sync with that convention.
     fun isTls(uri: String): Boolean = uri.substringAfterLast(":").toIntOrNull() == 443
 
-    // Fallback for callers without a Context. Prefer [initial] so first-run
-    // traffic is not concentrated on one operator.
+    // Fallback for callers without a Context. Prefer [initial].
     const val INITIAL = "xmr-node.cakewallet.com:18081"
 
     /**
      * Node used before the user (or auto-select) has ever picked one, drawn once
      * per install and then persisted so it stays stable across launches.
      *
-     * Drawn from every entry in [ALL], TLS (node.monero.one) and cleartext alike.
+     * Drawn only from the [isTls] entries, as on iOS, so a new install starts on
+     * an encrypted connection (today that is always node.monero.one). Falls back
+     * to all of [ALL] if no entry is TLS. Installs that already drew a node keep it.
      */
     fun initial(context: Context): String =
         initial(context.getSharedPreferences("monero_wallet", Context.MODE_PRIVATE))
@@ -57,7 +58,8 @@ object DefaultNodes {
     internal fun initial(prefs: SharedPreferences, random: Random = Random): String {
         prefs.getString(KEY_INITIAL_NODE, null)?.let { return it }
 
-        val picked = ALL[random.nextInt(ALL.size)].uri
+        val candidates = ALL.filter { isTls(it.uri) }.ifEmpty { ALL }
+        val picked = candidates[random.nextInt(candidates.size)].uri
         prefs.edit().putString(KEY_INITIAL_NODE, picked).apply()
         return picked
     }
