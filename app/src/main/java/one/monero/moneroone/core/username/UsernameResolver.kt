@@ -20,7 +20,22 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
 
 enum class UsernameTrust { PUBLISHED, PENDING, STALE, EXPIRED;
-    val amountLimit: Long? get() = if (this == STALE || this == EXPIRED) 100_000_000_000L else null
+    /** 0.1 XMR, in atomic units, for a record not yet in the public log or out of date. */
+    val amountLimit: Long? get() = if (this == PUBLISHED) null else 100_000_000_000L
+
+    /** Why a send over [amountLimit] stops. English source text for `tr`. */
+    val limitMessage: String? get() = when (this) {
+        PUBLISHED -> null
+        PENDING -> "This username is not in the public log yet. The payment limit is 0.1 XMR."
+        STALE, EXPIRED -> "Username records are out of date. The payment limit is 0.1 XMR."
+    }
+
+    /** The note above the amount while [amountLimit] applies. English source text for `tr`. */
+    val limitNote: String? get() = when (this) {
+        PUBLISHED -> null
+        PENDING -> "This username is not in the public log yet. The payment limit is 0.1 XMR."
+        STALE, EXPIRED -> "Username records are out of date. Payments are limited to 0.1 XMR until they refresh."
+    }
 }
 
 object UsernameRecipient {

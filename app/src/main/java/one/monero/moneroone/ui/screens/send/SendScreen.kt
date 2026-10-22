@@ -5,6 +5,7 @@ import one.monero.moneroone.core.openalias.OpenAliasOutcome
 import one.monero.moneroone.core.openalias.OpenAliasFailure
 import one.monero.moneroone.core.username.UsernameResolver
 import one.monero.moneroone.core.username.UsernameResolutionConfiguration
+import one.monero.moneroone.core.username.UsernameTrust
 
 import one.monero.moneroone.core.locale.tr
 import android.view.MotionEvent
@@ -525,7 +526,7 @@ fun SendScreen(
                             isSweepAll = true
                             amountPrefilledFromQR = false
                         },
-                        usernameAmountLimit = openAliasSummary?.usernameTrust?.amountLimit,
+                        usernameTrust = openAliasSummary?.usernameTrust,
                         availableBalance = walletViewModel.formatXmr(walletState.balance.unlocked),
                         unlockedBalance = walletState.balance.unlocked,
                         parseXmr = walletViewModel::parseXmr,
@@ -710,7 +711,7 @@ fun SendScreen(
                                     checked.result.address != address || checked.result.usernameTrust != username.usernameTrust ->
                                         tr("The username changed since your review. Look it up again before sending.")
                                     checked.result.usernameTrust?.amountLimit?.let { isSweepAll || prepared.sentAmount > it } == true ->
-                                        tr("Username records are out of date. The payment limit is 0.1 XMR.")
+                                        checked.result.usernameTrust?.limitMessage?.let { tr(it) }
                                     else -> null
                                 }
                             }
@@ -1050,8 +1051,10 @@ private fun AmountPhase(
     linkMode: Boolean = false,
     /** Link mode: the name the link gets without a note ("Link 9"). */
     notePlaceholder: String? = null,
-    usernameAmountLimit: Long? = null
+    /** A username recipient's trust; any but published limits the amount and turns off Max. */
+    usernameTrust: UsernameTrust? = null
 ) {
+    val usernameAmountLimit = usernameTrust?.amountLimit
     val parsedAmount = parseXmr(amount)
     val canContinue = parsedAmount > 0 && parsedAmount <= unlockedBalance &&
         (usernameAmountLimit == null || (!isSweepAll && parsedAmount <= usernameAmountLimit))
@@ -1090,9 +1093,8 @@ private fun AmountPhase(
             .graphicsLayer { this.alpha = alpha; translationY = offsetY.dp.toPx() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (usernameAmountLimit != null) {
-            Text(tr("Username records are out of date. Payments are limited to 0.1 XMR until they refresh."),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        usernameTrust?.limitNote?.let { note ->
+            Text(tr(note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         // Where the amount came from (iOS SendAmountStep); the donation's
         // suggested amount has no note, as on iOS.
