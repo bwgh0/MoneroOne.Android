@@ -5,6 +5,7 @@ import one.monero.moneroone.core.openalias.OpenAliasOutcome
 import one.monero.moneroone.core.openalias.OpenAliasFailure
 import one.monero.moneroone.core.username.UsernameResolver
 import one.monero.moneroone.core.username.UsernameResolutionConfiguration
+import one.monero.moneroone.core.username.UsernameSendCheck
 import one.monero.moneroone.core.username.UsernameTrust
 
 import one.monero.moneroone.core.locale.tr
@@ -707,13 +708,8 @@ fun SendScreen(
                                 else UsernameResolver(usernameContext, config).resolve(username.name)
                             val failure = when (checked) {
                                 is OpenAliasOutcome.Failed -> failureText(checked.failure)
-                                is OpenAliasOutcome.Resolved -> when {
-                                    checked.result.address != address || checked.result.usernameTrust != username.usernameTrust ->
-                                        tr("The username changed since your review. Look it up again before sending.")
-                                    checked.result.usernameTrust?.amountLimit?.let { isSweepAll || prepared.sentAmount > it } == true ->
-                                        checked.result.usernameTrust?.limitMessage?.let { tr(it) }
-                                    else -> null
-                                }
+                                is OpenAliasOutcome.Resolved ->
+                                    UsernameSendCheck.stopReason(address, checked.result, isSweepAll, prepared.sentAmount)?.let { tr(it) }
                             }
                             if (failure != null) {
                                 linkFundingError = failure
