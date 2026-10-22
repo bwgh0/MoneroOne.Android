@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import one.monero.moneroone.R
@@ -63,6 +65,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.core.content.FileProvider
 import java.io.File
+import kotlin.math.roundToInt
 
 @Composable
 fun UsernameCard(handle: String, externalAddress: String, modifier: Modifier = Modifier, still: Boolean = false) {
@@ -126,18 +129,33 @@ fun UsernameCard(handle: String, externalAddress: String, modifier: Modifier = M
     }
 }
 
+/**
+ * Records the card as drawn for the share image, with a margin around it so the lip and the
+ * shadow show: 40 on a 1000-wide card, as iOS renders 1000 x 600 with padding 40.
+ * Pass the modifier to [UsernameCard]; the function returns the share bitmap.
+ */
+@Composable
+internal fun rememberUsernameCardShare(): Pair<Modifier, suspend () -> android.graphics.Bitmap> {
+    val layer = rememberGraphicsLayer()
+    return remember(layer) {
+        val capture = Modifier.drawWithContent {
+            val margin = (size.width * 0.04f).roundToInt().toFloat()
+            layer.record(IntSize((size.width + 2 * margin).roundToInt(), (size.height + 2 * margin).roundToInt())) {
+                translate(margin, margin) { this@drawWithContent.drawContent() }
+            }
+            translate(-margin, -margin) { drawLayer(layer) }
+        }
+        capture to suspend { layer.toImageBitmap().asAndroidBitmap() }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, model: UsernameViewModel,
                   binding: UsernameBinding?, onDismiss: () -> Unit) {
     val state by model.state.collectAsState()
     val busy = binding == null && state.stage == UsernameStage.CLAIMING
-    val cardLayer = rememberGraphicsLayer()
-    val cardCapture = Modifier.drawWithContent {
-        cardLayer.record { this@drawWithContent.drawContent() }
-        drawLayer(cardLayer)
-    }
-    val shareCard: suspend () -> android.graphics.Bitmap = { cardLayer.toImageBitmap().asAndroidBitmap() }
+    val (cardCapture, shareCard) = rememberUsernameCardShare()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !busy })
     ModalBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = sheet,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {

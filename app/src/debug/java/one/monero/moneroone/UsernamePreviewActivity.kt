@@ -18,6 +18,7 @@ import one.monero.moneroone.core.username.UsernameBinding
 import one.monero.moneroone.ui.screens.wallet.BalanceCard
 import one.monero.moneroone.ui.screens.wallet.BalanceHistoryState
 import one.monero.moneroone.ui.screens.wallet.UsernameCard
+import one.monero.moneroone.ui.screens.wallet.rememberUsernameCardShare
 import one.monero.moneroone.ui.screens.wallet.WalletRowCard
 import one.monero.moneroone.ui.screens.wallet.WalletRowCheck
 import one.monero.moneroone.ui.theme.MoneroOneTheme
@@ -30,6 +31,8 @@ class UsernamePreviewActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val handle = intent.getStringExtra("handle")?.take(15) ?: "Joe"
+        // --ez share true writes the card's share image to files/username-card-share.png (app external files).
+        val writeShare = intent.getBooleanExtra("share", false)
         val binding = UsernameBinding("preview", "mainnet", handle.lowercase(java.util.Locale.ROOT), handle, "", "preview", "", 0)
         setContent {
             MoneroOneTheme(darkTheme = dark) {
@@ -44,7 +47,15 @@ class UsernamePreviewActivity : AppCompatActivity() {
                             fiatMode = false, syncState = SyncState.Synced, isOnline = true, history = history, historicalPoint = null
                         ) { }
                         Text("Your Username", style = MaterialTheme.typography.titleLarge)
-                        UsernameCard(binding.displayHandle, binding.externalAddress, still = true)
+                        val (capture, share) = rememberUsernameCardShare()
+                        UsernameCard(binding.displayHandle, binding.externalAddress, capture, still = true)
+                        if (writeShare) LaunchedEffect(Unit) {
+                            withFrameNanos { }; withFrameNanos { }
+                            val bitmap = share()
+                            java.io.File(getExternalFilesDir(null), "username-card-share.png").outputStream().use {
+                                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                            }
+                        }
                         Text("Switcher Row", style = MaterialTheme.typography.titleLarge)
                         WalletRowCard(emoji = "\uD83D\uDCB0", name = "Everyday", address = null, username = binding.shortName,
                             balanceText = "12.4826 XMR", isActive = true) { WalletRowCheck(true) }
