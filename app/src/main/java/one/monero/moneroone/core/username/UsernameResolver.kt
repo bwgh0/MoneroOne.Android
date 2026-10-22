@@ -40,12 +40,14 @@ object UsernameSendCheck {
      * Null to send, else why the send stops (English source text for `tr`).
      * Only a new address stops it. A new trust alone does not: its own limit
      * applies, so published to stale gains the limit, pending to published loses it.
+     * [sentAmount] is the amount the signed transfer sends, also when the review
+     * switched to send all because amount and fee were over the balance.
      */
-    fun stopReason(reviewedAddress: String, checked: OpenAliasResult, sendAll: Boolean, amount: Long): String? {
+    fun stopReason(reviewedAddress: String, checked: OpenAliasResult, sentAmount: Long): String? {
         if (checked.address != reviewedAddress) return "The username changed since your review. Look it up again before sending."
         val trust = checked.usernameTrust ?: return null
         val limit = trust.amountLimit ?: return null
-        return if (sendAll || amount > limit) trust.limitMessage else null
+        return if (sentAmount > limit) trust.limitMessage else null
     }
 }
 

@@ -16,8 +16,8 @@ class UsernameSendCheckTest {
     private fun checked(trust: UsernameTrust, address: String = reviewed) =
         OpenAliasResult(address, null, DnssecStatus.OFF, usernameTrust = trust)
 
-    private fun stop(trust: UsernameTrust, amount: Long, sendAll: Boolean = false, address: String = reviewed) =
-        UsernameSendCheck.stopReason(reviewed, checked(trust, address), sendAll, amount)
+    private fun stop(trust: UsernameTrust, sentAmount: Long, address: String = reviewed) =
+        UsernameSendCheck.stopReason(reviewed, checked(trust, address), sentAmount)
 
     @Test fun aNewAddressStops() {
         for (trust in UsernameTrust.entries) assertEquals(trust.name, changed, stop(trust, 1L, address = "other-test-address"))
@@ -26,7 +26,6 @@ class UsernameSendCheckTest {
     @Test fun aNewTrustAloneDoesNotStop() {
         // Reviewed as pending, now published: the limit goes away.
         assertNull(stop(UsernameTrust.PUBLISHED, limit * 5))
-        assertNull(stop(UsernameTrust.PUBLISHED, limit * 5, sendAll = true))
         // Reviewed as published, now stale or expired: under the limit it sends.
         assertNull(stop(UsernameTrust.STALE, limit))
         assertNull(stop(UsernameTrust.EXPIRED, 1L))
@@ -38,8 +37,13 @@ class UsernameSendCheckTest {
         assertEquals(notInLog, stop(UsernameTrust.PENDING, limit + 1))
     }
 
-    @Test fun sendAllStopsWhileALimitApplies() {
-        assertEquals(outOfDate, stop(UsernameTrust.STALE, 1L, sendAll = true))
-        assertEquals(notInLog, stop(UsernameTrust.PENDING, 1L, sendAll = true))
+    @Test fun sendAllIsJudgedByTheAmountItSends() {
+        // The review switched to send all because amount and fee were over the balance.
+        for (trust in listOf(UsernameTrust.PENDING, UsernameTrust.STALE, UsernameTrust.EXPIRED)) {
+            assertNull(trust.name, stop(trust, limit - 5_000_000L))
+            assertNull(trust.name, stop(trust, limit))
+        }
+        assertEquals(outOfDate, stop(UsernameTrust.STALE, limit + 1))
+        assertEquals(notInLog, stop(UsernameTrust.PENDING, limit * 3))
     }
 }

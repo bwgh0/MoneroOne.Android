@@ -709,7 +709,7 @@ fun SendScreen(
                             val failure = when (checked) {
                                 is OpenAliasOutcome.Failed -> failureText(checked.failure)
                                 is OpenAliasOutcome.Resolved ->
-                                    UsernameSendCheck.stopReason(address, checked.result, isSweepAll, prepared.sentAmount)?.let { tr(it) }
+                                    UsernameSendCheck.stopReason(address, checked.result, prepared.sentAmount)?.let { tr(it) }
                             }
                             if (failure != null) {
                                 linkFundingError = failure
