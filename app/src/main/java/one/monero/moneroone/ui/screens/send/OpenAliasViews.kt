@@ -1,5 +1,9 @@
 package one.monero.moneroone.ui.screens.send
 
+import one.monero.moneroone.core.username.UsernameResolver
+import one.monero.moneroone.core.username.UsernameResolutionConfiguration
+import one.monero.moneroone.core.username.UsernameTrust
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.EaseOut
@@ -126,11 +130,14 @@ internal sealed class LookupStatus {
         fun summary() = OpenAliasSummary(
             name, result.address, result.dnssec, pin,
             recipientName = result.recipientName,
-            txDescription = result.txDescription
+            txDescription = result.txDescription,
+            usernameTrust = result.usernameTrust
         )
 
         /** A changed pin, or DNSSEC off, asks the user first. */
-        val needsConfirmation: Boolean get() = pin is PinState.Changed || result.dnssec == DnssecStatus.OFF
+        val needsConfirmation: Boolean get() = pin is PinState.Changed ||
+            if (result.usernameTrust != null) pin == PinState.None || result.usernameTrust != UsernameTrust.PUBLISHED
+            else result.dnssec == DnssecStatus.OFF
     }
     data class Failed(val name: OpenAliasName, val failure: OpenAliasFailure) : LookupStatus()
 
@@ -339,7 +346,13 @@ internal fun rememberOpenAliasLookup(): OpenAliasLookupModel {
         val resolver = OpenAliasResolver()
         OpenAliasLookupModel(
             scope = scope,
-            lookup = { name -> resolver.resolve(name, ::openAliasAddressCheck) },
+            lookup = { name ->
+                if (name.isUsername) {
+                    val config = UsernameResolutionConfiguration.current
+                    if (config == null) OpenAliasOutcome.Failed(OpenAliasFailure.USERNAME_NOT_CONFIGURED)
+                    else UsernameResolver(context.applicationContext, config).resolve(name)
+                } else resolver.resolve(name, ::openAliasAddressCheck)
+            },
             pins = OpenAliasPinStore.create(context.applicationContext),
             isValidAddress = ::isValidMoneroAddress,
             // The keypad tick of the app, as iOS plays its soft tick.
@@ -385,6 +398,7 @@ internal fun OpenAliasSummary.toSaved(): ArrayList<Any?> = arrayListOf(
     },
     recipientName,
     txDescription,
+    usernameTrust?.name,
 )
 
 internal fun summaryFromSaved(saved: List<Any?>): OpenAliasSummary {
@@ -400,18 +414,19 @@ internal fun summaryFromSaved(saved: List<Any?>): OpenAliasSummary {
         },
         recipientName = saved[6] as String?,
         txDescription = saved[7] as String?,
+        usernameTrust = (saved.getOrNull(8) as? String)?.let(UsernameTrust::valueOf),
     )
 }
 
 private fun OpenAliasSummary.toResolved() = LookupStatus.Resolved(
     name,
-    OpenAliasResult(address, recipientName, dnssec, txDescription),
+    OpenAliasResult(address, recipientName, dnssec, txDescription, usernameTrust),
     pin
 )
 
 /** What TalkBack hears when a lookup ends, as on iOS. */
 internal fun lookupAnnouncement(status: LookupStatus): String? = when (status) {
-    is LookupStatus.Resolved -> tr("Address found for %s", status.name.display) + ". " + dnssecWord(status.result.dnssec)
+    is LookupStatus.Resolved -> tr("Address found for %s", status.name.display) + ". " + verificationWord(status.result.dnssec, status.result.usernameTrust)
     is LookupStatus.Failed -> failureText(status.failure)
     else -> null
 }
@@ -550,8 +565,8 @@ private fun ErrorLineContent(text: String) {
  * open lock, with the text in the label color.
  */
 @Composable
-private fun DnssecLineContent(dnssec: DnssecStatus) {
-    val valid = dnssec == DnssecStatus.VALID
+private fun DnssecLineContent(dnssec: DnssecStatus, usernameTrust: UsernameTrust? = null) {
+    val valid = usernameTrust == UsernameTrust.PUBLISHED || (usernameTrust == null && dnssec == DnssecStatus.VALID)
     Icon(
         if (valid) Icons.Filled.Lock else Icons.Filled.LockOpen,
         contentDescription = null,
@@ -559,7 +574,7 @@ private fun DnssecLineContent(dnssec: DnssecStatus) {
         modifier = Modifier.size(14.dp)
     )
     Text(
-        dnssecWord(dnssec),
+        verificationWord(dnssec, usernameTrust),
         style = MaterialTheme.typography.bodySmall,
         color = if (valid) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
     )
@@ -582,10 +597,22 @@ private fun TryAgainButton(onRetry: () -> Unit) {
     )
 }
 
+private fun verificationWord(dnssec: DnssecStatus, trust: UsernameTrust?): String = when (trust) {
+    UsernameTrust.PUBLISHED -> tr("Signature checked")
+    UsernameTrust.PENDING -> tr("Not yet in the public log")
+    UsernameTrust.STALE -> tr("Username records are out of date")
+    UsernameTrust.EXPIRED -> tr("Using a previously checked username")
+    null -> dnssecWord(dnssec)
+}
+
 private fun dnssecWord(dnssec: DnssecStatus): String =
     if (dnssec == DnssecStatus.VALID) tr("DNSSEC valid") else tr("DNSSEC off")
 
-private fun failureText(failure: OpenAliasFailure): String = when (failure) {
+internal fun failureText(failure: OpenAliasFailure): String = when (failure) {
+    OpenAliasFailure.USERNAME_UNAVAILABLE -> tr("This username is unavailable")
+    OpenAliasFailure.USERNAME_VERIFICATION -> tr("Username signature check failed. Do not send to this address.")
+    OpenAliasFailure.USERNAME_STALE -> tr("The public username records are too old for a first payment. Try again later.")
+    OpenAliasFailure.USERNAME_NOT_CONFIGURED -> tr("Username payments aren't available yet")
     OpenAliasFailure.NO_RECORD -> tr("No Monero address for this name")
     OpenAliasFailure.SEVERAL_ADDRESSES -> tr("This name lists more than one Monero address")
     OpenAliasFailure.PAYMENT_ID -> tr(
@@ -607,7 +634,7 @@ private fun pinText(pin: PinState): String? = when (pin) {
 
 /** The TalkBack value of the recipient card: the DNSSEC word and the pin. */
 internal fun openAliasSpokenStatus(summary: OpenAliasSummary): String =
-    listOfNotNull(dnssecWord(summary.dnssec), pinText(summary.pin)).joinToString(", ")
+    listOfNotNull(verificationWord(summary.dnssec, summary.usernameTrust), pinText(summary.pin)).joinToString(", ")
 
 /** The spinner in the recipient field while a lookup runs, as on iOS. */
 @Composable
@@ -822,7 +849,7 @@ internal fun OpenAliasResolvedLines(summary: OpenAliasSummary?) {
         ) {
             val dnssecLine: @Composable () -> Unit = {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    DnssecLineContent(shown.dnssec)
+                    DnssecLineContent(shown.dnssec, shown.usernameTrust)
                 }
             }
             if (shown.recipientName != null) {
@@ -950,6 +977,11 @@ internal fun OpenAliasContinueDialog(
             )
         }
         confirm = tr("Use New Address")
+    } else if (request.result.usernameTrust != null) {
+        title = tr("Check Username")
+        message = tr("Confirm with the recipient that %s is their username before your first payment.", request.name.display) +
+            if (request.result.usernameTrust == UsernameTrust.PUBLISHED) "" else "\n\n" + verificationWord(request.result.dnssec, request.result.usernameTrust)
+        confirm = tr("Continue")
     } else {
         title = tr("Name Not Signed")
         message = tr(
@@ -1054,7 +1086,7 @@ internal fun OpenAliasReviewNotes(summary: OpenAliasSummary, modifier: Modifier 
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            DnssecLineContent(summary.dnssec)
+            DnssecLineContent(summary.dnssec, summary.usernameTrust)
         }
         if (summary.pin == PinState.None) {
             Row(

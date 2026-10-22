@@ -1,5 +1,11 @@
 package one.monero.moneroone.ui.screens.send
 
+import androidx.compose.ui.platform.LocalContext
+import one.monero.moneroone.core.openalias.OpenAliasOutcome
+import one.monero.moneroone.core.openalias.OpenAliasFailure
+import one.monero.moneroone.core.username.UsernameResolver
+import one.monero.moneroone.core.username.UsernameResolutionConfiguration
+
 import one.monero.moneroone.core.locale.tr
 import android.view.MotionEvent
 import androidx.activity.compose.BackHandler
@@ -235,6 +241,7 @@ fun SendScreen(
     paymentLinks: PaymentLinksViewModel? = null,
     onClaimLink: (String) -> Unit = {}
 ) {
+    val usernameContext = LocalContext.current.applicationContext
     val walletState by walletViewModel.walletState.collectAsState()
     val flow = rememberSaveable(saver = SendFlowSaver) { SendFlow(walletViewModel.activeWallet.value?.id) }
     val sharedSendState by walletViewModel.sendState.collectAsState()
@@ -518,6 +525,7 @@ fun SendScreen(
                             isSweepAll = true
                             amountPrefilledFromQR = false
                         },
+                        usernameAmountLimit = openAliasSummary?.usernameTrust?.amountLimit,
                         availableBalance = walletViewModel.formatXmr(walletState.balance.unlocked),
                         unlockedBalance = walletState.balance.unlocked,
                         parseXmr = walletViewModel::parseXmr,
@@ -691,6 +699,28 @@ fun SendScreen(
                             reviewBuild++
                             return@launch
                         }
+                        val username = openAliasSummary?.takeIf { it.name.isUsername }
+                        if (username != null) {
+                            val config = UsernameResolutionConfiguration.current
+                            val checked = if (config == null) OpenAliasOutcome.Failed(OpenAliasFailure.USERNAME_NOT_CONFIGURED)
+                                else UsernameResolver(usernameContext, config).resolve(username.name)
+                            val failure = when (checked) {
+                                is OpenAliasOutcome.Failed -> failureText(checked.failure)
+                                is OpenAliasOutcome.Resolved -> when {
+                                    checked.result.address != address || checked.result.usernameTrust != username.usernameTrust ->
+                                        tr("The username changed since your review. Look it up again before sending.")
+                                    checked.result.usernameTrust?.amountLimit?.let { isSweepAll || prepared.sentAmount > it } == true ->
+                                        tr("Username records are out of date. The payment limit is 0.1 XMR.")
+                                    else -> null
+                                }
+                            }
+                            if (failure != null) {
+                                linkFundingError = failure
+                                phase = SendPhase.ERROR
+                                sendInProgress = false
+                                return@launch
+                            }
+                        }
                         // The transfer the review built goes out as it is: its fee is the one the review showed.
                         sentAtomic = prepared.sentAmount
                         // The Sent screen plays the chime when its circle closes.
@@ -848,7 +878,7 @@ private fun AddressPhase(
                             .fillMaxWidth()
                             .focusRequester(fieldFocus)
                             .semantics { contentDescription = fieldLabel },
-                        placeholder = { Text(tr("Enter XMR address or OpenAlias"), style = MonoCaption) },
+                        placeholder = { Text(tr("Address, @username or OpenAlias"), style = MonoCaption) },
                         textStyle = MonoCaption,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Text,
@@ -1019,10 +1049,12 @@ private fun AmountPhase(
     // note, which stays on this phone (the tx memo stays "Payment link").
     linkMode: Boolean = false,
     /** Link mode: the name the link gets without a note ("Link 9"). */
-    notePlaceholder: String? = null
+    notePlaceholder: String? = null,
+    usernameAmountLimit: Long? = null
 ) {
     val parsedAmount = parseXmr(amount)
-    val canContinue = parsedAmount > 0 && parsedAmount <= unlockedBalance
+    val canContinue = parsedAmount > 0 && parsedAmount <= unlockedBalance &&
+        (usernameAmountLimit == null || (!isSweepAll && parsedAmount <= usernameAmountLimit))
     val clipboardManager = LocalClipboardManager.current
 
     // Fiat mode toggle. Saved, as the amount is, through a recreation.
@@ -1058,6 +1090,10 @@ private fun AmountPhase(
             .graphicsLayer { this.alpha = alpha; translationY = offsetY.dp.toPx() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (usernameAmountLimit != null) {
+            Text(tr("Username records are out of date. Payments are limited to 0.1 XMR until they refresh."),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         // Where the amount came from (iOS SendAmountStep); the donation's
         // suggested amount has no note, as on iOS.
         val prefillNote = when (prefillSource) {
@@ -1197,7 +1233,7 @@ private fun AmountPhase(
                 Text(tr("Paste"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MoneroOrange)
             }
             if (!linkMode) Spacer(modifier = Modifier.width(8.dp))
-            if (!linkMode) Row(
+            if (!linkMode && usernameAmountLimit == null) Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(CapsuleShape)

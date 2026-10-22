@@ -140,7 +140,7 @@ class OpenAliasLookupModelTest {
         assertEquals(LookupStatus.Address("donate", valid = false), model.status)
 
         // The reserved row is a name row too.
-        model.onInputChanged("@joe", immediate = true)
+        model.onInputChanged("monero.one", immediate = true)
         assertEquals(LookupStatus.Rejected(reserved = true), model.status)
         model.onInputChanged("joe", immediate = false)
         assertEquals(LookupStatus.Idle, model.status)
@@ -210,7 +210,7 @@ class OpenAliasLookupModelTest {
 
     @Test
     fun reservedAndInvalidNamesWaitForThePauseWhenTyped() {
-        type("@joe")
+        type("monero.one")
         assertEquals(LookupStatus.Idle, model.status)
         pauses.end()
         assertEquals(LookupStatus.Rejected(reserved = true), model.status)
@@ -221,7 +221,7 @@ class OpenAliasLookupModelTest {
         pauses.end()
         assertEquals(LookupStatus.Rejected(reserved = false), model.status)
 
-        model.onInputChanged("joe@monero.one", immediate = true)
+        model.onInputChanged("a.b.monero.one", immediate = true)
         assertEquals(LookupStatus.Rejected(reserved = true), model.status)
         assertTrue(lookups.isEmpty())
     }
