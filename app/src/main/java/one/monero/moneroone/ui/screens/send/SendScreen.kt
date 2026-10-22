@@ -1101,7 +1101,7 @@ private fun AmountPhase(
             .graphicsLayer { this.alpha = alpha; translationY = offsetY.dp.toPx() },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        usernameTrust?.limitNote?.let { note ->
+        usernameTrust?.limitMessage?.let { note ->
             Text(tr(note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         // Where the amount came from (iOS SendAmountStep); the donation's

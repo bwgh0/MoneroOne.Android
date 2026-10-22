@@ -10,7 +10,6 @@ class UsernameTrustTest {
     @Test fun publishedHasNoLimit() {
         assertNull(UsernameTrust.PUBLISHED.amountLimit)
         assertNull(UsernameTrust.PUBLISHED.limitMessage)
-        assertNull(UsernameTrust.PUBLISHED.limitNote)
     }
 
     @Test fun pendingStaleAndExpiredShareTheLimit() {
@@ -21,10 +20,8 @@ class UsernameTrustTest {
 
     @Test fun theMessageFitsTheTrust() {
         assertEquals("This username is not in the public log yet. The payment limit is 0.1 XMR.", UsernameTrust.PENDING.limitMessage)
-        assertEquals("This username is not in the public log yet. The payment limit is 0.1 XMR.", UsernameTrust.PENDING.limitNote)
         for (trust in listOf(UsernameTrust.STALE, UsernameTrust.EXPIRED)) {
             assertEquals("Username records are out of date. The payment limit is 0.1 XMR.", trust.limitMessage)
-            assertEquals("Username records are out of date. Payments are limited to 0.1 XMR until they refresh.", trust.limitNote)
         }
     }
 }
