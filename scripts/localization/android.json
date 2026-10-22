@@ -1970,5 +1970,22 @@
     "uk": "плюс приблизно %s",
     "zh-Hans": "增加约 %s",
     "zh-Hant": "增加約 %s"
+  },
+  "New wallets are created faster.": {
+    "de": "Neue Wallets werden schneller erstellt.",
+    "es": "Las carteras nuevas se crean más rápido.",
+    "fr": "Les nouveaux portefeuilles sont créés plus rapidement.",
+    "it": "I nuovi portafogli vengono creati più rapidamente.",
+    "ja": "新規ウォレットの作成が速くなりました。",
+    "ko": "새 지갑이 더 빠르게 만들어집니다.",
+    "nl": "Nieuwe portemonnees worden sneller aangemaakt.",
+    "pl": "Nowe portfele są tworzone szybciej.",
+    "pt-BR": "Novas carteiras são criadas mais rápido.",
+    "ro": "Portofelele noi sunt create mai rapid.",
+    "ru": "Новые кошельки создаются быстрее.",
+    "tr": "Yeni cüzdanlar daha hızlı oluşturuluyor.",
+    "uk": "Нові гаманці створюються швидше.",
+    "zh-Hans": "新钱包创建更快。",
+    "zh-Hant": "新錢包建立更快。"
   }
 }

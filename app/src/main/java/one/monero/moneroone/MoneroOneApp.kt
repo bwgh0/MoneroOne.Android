@@ -17,6 +17,7 @@ import one.monero.moneroone.core.service.WalletSyncService
 import one.monero.moneroone.core.util.NetworkMonitor
 import one.monero.moneroone.core.wallet.PinHash
 import one.monero.moneroone.core.wallet.WalletManager
+import one.monero.moneroone.core.whatsnew.WhatsNewGate
 import one.monero.moneroone.widget.PriceWidget
 import one.monero.moneroone.widget.WalletWidget
 import timber.log.Timber
@@ -71,6 +72,8 @@ class MoneroOneApp : Application() {
         one.monero.moneroone.core.network.TorNetwork.initialize(this)
         one.monero.moneroone.core.util.SoundFeedback.initialize(this)
         one.monero.moneroone.core.locale.AppStrings.initialize(this)
+        // What's New: decide fresh install or update before onboarding can create a wallet.
+        WhatsNewGate.create(this).launched(hadWalletFiles = WhatsNewGate.hasWalletFiles(this))
         // Seed word lists load lazily from assets; this only stores the asset manager.
         one.monero.moneroone.core.wallet.seed.SeedWordLists.initialize(this)
 
