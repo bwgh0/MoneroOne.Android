@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,6 +50,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
@@ -63,7 +67,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.core.util.SoundFeedback
+import one.monero.moneroone.paymentlinks.CHECK_RISE_DP
+import one.monero.moneroone.paymentlinks.LinkPacking
+import one.monero.moneroone.paymentlinks.LinkPackingHero
+import one.monero.moneroone.paymentlinks.LinkSendResult
 import one.monero.moneroone.ui.components.CapsuleShape
+import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.components.ShrinkToFitText
@@ -94,13 +103,18 @@ internal class SentAmount(val big: String, val unit: String?, val other: String?
  * chime. When the check lands (660 ms) the ring burst and the confetti start.
  * "Sent!", the hash pill and Done arrive. Reduce Motion: cross-fades, no
  * burst, no confetti; the haptic and the chime play at once.
+ *
+ * A payment link ([link]) keeps the same sending screen. At success the amount fades with the
+ * spinner, the green check turns into the note and the note is sealed in the envelope
+ * ([LinkPacking]); "Link ready", the other unit, Share and Done arrive.
  */
 @Composable
 internal fun SendStatusPhase(
     success: Boolean,
     amount: SentAmount?,
     txHash: String,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    link: LinkSendResult? = null
 ) {
     val reduceMotion = rememberReduceMotion()
     val context = LocalContext.current
@@ -115,12 +129,17 @@ internal fun SendStatusPhase(
     val pillIn = remember { Animatable(if (played) 1f else 0f) }
     val doneIn = remember { Animatable(if (played) 1f else 0f) }
     var burst by remember { mutableStateOf(false) }
+    val packing = remember { LinkPacking(settled = played) }
 
     LaunchedEffect(success) {
         if (!success || played) return@LaunchedEffect
         played = true
         coroutineScope {
             launch { sendingAlpha.animateTo(0f, Motion.crossFade()) }
+            if (link != null) {
+                packing.play(view, context, reduceMotion)
+                return@coroutineScope
+            }
             if (reduceMotion) {
                 circle.snapTo(1f)
                 check.snapTo(1f)
@@ -156,7 +175,8 @@ internal fun SendStatusPhase(
         ) {
             Spacer(modifier = Modifier.height(32.dp))
             if (amount != null) {
-                AmountBlock(amount)
+                // A link's amount goes with the spinner: the note shows it.
+                AmountBlock(amount, Modifier.graphicsLayer { alpha = if (link != null) sendingAlpha.value else 1f })
                 Spacer(modifier = Modifier.height(32.dp))
             } else {
                 Spacer(modifier = Modifier.weight(1f))
@@ -167,7 +187,9 @@ internal fun SendStatusPhase(
                 if (sendingAlpha.value > 0f) {
                     Box(modifier = Modifier.graphicsLayer { alpha = sendingAlpha.value }) { GradientSpinner() }
                 }
-                if (success) {
+                if (link != null) {
+                    LinkPackingSlot(packing, link, success, reduceMotion)
+                } else if (success) {
                     if (burst && !reduceMotion) RingBurst()
                     DoneCheck(
                         circle = circle.value,
@@ -198,7 +220,9 @@ internal fun SendStatusPhase(
                         textAlign = TextAlign.Center
                     )
                 }
-                if (success) {
+                if (success && link != null) {
+                    LinkReadyText(amount?.other, Modifier.graphicsLayer { alpha = packing.readyIn.value })
+                } else if (success) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             tr("Sent!"),
@@ -217,7 +241,22 @@ internal fun SendStatusPhase(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            if (success) {
+            if (success && link != null) {
+                PrimaryButton(
+                    onClick = link.onShare,
+                    modifier = Modifier.fillMaxWidth().arrive(packing.shareIn.value, reduceMotion)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Text(tr("Share"))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                DismissTextButton(
+                    onClick = onDone,
+                    modifier = Modifier.fillMaxWidth().arrive(packing.doneIn.value, reduceMotion)
+                ) {
+                    Text(tr("Done"), fontWeight = FontWeight.Medium)
+                }
+            } else if (success) {
                 PrimaryButton(
                     onClick = onDone,
                     modifier = Modifier.fillMaxWidth().arrive(doneIn.value, reduceMotion)
@@ -241,9 +280,103 @@ private fun Modifier.arrive(progress: Float, reduceMotion: Boolean): Modifier = 
     if (!reduceMotion) translationY = (1f - progress) * Motion.ARRIVE_RISE_DP * density
 }
 
+/**
+ * A link's hero slot: today's check, ring and confetti, and over them the note and the envelope
+ * ([LinkPackingHero]). The hero is the claim sheet's 338 x 280 box, placed so the note starts on
+ * the check. It is there while the funding goes out, so its art is ready at the result.
+ */
 @Composable
-private fun AmountBlock(amount: SentAmount) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun LinkPackingSlot(packing: LinkPacking, link: LinkSendResult, success: Boolean, reduceMotion: Boolean) {
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val heroWidth = minOf(LinkHeroWidth, screenWidth - 32.dp)
+    val heroHeight = heroWidth * LinkHeroAspect
+    val heroScale = heroWidth / LinkHeroWidth
+    if (success) {
+        if (packing.burst && !reduceMotion) RingBurst()
+        LinkCheck(
+            Modifier
+                .size(160.dp)
+                .graphicsLayer {
+                    alpha = packing.checkAlpha.value
+                    scaleX = packing.checkScale.value
+                    scaleY = packing.checkScale.value
+                    translationY = -packing.checkRise.value * CHECK_RISE_DP * heroScale * density
+                }
+        )
+        if (packing.confetti && !reduceMotion) Confetti()
+    }
+    LinkPackingHero(
+        packing = packing,
+        face = link.face,
+        spoken = link.spoken,
+        // Centered on the slot, then up: the note starts at the check (71.4% down the hero box).
+        modifier = Modifier
+            .offset(y = -heroHeight * (LinkNoteStart - 0.5f))
+            .requiredSize(heroWidth, heroHeight)
+    )
+}
+
+/** The claim sheet's hero box: 338 x 280 dp. The note starts as the check, 200 dp down it. */
+private val LinkHeroWidth = 338.dp
+private const val LinkHeroAspect = 828.4f / 1000f
+private const val LinkNoteStart = 200f / 280f
+
+/**
+ * Today's link check (iOS SuccessCheckmarkView, checkmark.circle.fill at 80 pt): an 80 dp green
+ * disc with the check cut out of it.
+ */
+@Composable
+private fun LinkCheck(modifier: Modifier = Modifier) {
+    val green = SuccessGreen
+    val cut = MaterialTheme.colorScheme.background
+    val check = remember { Path() }
+    Canvas(modifier = modifier) {
+        val d = 80.dp.toPx()
+        val left = center.x - d / 2
+        val top = center.y - d / 2
+        drawCircle(green, radius = d / 2, center = center)
+        // The symbol's check, measured on its 80 pt circle.
+        check.reset()
+        check.moveTo(left + 0.315f * d, top + 0.546f * d)
+        check.lineTo(left + 0.441f * d, top + 0.685f * d)
+        check.lineTo(left + 0.685f * d, top + 0.328f * d)
+        drawPath(check, cut, style = Stroke(width = 0.092f * d, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/** "Link ready", the other unit (as the claim sheet shows it) and how to send the link. */
+@Composable
+private fun LinkReadyText(other: String?, modifier: Modifier = Modifier) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier
+    ) {
+        Text(
+            tr("Link ready"),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = SuccessGreen
+        )
+        if (other != null) {
+            Text(
+                other,
+                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            tr("Send it to one person in a private chat. Anyone who has this link can claim the money."),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun AmountBlock(amount: SentAmount, modifier: Modifier = Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {
             // Shrinks like the amount step (minimumScaleFactor 0.4) instead of clipping.
             ShrinkToFitText(

@@ -109,6 +109,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
@@ -146,7 +147,10 @@ import one.monero.moneroone.paymentlinks.EnvelopeDraft
 import one.monero.moneroone.paymentlinks.LinkNames
 import one.monero.moneroone.paymentlinks.PaymentLinkCodec
 import one.monero.moneroone.paymentlinks.PaymentLinkParse
-import one.monero.moneroone.paymentlinks.PaymentLinkReadyPhase
+import one.monero.moneroone.paymentlinks.EnvelopeCardFace
+import one.monero.moneroone.paymentlinks.LinkSendResult
+import one.monero.moneroone.paymentlinks.envelopeFigures
+import one.monero.moneroone.paymentlinks.shareLink
 import one.monero.moneroone.paymentlinks.PaymentLinkRecipientToken
 import one.monero.moneroone.paymentlinks.PaymentLinkReview
 import one.monero.moneroone.paymentlinks.PaymentLinksViewModel
@@ -460,8 +464,9 @@ fun SendScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            // Sending and Sent are one screen: the amount stays put while the spinner becomes the check.
-            contentKey = { if (!linkMode && (it == SendPhase.SENDING || it == SendPhase.SUCCESS)) "status" else it },
+            // Sending and Sent are one screen: the amount stays put while the spinner becomes the check
+            // (a link: the check becomes the note in its envelope).
+            contentKey = { if (it == SendPhase.SENDING || it == SendPhase.SUCCESS) "status" else it },
             label = "sendPhase"
         ) { currentPhase ->
             when (currentPhase) {
@@ -592,28 +597,35 @@ fun SendScreen(
                 }
                 SendPhase.SENDING, SendPhase.SUCCESS -> {
                     val draft = linkDraft
-                    if (linkMode && draft != null && currentPhase == SendPhase.SUCCESS) {
-                        PaymentLinkReadyPhase(draft.link, walletViewModel.formatXmr(draft.amount), onDone = onSent)
-                    } else if (linkMode) {
-                        SendingPhase()
-                    } else {
-                        val fiatMode by walletViewModel.fiatMode.collectAsState()
-                        val currentPrice by walletViewModel.currentPrice.collectAsState()
-                        val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
-                        val sent = sentAtomic
-                        val xmr = walletViewModel.formatXmr(sent)
-                        val fiat = currentPrice?.price?.let { "${selectedCurrency.symbol}${"%.2f".format(sent / 1_000_000_000_000.0 * it)}" }
-                        SendStatusPhase(
-                            success = currentPhase == SendPhase.SUCCESS,
-                            amount = when {
-                                sent <= 0L -> null
-                                fiatMode && fiat != null -> SentAmount(fiat, null, "$xmr XMR")
-                                else -> SentAmount(xmr, "XMR", fiat?.let { "≈ $it" })
-                            },
-                            txHash = (sendState as? SendState.Success)?.txHash ?: "",
-                            onDone = onSent
-                        )
+                    val fiatMode by walletViewModel.fiatMode.collectAsState()
+                    val currentPrice by walletViewModel.currentPrice.collectAsState()
+                    val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+                    val context = LocalContext.current
+                    // A link's amount is the note's: what the link holds.
+                    val sent = if (linkMode) draft?.amount ?: 0L else sentAtomic
+                    val xmr = walletViewModel.formatXmr(sent)
+                    val fiat = currentPrice?.price?.let { "${selectedCurrency.symbol}${"%.2f".format(sent / 1_000_000_000_000.0 * it)}" }
+                    val amount = when {
+                        sent <= 0L -> null
+                        fiatMode && fiat != null -> SentAmount(fiat, null, "$xmr XMR")
+                        else -> SentAmount(xmr, "XMR", fiat?.let { "≈ $it" })
                     }
+                    SendStatusPhase(
+                        // A link with no draft keeps its sending screen (it has nothing to share).
+                        success = currentPhase == SendPhase.SUCCESS && (!linkMode || draft != null),
+                        amount = amount,
+                        txHash = (sendState as? SendState.Success)?.txHash ?: "",
+                        onDone = onSent,
+                        link = if (linkMode && draft != null && amount != null) {
+                            LinkSendResult(
+                                face = EnvelopeCardFace(amount.big, unit = amount.unit != null),
+                                spoken = envelopeFigures(xmr, fiat, estimated = false, fiatMode = fiatMode).spoken,
+                                onShare = { shareLink(context, xmr, draft.link) }
+                            )
+                        } else {
+                            null
+                        }
+                    )
                 }
                 SendPhase.ERROR -> ErrorPhase(
                     message = linkFundingError
@@ -678,7 +690,9 @@ fun SendScreen(
                             prepared?.amount ?: (draft.amount + linkFeeReserve),
                             memo = "Payment link",
                             beforeCommit = { signed -> paymentLinks.fundingSigned(id, signed.txids) },
-                            prepared = prepared
+                            prepared = prepared,
+                            // The sending screen plays the chime with its check.
+                            playChime = false
                         )
                     }
                 } else {
@@ -1677,34 +1691,6 @@ private fun ReviewDetailRow(
 // ============================================================
 // PHASE 4: STATUS SCREENS
 // ============================================================
-
-@Composable
-private fun SendingPhase() {
-    Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 32.dp)
-        ) {
-            GradientSpinner()
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            Text(tr("Sending Transaction..."), style = MaterialTheme.typography.headlineSmall)
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                tr("Please wait while your transaction is being broadcast"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
 
 @Composable
 private fun ErrorPhase(message: String, onRetry: () -> Unit, onClose: () -> Unit, canRetry: Boolean = true) {

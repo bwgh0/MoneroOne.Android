@@ -2,10 +2,6 @@ package one.monero.moneroone.paymentlinks
 
 import android.content.Context
 import android.view.MotionEvent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,11 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,19 +44,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInteropFilter
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.SignedTransaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.ui.components.GlassCard
@@ -72,7 +62,6 @@ import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.MoneroOrange
-import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.WarningYellow
 import java.text.DateFormat
 import java.util.Date
@@ -466,62 +455,11 @@ fun PaymentLinkReview(
     }
 }
 
-/** "Link ready" after the funding broadcast: Share (system share sheet) and Done. */
-@Composable
-fun PaymentLinkReadyPhase(link: PaymentLink, amountXmr: String, onDone: () -> Unit) {
-    val context = LocalContext.current
-    var showCheck by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { delay(200); showCheck = true }
-    val checkScale by animateFloatAsState(
-        if (showCheck) 1f else 0.3f,
-        spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-        label = "linkCheckScale"
-    )
-    val checkAlpha by animateFloatAsState(if (showCheck) 1f else 0f, tween(300), label = "linkCheckAlpha")
-
-    Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 32.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .graphicsLayer { scaleX = checkScale; scaleY = checkScale; alpha = checkAlpha }
-                    .clip(CircleShape)
-                    .background(SuccessGreen.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(80.dp))
-            }
-            Spacer(modifier = Modifier.height(40.dp))
-            Text(
-                tr("Link ready"),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = SuccessGreen
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "$amountXmr XMR",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            CautionBanner(bearerWarning)
-            Spacer(modifier = Modifier.height(32.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PrimaryButton(onClick = { shareLink(context, amountXmr, link) }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text(tr("Share"))
-                }
-                PrimaryButton(onClick = onDone, modifier = Modifier.weight(1f)) {
-                    Text(tr("Done"))
-                }
-            }
-        }
-    }
-}
+/**
+ * The link Send funded, for its sending screen: the note's face (Fiat Mode, as the claim card),
+ * TalkBack's words for it, and Share.
+ */
+internal class LinkSendResult(val face: EnvelopeCardFace, val spoken: String, val onShare: () -> Unit)
 
 /** TalkBack: one spoken label for a status chip. */
 internal fun Modifier.spoken(label: String): Modifier = clearAndSetSemantics { contentDescription = label }

@@ -15,6 +15,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -37,6 +38,7 @@ import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -53,9 +55,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import one.monero.moneroone.core.locale.tr
+import one.monero.moneroone.core.util.SoundFeedback
 import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.components.softTickHaptic
 import one.monero.moneroone.ui.components.successHaptic
+import one.monero.moneroone.ui.theme.SuccessGreen
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
@@ -348,6 +352,209 @@ internal fun LinkEnvelopeHero(
             native.translate(EnvelopeGeometry.ENV_LEFT, EnvelopeGeometry.ENV_TOP + EnvelopeGeometry.DROP * motion.drop.value)
             native.scale(EnvelopeGeometry.ENV_SCALE, EnvelopeGeometry.ENV_SCALE)
             drawn.draw(native, pose, card)
+            native.restore()
+        }
+    }
+}
+
+/** tokens.json motion.springs settle: SwiftUI .spring(response: 0.4, dampingFraction: 0.8). */
+private fun <T> settle() = spring<T>(dampingRatio = 0.8f, stiffness = 246.7f)
+
+/** tokens.json motion.springs selector: SwiftUI .spring(response: 0.3, dampingFraction: 0.7). */
+private fun <T> selector() = spring<T>(dampingRatio = 0.7f, stiffness = 438.6f)
+
+// The send side's moment (send-link-moment, Option 2: check, then package), in ms from the result.
+/** The check springs in with today's ring, the success haptic and the chime at 0; confetti at 200. */
+private const val PACK_CONFETTI_AT_MS = 200L
+/** "Link ready" and its lines fade in (easeOut 0.4 s after 0.3 s, as the ready step did). */
+private const val PACK_READY_AT_MS = 300L
+/** The check turns into the note: it fades and rises, the note grows from its disc. */
+private const val PACK_NOTE_AT_MS = 550L
+/** The open envelope comes up around the note. */
+private const val PACK_ENVELOPE_AT_MS = 850L
+/** The note drops into the envelope. */
+private const val PACK_DROP_AT_MS = 1050L
+/** The flap folds down and the envelope lifts to the middle. */
+private const val PACK_FLAP_AT_MS = 1300L
+/** The seal presses on; it touches the paper 150 ms later (softTick), and Share and Done arrive. */
+private const val PACK_SEAL_AT_MS = 1600L
+private const val PACK_CONTACT_MS = 1750L
+/** Done arrives 100 ms after Share. */
+private const val PACK_DONE_AT_MS = 1850L
+/** One light sweep shows the foil amount. */
+private const val PACK_SWEEP_AT_MS = 1950L
+
+// Where the note and the envelope start, in the claim mockup's units (send.js G).
+/** The note as the check's disc: 406.8 envelope units under its risen place (CARD_RISE above the pocket). */
+private const val NOTE_FROM_Y = 406.8f - EnvelopeGeometry.CARD_RISE
+/** The open envelope comes up from 148 object units below its open place. */
+private const val ENVELOPE_ARRIVE = 148f
+
+/** How far the check rises as it turns into the note, in dp of the 338 dp hero. */
+internal const val CHECK_RISE_DP = 110f
+
+/**
+ * The send side's moment (send-link-moment, Option 2): after the funding goes out, today's green
+ * check springs in, turns into the ivory note, the note drops into the envelope, the flap closes
+ * and the wax seal presses on. "Link ready", Share and Done arrive on the way. Reduce Motion: one
+ * cross-fade to the sealed envelope. [settled]: show the end at once (a screen made again).
+ */
+@Stable
+internal class LinkPacking(private val settled: Boolean) {
+    private fun start(end: Float, from: Float) = Animatable(if (settled) end else from)
+
+    val checkAlpha = Animatable(0f)
+    val checkScale = start(1f, 0.3f)
+    /** 0 in the slot, 1 risen [CHECK_RISE_DP]. */
+    val checkRise = start(1f, 0f)
+    var burst by mutableStateOf(false)
+        private set
+    var confetti by mutableStateOf(false)
+        private set
+
+    val heroAlpha = Animatable(1f)
+    val envelopeY = start(0f, EnvelopeGeometry.DROP + ENVELOPE_ARRIVE)
+    val envelopeAlpha = start(1f, 0f)
+    val noteLayerY = start(0f, EnvelopeGeometry.DROP)
+    val noteY = start(0f, NOTE_FROM_Y)
+    val noteShape = start(1f, 0f)
+    val noteAlpha = start(1f, 0f)
+    val noteTint = start(0f, 1f)
+    val flap = start(0f, 180f)
+    val sealAlpha = start(1f, 0f)
+    val sealScale = start(1f, 1.5f)
+    val sealPress = start(1f, 0f)
+    val sweep = Animatable(-1f)
+    val foilReveal = start(1.35f, -0.35f)
+
+    val readyIn = start(1f, 0f)
+    val shareIn = start(1f, 0f)
+    val doneIn = start(1f, 0f)
+
+    /** The hero shows: from the note on (TalkBack reads it then). */
+    val shown: Boolean get() = noteAlpha.value > 0f || envelopeAlpha.value > 0f
+
+    /** The moment, once the funding went out. Times in the PACK_ constants. */
+    suspend fun play(view: View, context: Context, reduceMotion: Boolean) = coroutineScope {
+        if (reduceMotion) {
+            // One cross-fade (0.35 s) to the sealed envelope; the haptic and the chime in its middle.
+            heroAlpha.snapTo(0f)
+            envelopeY.snapTo(0f); envelopeAlpha.snapTo(1f); noteLayerY.snapTo(0f); noteY.snapTo(0f)
+            noteShape.snapTo(1f); noteAlpha.snapTo(1f); noteTint.snapTo(0f); flap.snapTo(0f)
+            sealAlpha.snapTo(1f); sealScale.snapTo(1f); sealPress.snapTo(1f); foilReveal.snapTo(1.35f)
+            launch { heroAlpha.animateTo(1f, Motion.crossFade()) }
+            launch { readyIn.animateTo(1f, Motion.crossFade()) }
+            launch { shareIn.animateTo(1f, Motion.crossFade()) }
+            launch { doneIn.animateTo(1f, Motion.crossFade()) }
+            delay(HALF_FADE_MS.toLong())
+            successHaptic(view)
+            SoundFeedback.sendComplete(context)
+            return@coroutineScope
+        }
+        fun at(ms: Long, block: suspend () -> Unit) = launch {
+            if (ms > 0) delay(ms)
+            block()
+        }
+        // The result: the check, as today (SuccessCheckmarkView), with the success haptic and the chime.
+        at(0) { checkAlpha.animateTo(1f, tween(200, easing = Motion.EaseInOut)) }
+        at(0) { checkScale.animateTo(1f, celebrate()) }
+        burst = true
+        successHaptic(view)
+        SoundFeedback.sendComplete(context)
+        at(PACK_CONFETTI_AT_MS) { confetti = true }
+        at(PACK_READY_AT_MS) { readyIn.animateTo(1f, tween(400, easing = Motion.EaseOut)) }
+        // The check turns into the note and rises.
+        at(PACK_NOTE_AT_MS) { checkAlpha.animateTo(0f, tween(180, easing = Motion.EaseIn)) }
+        at(PACK_NOTE_AT_MS) { checkRise.animateTo(1f, Motion.stepForward()) }
+        at(PACK_NOTE_AT_MS) { noteAlpha.animateTo(1f, tween(140, easing = LinearEasing)) }
+        at(PACK_NOTE_AT_MS) { noteY.animateTo(-EnvelopeGeometry.CARD_RISE, Motion.stepForward()) }
+        at(PACK_NOTE_AT_MS) { noteShape.animateTo(1f, Motion.stepForward()) }
+        at(PACK_NOTE_AT_MS) { noteTint.animateTo(0f, tween(300, easing = Motion.EaseInOut)) }
+        // The open envelope comes up around it.
+        at(PACK_ENVELOPE_AT_MS) { envelopeAlpha.animateTo(1f, tween(300, easing = Motion.EaseOut)) }
+        at(PACK_ENVELOPE_AT_MS) { envelopeY.animateTo(EnvelopeGeometry.DROP, Motion.stepForward()) }
+        // The note drops in.
+        at(PACK_DROP_AT_MS) { noteY.animateTo(0f, settle()) }
+        // The flap folds down, the envelope lifts to the middle.
+        at(PACK_FLAP_AT_MS) { flap.animateTo(0f, Motion.stepForward()) }
+        at(PACK_FLAP_AT_MS) { envelopeY.animateTo(0f, Motion.stepForward()) }
+        at(PACK_FLAP_AT_MS) { noteLayerY.animateTo(0f, Motion.stepForward()) }
+        // The seal presses on.
+        at(PACK_SEAL_AT_MS) { sealAlpha.animateTo(1f, tween(90, easing = LinearEasing)) }
+        at(PACK_SEAL_AT_MS) { sealScale.animateTo(1f, selector()) }
+        at(PACK_SEAL_AT_MS) { sealPress.animateTo(1f, tween(160, easing = Motion.EaseIn)) }
+        at(PACK_CONTACT_MS) { softTickHaptic(view) }
+        at(PACK_CONTACT_MS) { shareIn.animateTo(1f, Motion.arrive()) }
+        at(PACK_DONE_AT_MS) { doneIn.animateTo(1f, Motion.arrive()) }
+        // One light sweep; the foil amount shows where it has passed.
+        at(PACK_SWEEP_AT_MS) { foilReveal.animateTo(1.35f, tween(SWEEP_MS, easing = Motion.EaseInOut)) }
+        at(PACK_SWEEP_AT_MS) {
+            sweep.snapTo(-0.35f)
+            sweep.animateTo(1.35f, tween(SWEEP_MS, easing = Motion.EaseInOut))
+            sweep.snapTo(-1f)
+        }
+    }
+
+    fun pose() = PackingPose(
+        envelopeY = envelopeY.value,
+        envelopeAlpha = envelopeAlpha.value.coerceIn(0f, 1f),
+        noteLayerY = noteLayerY.value,
+        noteY = noteY.value,
+        noteShape = noteShape.value,
+        noteAlpha = noteAlpha.value,
+        noteTint = noteTint.value,
+        flapDegrees = flap.value,
+        sealAlpha = sealAlpha.value.coerceIn(0f, 1f),
+        sealScale = sealScale.value,
+        sealPress = sealPress.value,
+        sweep = sweep.value,
+        foilReveal = foilReveal.value,
+    )
+}
+
+/**
+ * The send side's hero, 338 x 280 dp at most (the claim sheet's hero box): the note and the
+ * envelope of [packing], drawn from the claim's parts. The light stays at rest (no tilt). TalkBack
+ * reads [spoken] once it shows.
+ */
+@Composable
+internal fun LinkPackingHero(
+    packing: LinkPacking,
+    face: EnvelopeCardFace,
+    spoken: String,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var widthPx by remember { mutableIntStateOf(0) }
+    val scale = widthPx / EnvelopeGeometry.FRAME_W * EnvelopeGeometry.ENV_SCALE
+    val art by produceState<EnvelopeArt?>(null, widthPx) {
+        if (widthPx > 0) value = withContext(Dispatchers.Default) { EnvelopeArt.renderForPacking(scale) }
+    }
+    val label = tr("Payment Link").uppercase(Locale.getDefault())
+    val unit = if (face.unit) "XMR" else null
+    val note by produceState<Bitmap?>(null, widthPx, face, label) {
+        if (widthPx > 0) {
+            value = withContext(Dispatchers.Default) { EnvelopeArt.renderCard(context, scale, face.number, unit, label) }
+        }
+    }
+    val foil by produceState<Bitmap?>(null, widthPx, face) {
+        if (widthPx > 0) value = withContext(Dispatchers.Default) { EnvelopeArt.renderFoil(context, scale, face.number, unit) }
+    }
+    val tint = SuccessGreen.toArgb()
+    Canvas(
+        modifier
+            .onSizeChanged { widthPx = it.width }
+            .graphicsLayer { alpha = packing.heroAlpha.value }
+            .clearAndSetSemantics { if (packing.shown) contentDescription = spoken }
+    ) {
+        val drawn = art ?: return@Canvas
+        val k = size.width / EnvelopeGeometry.FRAME_W
+        val pose = packing.pose()
+        drawIntoCanvas { canvas ->
+            val native = canvas.nativeCanvas
+            native.save()
+            native.scale(k, k)
+            drawn.drawPacking(native, pose, note, foil, tint)
             native.restore()
         }
     }

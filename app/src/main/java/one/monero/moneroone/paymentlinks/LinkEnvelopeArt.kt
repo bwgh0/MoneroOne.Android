@@ -91,6 +91,35 @@ internal data class EnvelopePose(
     val sweepAlpha: Float = 1f,
 )
 
+/**
+ * One frame of the send side's moment (send-link-moment, Option 2), in object units of the hero
+ * frame: the envelope's back and front, and the note between them at its own place.
+ */
+internal data class PackingPose(
+    /** The envelope's top below its rest place, in object units (the mockup's envB and envF translate). */
+    val envelopeY: Float,
+    val envelopeAlpha: Float,
+    /** The note's layer below its rest place, in object units (the mockup's cardW translate). */
+    val noteLayerY: Float,
+    /** The note below its place in the pocket, in envelope units (the mockup's ecard translate). */
+    val noteY: Float,
+    /** 0 the check's green disc, 1 the note (its scale and its corners). */
+    val noteShape: Float,
+    val noteAlpha: Float,
+    /** The green over the note as it comes from the check, 0 to 1. */
+    val noteTint: Float,
+    /** 180 open, 0 closed. */
+    val flapDegrees: Float,
+    val sealAlpha: Float,
+    val sealScale: Float,
+    /** The seal's shadow, 0 lifted to 1 pressed on. */
+    val sealPress: Float,
+    /** The light sweep: -1 before, -0.35 to 1.35 while it runs. */
+    val sweep: Float,
+    /** How far the foil amount shows: -0.35 none to 1.35 all (the mockup's --fr). */
+    val foilReveal: Float,
+)
+
 private object EnvelopePaths {
     const val SEAL_BLOB =
         "M191.20 98.00 L191.66 100.68 L191.01 103.32 L189.65 105.87 L188.29 108.36 L187.43 110.86 L186.92 113.39 " +
@@ -218,6 +247,37 @@ private fun sweepShader(left: Float, top: Float, width: Float, height: Float, fr
     )
 }
 
+/**
+ * The foil's mask (CSS `linear-gradient(98deg, #000 [opaque], transparent [clear])` over a box): what is
+ * before [opaque] along the gradient line shows, what is after [clear] does not.
+ */
+private fun revealShader(left: Float, top: Float, width: Float, height: Float, opaque: Float, clear: Float): Shader {
+    val rad = Math.toRadians(98.0)
+    val dx = sin(rad).toFloat()
+    val dy = -cos(rad).toFloat()
+    val length = abs(width * dx) + abs(height * dy)
+    val sx = left + width / 2 - dx * length / 2
+    val sy = top + height / 2 - dy * length / 2
+    return LinearGradient(
+        sx + dx * opaque, sy + dy * opaque, sx + dx * clear, sy + dy * clear,
+        Black.toArgb(), Black.withAlpha(0f), Shader.TileMode.CLAMP
+    )
+}
+
+private fun lerp(from: Float, to: Float, t: Float): Float = from + (to - from) * t
+
+/** The note's shape as the check's disc (send-link-moment): 0.324 x 0.475 of itself, an 80 dp circle in the hero. */
+private const val NOTE_FROM_SCALE_X = 0.324f
+private const val NOTE_FROM_SCALE_Y = 0.475f
+
+/** The foil amount's line box on the pocket, in envelope units, and room around it for its shadows. */
+private const val FOIL_TOP = 452f
+private const val FOIL_SIZE = 104f
+private const val FOIL_ROOM = 24f
+
+/** Room around the seal for its lifted shadow (0 22 16), in seal units. */
+private const val SEAL_SHADOW_MARGIN = 64f
+
 /** The length of a CSS 98deg gradient line over a box. */
 private fun sweepLength(width: Float, height: Float): Float {
     val rad = Math.toRadians(98.0)
@@ -258,6 +318,8 @@ internal class EnvelopeArt private constructor(
     private val flapOutside: Bitmap,
     private val flapInside: Bitmap,
     private val seal: Bitmap,
+    /** The send side's seal shadows, lifted and pressed on (the seal is drawn without its own). */
+    private val sealShadows: Pair<Bitmap, Bitmap>? = null,
 ) {
     private val blob = EnvelopePaths.parse(EnvelopePaths.SEAL_BLOB)
     private val sealLower = EnvelopePaths.sealLower()
@@ -270,6 +332,8 @@ internal class EnvelopeArt private constructor(
     private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val screen = PorterDuffXfermode(PorterDuff.Mode.SCREEN)
+    private val dstIn = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+    private val pocketCutPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT) }
     private val matrix = Matrix()
     private val src = FloatArray(8)
     private val dst = FloatArray(8)
@@ -301,6 +365,136 @@ internal class EnvelopeArt private constructor(
             drawSeal(canvas, pose, lowerHalf = false)
             if (pose.crack > 0f) drawCrack(canvas, pose)
         }
+    }
+
+    /**
+     * One frame of the send side's moment, in object units (the 1000 x 828.4 hero frame; the caller
+     * scales the canvas). The claim's parts in the claim's order: the back (the shadow, the open
+     * flap's inside), the [note] at its own place, then the front (the pocket, the [foil] amount,
+     * the closed flap and the seal). [tint] is the check's green.
+     */
+    fun drawPacking(canvas: Canvas, pose: PackingPose, note: Bitmap?, foil: Bitmap?, tint: Int) {
+        val g = EnvelopeGeometry
+        val light = EnvelopePose(flapDegrees = pose.flapDegrees, sweep = pose.sweep)
+        if (pose.envelopeAlpha > 0f) inEnvelope(canvas, pose.envelopeY, pose.envelopeAlpha) {
+            val m = g.MARGIN
+            rect.set(-m, -m, g.W + m, g.H + m)
+            canvas.drawBitmap(shadow, null, rect, bitmapPaint)
+            if (pose.flapDegrees > 90f) drawFlap(canvas, flapInside, pose.flapDegrees)
+        }
+        if (note != null && pose.noteAlpha > 0f) inEnvelope(canvas, pose.noteLayerY, 1f) {
+            // While the pocket fades in, the note under it fades out at the same rate, so it never shows through.
+            val hide = pose.envelopeAlpha
+            if (hide <= 0f || hide >= 1f) {
+                drawMorphingNote(canvas, note, pose, tint)
+            } else {
+                val count = canvas.saveLayer(null, null)
+                drawMorphingNote(canvas, note, pose, tint)
+                val dy = pose.envelopeY - pose.noteLayerY
+                rect.set(0f, dy, g.W, g.H + dy)
+                pocketCutPaint.alpha = (hide * 255).roundToInt()
+                canvas.drawBitmap(pocket, null, rect, pocketCutPaint)
+                canvas.restoreToCount(count)
+            }
+        }
+        if (pose.envelopeAlpha > 0f) inEnvelope(canvas, pose.envelopeY, pose.envelopeAlpha) {
+            rect.set(0f, 0f, g.W, g.H)
+            canvas.drawBitmap(pocket, null, rect, bitmapPaint)
+            drawPocketLight(canvas, light)
+            if (foil != null) drawFoil(canvas, foil, pose.foilReveal)
+            if (pose.flapDegrees <= 90f) {
+                drawFlap(canvas, flapOutside, pose.flapDegrees)
+                if (pose.flapDegrees < 0.5f) drawFlapLight(canvas, light)
+            }
+            if (pose.sealAlpha > 0f) drawPressedSeal(canvas, pose, light)
+        }
+    }
+
+    /** Runs [block] in envelope units, with the envelope [dy] object units below its rest place, at [alpha]. */
+    private inline fun inEnvelope(canvas: Canvas, dy: Float, alpha: Float, block: () -> Unit) {
+        val g = EnvelopeGeometry
+        val count = if (alpha < 1f) {
+            canvas.saveLayerAlpha(null, (alpha * 255).roundToInt())
+        } else {
+            canvas.save()
+        }
+        canvas.translate(g.ENV_LEFT, g.ENV_TOP + dy)
+        canvas.scale(g.ENV_SCALE, g.ENV_SCALE)
+        block()
+        canvas.restoreToCount(count)
+    }
+
+    /**
+     * The note as it comes from the check: scaled from the check's disc (0.324 x 0.475, corners 50%)
+     * to itself (corners 12), green fading off it.
+     */
+    private fun drawMorphingNote(canvas: Canvas, note: Bitmap, pose: PackingPose, tint: Int) {
+        val g = EnvelopeGeometry
+        val p = pose.noteShape
+        val top = g.CARD_Y + pose.noteY
+        rect.set(g.CARD_X, top, g.CARD_X + g.CARD_W, top + g.CARD_H)
+        canvas.save()
+        canvas.scale(lerp(NOTE_FROM_SCALE_X, 1f, p), lerp(NOTE_FROM_SCALE_Y, 1f, p), rect.centerX(), rect.centerY())
+        val count = canvas.saveLayerAlpha(rect, (pose.noteAlpha.coerceIn(0f, 1f) * 255).roundToInt())
+        canvas.drawBitmap(note, null, rect, bitmapPaint)
+        if (pose.noteTint > 0f) {
+            paint.color = tint
+            paint.alpha = (pose.noteTint.coerceIn(0f, 1f) * 255).roundToInt()
+            canvas.drawRect(rect, paint)
+        }
+        // The corners: what is outside the rounded box goes.
+        paint.color = Black.toArgb()
+        paint.xfermode = dstIn
+        val rx = max(0f, lerp(g.CARD_W / 2, g.RADIUS, p))
+        val ry = max(0f, lerp(g.CARD_H / 2, g.RADIUS, p))
+        canvas.drawRoundRect(rect, rx, ry, paint)
+        paint.xfermode = null
+        canvas.restoreToCount(count)
+        canvas.restore()
+    }
+
+    /** The foil amount, shown left to right as the light passes (the mockup's mask at --fr). */
+    private fun drawFoil(canvas: Canvas, foil: Bitmap, reveal: Float) {
+        val g = EnvelopeGeometry
+        if (reveal <= -0.25f) return
+        rect.set(0f, 0f, g.W, g.H)
+        if (reveal >= 1.27f) {
+            canvas.drawBitmap(foil, null, rect, bitmapPaint)
+            return
+        }
+        val band = RectF(0f, FOIL_TOP - FOIL_ROOM, g.W, FOIL_TOP + FOIL_SIZE + FOIL_ROOM)
+        val count = canvas.saveLayer(band, null)
+        canvas.drawBitmap(foil, null, rect, bitmapPaint)
+        val length = sweepLength(g.W, FOIL_SIZE)
+        paint.shader = revealShader(0f, FOIL_TOP, g.W, FOIL_SIZE, (reveal - 0.08f) * length, (reveal + 0.10f) * length)
+        paint.xfermode = dstIn
+        canvas.drawRect(band, paint)
+        paint.xfermode = null
+        paint.shader = null
+        canvas.restoreToCount(count)
+    }
+
+    /** The seal pressing on: it drops from [PackingPose.sealScale] to the paper, its shadow tightening. */
+    private fun drawPressedSeal(canvas: Canvas, pose: PackingPose, light: EnvelopePose) {
+        val g = EnvelopeGeometry
+        val (lifted, pressed) = sealShadows ?: return
+        val s = pose.sealScale
+        canvas.save()
+        canvas.scale(s, s, g.SEAL_X + g.SEAL / 2, g.SEAL_Y + g.SEAL / 2)
+        val count = if (pose.sealAlpha < 1f) canvas.saveLayerAlpha(null, (pose.sealAlpha * 255).roundToInt()) else canvas.save()
+        val press = pose.sealPress.coerceIn(0f, 1f)
+        val sm = SEAL_SHADOW_MARGIN
+        rect.set(g.SEAL_X - sm, g.SEAL_Y - sm, g.SEAL_X + g.SEAL + sm, g.SEAL_Y + g.SEAL + sm)
+        if (press < 1f) {
+            bitmapPaint.alpha = ((1f - press) * 255).roundToInt()
+            canvas.drawBitmap(lifted, null, rect, bitmapPaint)
+        }
+        bitmapPaint.alpha = (press * 255).roundToInt()
+        canvas.drawBitmap(pressed, null, rect, bitmapPaint)
+        bitmapPaint.alpha = 255
+        drawSeal(canvas, light, lowerHalf = false)
+        canvas.restoreToCount(count)
+        canvas.restore()
     }
 
     /** The flap turned [degrees] on its top edge, in perspective (CSS perspective(1600px) rotateX). */
@@ -461,6 +655,41 @@ internal class EnvelopeArt private constructor(
             )
         }
 
+        /**
+         * The same layers for the send side ([drawPacking]): the flap closes before the seal presses
+         * on, so the flap has no seal half, and the seal's shadow is drawn apart. Call off the main thread.
+         */
+        fun renderForPacking(scale: Float): EnvelopeArt = EnvelopeArt(
+            shadow = renderShadow(scale),
+            pocket = renderPocket(scale),
+            flapOutside = renderFlapOutside(scale, seal = null),
+            flapInside = renderFlapInside(scale),
+            seal = renderSeal(scale, shadow = false),
+            // drop-shadow(0 22 16 rgba(0,0,0,.28)) lifted, drop-shadow(0 5 6 rgba(0,0,0,.5)) pressed on.
+            sealShadows = renderSealShadow(scale, 22f, 16f, 0.28f) to renderSealShadow(scale, 5f, 6f, 0.5f),
+        )
+
+        /**
+         * The foil amount alone, on a clear envelope-sized layer: [number] and [unit] (none in Fiat
+         * Mode), fitted to 860 units down to 40%. Call off the main thread.
+         */
+        fun renderFoil(context: Context, scale: Float, number: String, unit: String?): Bitmap {
+            val g = EnvelopeGeometry
+            val (bitmap, canvas) = layer(g.W, g.H, 0f, scale)
+            foil(context, canvas, number, unit, fitWidth = 860f, minFit = 0.4f)
+            return bitmap
+        }
+
+        /** The seal's drop shadow alone, [dy] down and [blurRadius] soft (CSS units), around the seal. */
+        private fun renderSealShadow(scale: Float, dy: Float, blurRadius: Float, alpha: Float): Bitmap {
+            val g = EnvelopeGeometry
+            val (bitmap, canvas) = layer(g.SEAL, g.SEAL, SEAL_SHADOW_MARGIN, scale)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Black.withAlpha(alpha); maskFilter = blur(blurRadius) }
+            canvas.translate(0f, dy)
+            canvas.drawPath(EnvelopePaths.parse(EnvelopePaths.SEAL_BLOB), paint)
+            return bitmap
+        }
+
         private fun layer(width: Float, height: Float, margin: Float, scale: Float): Pair<Bitmap, Canvas> {
             val bitmap = Bitmap.createBitmap(
                 max(1, ceil((width + 2 * margin) * scale).toInt()),
@@ -556,7 +785,8 @@ internal class EnvelopeArt private constructor(
             canvas.save(); canvas.translate(0f, 7f); canvas.drawPath(flap, paint); canvas.restore()
         }
 
-        private fun renderFlapOutside(scale: Float, seal: Bitmap): Bitmap {
+        /** The flap's outside; with [seal], the seal's upper half on it (it lifts with the flap when the seal cracks). */
+        private fun renderFlapOutside(scale: Float, seal: Bitmap?): Bitmap {
             val g = EnvelopeGeometry
             val c = LinkEnvelopeColors
             val (bitmap, canvas) = layer(g.W, g.FLAP_H, g.MARGIN, scale)
@@ -577,6 +807,7 @@ internal class EnvelopeArt private constructor(
             }
             canvas.drawPath(EnvelopePaths.flapEdge(), stroke)
             canvas.restore()
+            if (seal == null) return bitmap
             // The seal's upper half lifts with the flap.
             canvas.save()
             canvas.translate(g.SEAL_X, g.SEAL_Y)
@@ -614,17 +845,20 @@ internal class EnvelopeArt private constructor(
             return bitmap
         }
 
-        private fun renderSeal(scale: Float): Bitmap {
+        /** The wax seal; [shadow]: with its drop shadow (the send side draws the shadow apart). */
+        private fun renderSeal(scale: Float, shadow: Boolean = true): Bitmap {
             val g = EnvelopeGeometry
             val c = LinkEnvelopeColors
             val (bitmap, canvas) = layer(g.SEAL, g.SEAL, g.SEAL_MARGIN, scale)
             val blob = EnvelopePaths.parse(EnvelopePaths.SEAL_BLOB)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
             // drop-shadow(0 5 6 rgba(0,0,0,.5))
-            paint.color = Black.withAlpha(0.5f)
-            paint.maskFilter = blur(6f)
-            canvas.save(); canvas.translate(0f, 5f); canvas.drawPath(blob, paint); canvas.restore()
-            paint.maskFilter = null
+            if (shadow) {
+                paint.color = Black.withAlpha(0.5f)
+                paint.maskFilter = blur(6f)
+                canvas.save(); canvas.translate(0f, 5f); canvas.drawPath(blob, paint); canvas.restore()
+                paint.maskFilter = null
+            }
             // The wax: radial-gradient(circle at 42% 34%, ...), to the farthest corner.
             val cx = 0.42f * g.SEAL
             val cy = 0.34f * g.SEAL
@@ -776,16 +1010,26 @@ internal class EnvelopeArt private constructor(
             return candidates.firstOrNull { 820f / width(it) >= 0.4f } ?: candidates.last()
         }
 
-        /** The share image's amount, debossed in orange foil at 452 units, 104 units tall at most. */
-        private fun foil(context: Context, canvas: Canvas, amount: String) {
+        /**
+         * The share image's amount, debossed in orange foil at 452 units, 104 units tall at most: [amount],
+         * then [unit] when given, fitted to [fitWidth] units, down to [minFit].
+         */
+        private fun foil(
+            context: Context,
+            canvas: Canvas,
+            amount: String,
+            unit: String? = "XMR",
+            fitWidth: Float = 820f,
+            minFit: Float = 0f
+        ) {
             val g = EnvelopeGeometry
             val c = LinkEnvelopeColors
             val full = 104f
             val numberPaint = interPaint(context, full, 600, 32, c.FoilBrand.toArgb())
             val unitPaint = interPaint(context, full * 0.46f, 600, 32, c.FoilBrand.toArgb())
             val gap = 0.14f * full * 0.46f
-            val width = numberPaint.measureText(amount) + gap + unitPaint.measureText("XMR")
-            val fit = if (width > 820f) 820f / width else 1f
+            val width = numberPaint.measureText(amount) + (unit?.let { gap + unitPaint.measureText(it) } ?: 0f)
+            val fit = if (width > fitWidth) max(minFit, fitWidth / width) else 1f
             numberPaint.textSize = full * fit
             unitPaint.textSize = full * 0.46f * fit
             val left = (g.W - width * fit) / 2
@@ -797,7 +1041,7 @@ internal class EnvelopeArt private constructor(
                     p.shader = shader
                 }
                 canvas.drawText(amount, left, base + dy, numberPaint)
-                canvas.drawText("XMR", unitLeft, base + dy, unitPaint)
+                if (unit != null) canvas.drawText(unit, unitLeft, base + dy, unitPaint)
             }
             // drop-shadow(0 -1.4 0 rgba(0,0,0,.75)) drop-shadow(0 1.1 0 rgba(255,255,255,.09))
             text(1.1f, White.withAlpha(0.09f), null)
