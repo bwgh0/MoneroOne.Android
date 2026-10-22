@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -72,6 +73,9 @@ fun UsernameCard(handle: String, externalAddress: String, modifier: Modifier = M
         contentDescription = "$handle, Monero One username card. $externalAddress"
     }) {
         val s = maxWidth.value / 1000f
+        // Type follows the card width, not the text size, as on iOS: the card is a picture of a card.
+        val density = LocalDensity.current
+        fun cardSp(n: Float) = with(density) { (n * s).dp.toSp() }
         val shape = RoundedCornerShape((30*s).dp)
         Box(Modifier.fillMaxSize().shadow((14*s).dp, shape).clip(shape)
             .background(Brush.linearGradient(if (dark) listOf(Color(0xFF343B3F), Color(0xFF262C30), Color(0xFF1A2025))
@@ -86,13 +90,13 @@ fun UsernameCard(handle: String, externalAddress: String, modifier: Modifier = M
             }
             Image(painterResource(R.drawable.monero_mark), contentDescription = null,
                 modifier = Modifier.offset((87*s).dp, (87*s).dp).size((48*s).dp))
-            Text("MONERO ONE", color = secondary, fontSize = (17*s).sp, fontWeight = FontWeight.Medium, letterSpacing = (2*s).sp,
+            Text("MONERO ONE", color = secondary, fontSize = cardSp(17f), fontWeight = FontWeight.Medium, letterSpacing = cardSp(2f),
                 modifier = Modifier.offset((88*s).dp, (93*s).dp).width((824*s).dp), textAlign = TextAlign.End)
             Text(buildAnnotatedString { withStyle(SpanStyle(color = MoneroOrange)) { append("@") }; withStyle(SpanStyle(color = ink)) { append(handle) } },
                 // Inter's widest capitals need this fixed size to stay inside the inset at 15 characters.
-                fontSize = (51*s).sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-1.8f*s).sp, maxLines = 1,
+                fontSize = cardSp(51f), fontWeight = FontWeight.SemiBold, letterSpacing = cardSp(-1.8f), maxLines = 1,
                 modifier = Modifier.offset((88*s).dp, (248*s).dp))
-            Text(externalAddress, color = secondary, fontSize = (38*s).sp, letterSpacing = (-0.5f*s).sp, maxLines = 1,
+            Text(externalAddress, color = secondary, fontSize = cardSp(38f), letterSpacing = cardSp(-0.5f), maxLines = 1,
                 modifier = Modifier.offset((88*s).dp, (328*s).dp))
             Canvas(Modifier.fillMaxSize()) {
                 val scale = size.width / 1000f
