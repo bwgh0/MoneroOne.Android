@@ -1026,6 +1026,19 @@ private fun RecipientButtons(stack: Boolean, content: @Composable () -> Unit) {
 // PHASE 2: AMOUNT
 // ============================================================
 
+/**
+ * The amount step can continue: an amount above zero within the unlocked balance.
+ * While a username limit applies, the amount stays within it and Max (send all) is off.
+ */
+internal fun amountCanContinue(parsedAmount: Long, unlockedBalance: Long, isSweepAll: Boolean, usernameTrust: UsernameTrust?): Boolean {
+    if (parsedAmount <= 0 || parsedAmount > unlockedBalance) return false
+    val limit = usernameTrust?.amountLimit ?: return true
+    return !isSweepAll && parsedAmount <= limit
+}
+
+/** Max shows on the amount step but is off while a username limit applies, as on iOS. */
+internal fun maxEnabled(usernameTrust: UsernameTrust?): Boolean = usernameTrust?.amountLimit == null
+
 @Composable
 private fun AmountPhase(
     amount: String,
@@ -1050,10 +1063,9 @@ private fun AmountPhase(
     /** A username recipient's trust; any but published limits the amount and turns off Max. */
     usernameTrust: UsernameTrust? = null
 ) {
-    val usernameAmountLimit = usernameTrust?.amountLimit
     val parsedAmount = parseXmr(amount)
-    val canContinue = parsedAmount > 0 && parsedAmount <= unlockedBalance &&
-        (usernameAmountLimit == null || (!isSweepAll && parsedAmount <= usernameAmountLimit))
+    val canContinue = amountCanContinue(parsedAmount, unlockedBalance, isSweepAll, usernameTrust)
+    val maxEnabled = maxEnabled(usernameTrust)
     val clipboardManager = LocalClipboardManager.current
 
     // Fiat mode toggle. Saved, as the amount is, through a recreation.
@@ -1231,18 +1243,20 @@ private fun AmountPhase(
                 Text(tr("Paste"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MoneroOrange)
             }
             if (!linkMode) Spacer(modifier = Modifier.width(8.dp))
-            if (!linkMode && usernameAmountLimit == null) Row(
+            // Shown but off while a username limit applies, as on iOS.
+            val maxColor = if (maxEnabled) MoneroOrange else MoneroTheme.colors.gray
+            if (!linkMode) Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(CapsuleShape)
-                    .background(MoneroOrange.copy(alpha = 0.15f))
-                    .clickable {
+                    .background(maxColor.copy(alpha = 0.15f))
+                    .clickable(enabled = maxEnabled) {
                         isFiatMode = false
                         onMaxTap()
                     }
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Text(tr("Max"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = MoneroOrange)
+                Text(tr("Max"), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = maxColor)
             }
         }
 
