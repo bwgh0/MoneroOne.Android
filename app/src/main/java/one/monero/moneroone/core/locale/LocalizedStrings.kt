@@ -1229,6 +1229,7 @@ internal val localizedStrings: Map<String, Int> = mapOf(
     "Wait for your wallet to finish syncing, then try again." to R.string.l10n_wait_for_your_wallet_to_finish_syncing_then_try_again_b26130ac,
     "Waiting" to R.string.l10n_waiting_6e293a8c,
     "Waiting for fee estimate" to R.string.l10n_waiting_for_fee_estimate_44418c72,
+    "Waiting for your wallet to sync" to R.string.l10n_waiting_for_your_wallet_to_sync_dcd5cbde,
     "Wallet" to R.string.l10n_wallet_d1c9a01d,
     "Wallet %s" to R.string.l10n_wallet_s_ca6410b6,
     "Wallet Birthday" to R.string.l10n_wallet_birthday_1b0a056d,

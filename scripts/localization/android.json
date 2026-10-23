@@ -1987,5 +1987,22 @@
     "uk": "%s з 10 підтверджень",
     "zh-Hans": "确认数 %s/10",
     "zh-Hant": "確認次數 %s/10"
+  },
+  "Waiting for your wallet to sync": {
+    "de": "Warte auf die Synchronisierung deiner Wallet",
+    "es": "Esperando a que tu cartera se sincronice",
+    "fr": "En attente de la synchronisation de votre portefeuille",
+    "it": "In attesa della sincronizzazione del portafoglio",
+    "ja": "ウォレットの同期を待機中",
+    "ko": "지갑 동기화 대기 중",
+    "nl": "Wachten tot je portemonnee is gesynchroniseerd",
+    "pl": "Oczekiwanie na synchronizację portfela",
+    "pt-BR": "Aguardando a sincronização da carteira",
+    "ro": "Se așteaptă sincronizarea portofelului",
+    "ru": "Ожидание синхронизации кошелька",
+    "tr": "Cüzdanınızın eşzamanlanması bekleniyor",
+    "uk": "Очікування синхронізації гаманця",
+    "zh-Hans": "正在等待钱包同步",
+    "zh-Hant": "正在等待錢包同步"
   }
 }

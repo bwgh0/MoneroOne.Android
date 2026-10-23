@@ -1226,6 +1226,7 @@
     <string name="l10n_wait_for_your_wallet_to_finish_syncing_then_try_again_b26130ac" formatted="false">"지갑 동기화가 끝날 때까지 기다린 뒤 다시 시도하세요."</string>
     <string name="l10n_waiting_6e293a8c" formatted="false">"대기 중"</string>
     <string name="l10n_waiting_for_fee_estimate_44418c72" formatted="false">"수수료 추정 대기 중"</string>
+    <string name="l10n_waiting_for_your_wallet_to_sync_dcd5cbde" formatted="false">"지갑 동기화 대기 중"</string>
     <string name="l10n_wallet_d1c9a01d" formatted="false">"지갑"</string>
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"지갑 %1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"지갑 생성일"</string>

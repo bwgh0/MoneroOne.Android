@@ -102,7 +102,9 @@ fun SyncStatusIndicator(
     syncState: SyncState? = null,
     isOnline: Boolean = true,
     /** The sync stopped on a node that rejected the RPC login. */
-    nodeLoginFailed: Boolean = false
+    nodeLoginFailed: Boolean = false,
+    /** Where the ladder's caption sits under its dots: at the start (balance card) or centred (Send review). */
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start
 ) {
     if (status == SyncStatus.Synced) {
         // Simple synced display: green dot + "Synced"
@@ -119,11 +121,11 @@ fun SyncStatusIndicator(
             )
         }
     } else if (!isOnline) {
-        ConnectionStepIndicator(currentStage = 0, statusText = tr("No network"), modifier = modifier)
+        ConnectionStepIndicator(currentStage = 0, statusText = tr("No network"), modifier = modifier, horizontalAlignment = horizontalAlignment)
     } else if (syncState != null && syncState !is SyncState.Synced && syncState !is SyncState.NotSynced) {
         // If we have a full SyncState, use the step indicator
         val (currentStage, statusText) = syncStateToStage(syncState)
-        ConnectionStepIndicator(currentStage = currentStage, statusText = statusText, modifier = modifier)
+        ConnectionStepIndicator(currentStage = currentStage, statusText = statusText, modifier = modifier, horizontalAlignment = horizontalAlignment)
     } else if (status == SyncStatus.NotConnected) {
         // A wrapped error keeps the dot on its first line: the dot is centred in a box one line
         // tall (the line box of bodySmall), so one line sits exactly as with centred alignment.
@@ -153,7 +155,7 @@ fun SyncStatusIndicator(
             else -> SyncState.NotSynced(error = Throwable(tr("Unknown")))
         }
         val (currentStage, statusText) = syncStateToStage(fallbackState)
-        ConnectionStepIndicator(currentStage = currentStage, statusText = statusText, modifier = modifier)
+        ConnectionStepIndicator(currentStage = currentStage, statusText = statusText, modifier = modifier, horizontalAlignment = horizontalAlignment)
     }
 }
 
@@ -161,11 +163,12 @@ fun SyncStatusIndicator(
 private fun ConnectionStepIndicator(
     currentStage: Int,
     statusText: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start
 ) {
     Column(
         modifier = modifier,
-        horizontalAlignment = Alignment.Start
+        horizontalAlignment = horizontalAlignment
     ) {
         // Dot row
         Row(

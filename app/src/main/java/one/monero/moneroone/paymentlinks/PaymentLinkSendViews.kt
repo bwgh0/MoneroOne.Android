@@ -1,5 +1,13 @@
 package one.monero.moneroone.paymentlinks
 
+import one.monero.moneroone.ui.screens.send.sendWaitHint
+import one.monero.moneroone.ui.screens.send.collectAsState
+import one.monero.moneroone.ui.screens.send.ValuePlaceholder
+import one.monero.moneroone.ui.screens.send.SendWaitGate
+import one.monero.moneroone.ui.screens.send.SendStatusSlot
+import one.monero.moneroone.ui.screens.send.FillIn
+import one.monero.moneroone.core.wallet.SendWait
+import androidx.compose.runtime.rememberUpdatedState
 import android.content.Context
 import android.view.MotionEvent
 import androidx.compose.foundation.background
@@ -235,6 +243,10 @@ fun PaymentLinkReview(
      * transaction. Throws when the build fails.
      */
     prepareFunding: (address: String, amount: Long) -> SignedTransaction,
+    /** The wait for the main wallet: the link and its funding are built only once it runs and is synced. */
+    gate: SendWaitGate,
+    /** Retry on the status slot's offline or node banner. */
+    onRetryWait: () -> Unit,
     /** A new value builds the funding again (the one built here is gone). */
     rebuild: Int = 0,
     xmrPrice: Double?,
@@ -252,28 +264,27 @@ fun PaymentLinkReview(
     var tooMuch by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
+    // The link and its funding are being built, or wait for the wallet.
+    var building by remember { mutableStateOf(true) }
+    // The balance when the build starts: the wait for the wallet can outlast the one Review opened with.
+    val currentUnlocked by rememberUpdatedState(unlockedBalance)
+    val wait by gate.collectAsState()
 
-    LaunchedEffect(attempt, rebuild) {
-        error = null
-        prepared = null
-        tooMuch = false
-        networkFee = 0L
+    /** Builds the link and its funding. Returns the failure's message, or null. */
+    suspend fun build(): String? {
         try {
             val ready = draft ?: paymentLinks.prepare(amount).also { draft = it; onDraft(it) }
             // The reserve pays the claim's sweep (one input): wallet2's estimate fits it. The network fee is the
             // funding's own, built and signed here: the estimate counts one input, and the funding pays for each
             // input it spends. Send broadcasts this same transaction.
             val r = withContext(Dispatchers.IO) { estimateFee(ready.address, amount) }
-            if (r <= 0) {
-                error = tr("Fee estimation failed")
-                return@LaunchedEffect
-            }
+            if (r <= 0) return tr("Fee estimation failed")
             reserve = r
             val estimate = withContext(Dispatchers.IO) { estimateFee(ready.address, amount + r) }
-            if (estimate > 0 && amount + r + estimate > unlockedBalance) {
+            if (estimate > 0 && amount + r + estimate > currentUnlocked) {
                 networkFee = estimate
                 tooMuch = true
-                return@LaunchedEffect
+                return null
             }
             val built = try {
                 withContext(Dispatchers.IO) { prepareFunding(ready.address, amount + r) }
@@ -284,19 +295,41 @@ fun PaymentLinkReview(
                 if (e.message?.contains("not enough", ignoreCase = true) == true) {
                     networkFee = estimate
                     tooMuch = true
-                    return@LaunchedEffect
+                    return null
                 }
                 throw e
             }
             prepared = built
             networkFee = built.fee
-            if (built.fee <= 0) error = tr("Fee estimation failed")
+            return if (built.fee <= 0) tr("Fee estimation failed") else null
         } catch (e: CancellationException) {
             throw e
         } catch (e: EnvelopeMismatchException) {
-            error = tr("Could not create the link. Nothing was sent.")
+            return tr("Could not create the link. Nothing was sent.")
         } catch (e: Exception) {
-            error = e.message ?: tr("Fee estimation failed")
+            return e.message ?: tr("Fee estimation failed")
+        }
+    }
+
+    LaunchedEffect(attempt, rebuild) {
+        error = null
+        prepared = null
+        tooMuch = false
+        networkFee = 0L
+        building = true
+        try {
+            while (true) {
+                // The link needs the main wallet's height and the funding its outputs: wait until it runs and is
+                // synced (a link check stops it for a moment).
+                gate.awaitReady()
+                val failure = build()
+                // The wallet stopped while the link was built: wait for it again instead of failing.
+                if (failure != null && !gate.readyNow()) continue
+                error = failure
+                break
+            }
+        } finally {
+            building = false
         }
     }
 
@@ -367,19 +400,17 @@ fun PaymentLinkReview(
 
                     RowDivider()
 
+                    // Gray placeholders hold each value until it is known; an error shows in the status slot.
+                    val valueStyle = MaterialTheme.typography.bodyMedium
                     ReviewRow(tr("Network Fee")) {
-                        when {
-                            error != null -> Text(tr("Error"), style = MaterialTheme.typography.bodyMedium, color = ErrorRed)
-                            !feeReady -> CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            else -> Text("${formatXmr(networkFee)} XMR", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        FillIn(feeReady, placeholder = { ValuePlaceholder(104.dp, valueStyle) }) {
+                            Text("${formatXmr(networkFee)} XMR", style = valueStyle, fontWeight = FontWeight.Medium)
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     ReviewRow(tr("Claim fee reserve")) {
-                        if (feeReady) {
-                            Text("${formatXmr(reserve)} XMR", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                        } else if (error == null) {
-                            CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        FillIn(feeReady, placeholder = { ValuePlaceholder(104.dp, valueStyle) }) {
+                            Text("${formatXmr(reserve)} XMR", style = valueStyle, fontWeight = FontWeight.Medium)
                         }
                     }
                     Text(
@@ -390,8 +421,9 @@ fun PaymentLinkReview(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     ReviewRow(tr("Expires")) {
-                        draft?.let {
-                            Text(formatLinkDate(it.expiry), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        val expiry = draft?.expiry
+                        FillIn(expiry != null, placeholder = { ValuePlaceholder(92.dp, valueStyle) }) {
+                            if (expiry != null) Text(formatLinkDate(expiry), style = valueStyle, fontWeight = FontWeight.Medium)
                         }
                     }
 
@@ -400,7 +432,15 @@ fun PaymentLinkReview(
                     Row(modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
                         Text(tr("Total"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.weight(1f))
-                        if (feeReady) {
+                        FillIn(
+                            ready = feeReady,
+                            placeholder = {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    ValuePlaceholder(120.dp, MaterialTheme.typography.titleSmall)
+                                    if (xmrPrice != null) ValuePlaceholder(56.dp, MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        ) {
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
                                     "${formatXmr(total)} XMR",
@@ -428,23 +468,24 @@ fun PaymentLinkReview(
                     color = ErrorRed
                 )
             }
-            error?.let { message ->
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(message, style = MaterialTheme.typography.bodyMedium, color = ErrorRed)
-                Spacer(modifier = Modifier.height(8.dp))
-                PrimaryButton(onClick = { attempt++ }, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text(tr("Retry"))
-                }
-            }
             Spacer(modifier = Modifier.height(16.dp))
         }
+
+        // One status slot directly above Send: the wait for the wallet, or a real failure with Retry.
+        SendStatusSlot(
+            wait = wait,
+            pending = building,
+            error = error,
+            onRetryWait = onRetryWait,
+            onRetryBuild = { attempt++ }
+        )
 
         @OptIn(ExperimentalComposeUiApi::class)
         PrimaryButton(
             onClick = { draft?.let { onConfirm(it, reserve, prepared) } },
             modifier = Modifier
                 .fillMaxWidth()
+                .sendWaitHint(building && wait != SendWait.Ready)
                 .pointerInteropFilter { event -> (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0 },
             enabled = feeReady && !overBalance && prepared != null && !sendInProgress
         ) {

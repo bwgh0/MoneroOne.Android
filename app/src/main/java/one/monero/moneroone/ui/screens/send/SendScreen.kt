@@ -1,6 +1,9 @@
 package one.monero.moneroone.ui.screens.send
 
 import one.monero.moneroone.core.locale.tr
+import one.monero.moneroone.core.wallet.SendWait
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.DisposableEffect
 import android.view.MotionEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -356,6 +359,16 @@ fun SendScreen(
     // disposes the screen, but the recreated screen still needs the result.
     OnNavEntryEnd("send-flow") { walletViewModel.resetSendState(flow) }
 
+    // Send opens at any time; Review builds once the main wallet runs and is synced. A link check stops the main
+    // wallet, so the one that runs stops and no new one starts while Send is open.
+    val sendWaitGate = rememberSendWaitGate(walletViewModel)
+    DisposableEffect(paymentLinks) {
+        paymentLinks?.sendOpened()
+        onDispose { paymentLinks?.sendClosed() }
+    }
+    // Retry on the offline or node banner: open the wallet again (offline, the wait goes on by itself).
+    val retryWait: () -> Unit = { if (NetworkMonitor.isConnected.value) walletViewModel.refreshSync() }
+
     fun goForward(to: SendPhase) {
         navigatingForward = true
         phase = to
@@ -549,6 +562,8 @@ fun SendScreen(
                         formatXmr = walletViewModel::formatXmr,
                         estimateFee = { to, amt -> walletViewModel.estimateFee(to, amt) },
                         prepareFunding = { to, amt -> walletViewModel.prepareSend(to, amt, memo = "Payment link") },
+                        gate = sendWaitGate,
+                        onRetryWait = retryWait,
                         rebuild = linkRebuild,
                         xmrPrice = currentPrice?.price,
                         currencySymbol = selectedCurrency.symbol,
@@ -589,6 +604,8 @@ fun SendScreen(
                         xmrPrice = currentPrice?.price,
                         currencySymbol = selectedCurrency.symbol,
                         sendInProgress = sendInProgress,
+                        gate = sendWaitGate,
+                        onRetryWait = retryWait,
                         onConfirm = {
                         sendInProgress = true
                         showAuthGate = true
@@ -1324,20 +1341,36 @@ private fun ReviewPhase(
     xmrPrice: Double?,
     currencySymbol: String,
     sendInProgress: Boolean,
+    /** The wait for the main wallet: the review builds only once it runs and is synced. */
+    gate: SendWaitGate,
+    /** Retry on the slot's offline or node banner. */
+    onRetryWait: () -> Unit,
     onConfirm: () -> Unit
 ) {
     val parsedAmount = parseXmr(amount)
+    // The balance when the build starts: the wait for the wallet can outlast the one Review opened with.
+    val currentUnlocked by rememberUpdatedState(unlockedBalance)
+    var attempt by remember { mutableIntStateOf(0) }
+    val wait by gate.collectAsState()
 
     // Build and sign the transfer when the review opens, and again for a sweep or when the one built is gone.
     // wallet2's fee estimate counts one input; the fee shown is the one this transfer pays, and Send broadcasts it.
-    LaunchedEffect(isSweepAll, rebuild) {
+    // The build waits until the main wallet runs and is synced (a link check stops it for a moment).
+    LaunchedEffect(isSweepAll, rebuild, attempt) {
         onReviewFee(ReviewFeeState(loading = true))
-        val result = try {
-            withContext(Dispatchers.IO) { buildFee(parsedAmount, isSweepAll, unlockedBalance) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            ReviewFeeResult.Failed(e.message)
+        var result: ReviewFeeResult
+        while (true) {
+            gate.awaitReady()
+            result = try {
+                withContext(Dispatchers.IO) { buildFee(parsedAmount, isSweepAll, currentUnlocked) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ReviewFeeResult.Failed(e.message)
+            }
+            // The wallet stopped while the transfer was built: wait for it again instead of failing.
+            if (result is ReviewFeeResult.Failed && !gate.readyNow()) continue
+            break
         }
         when (result) {
             is ReviewFeeResult.Ready -> onReviewFee(ReviewFeeState(fee = result.prepared.fee, prepared = result.prepared))
@@ -1466,8 +1499,9 @@ private fun ReviewPhase(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                            } else if (feeLoading) {
-                                CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            } else {
+                                ValuePlaceholder(width = 132.dp, style = MaterialTheme.typography.bodyMedium)
+                                if (xmrPrice != null) ValuePlaceholder(width = 56.dp, style = MaterialTheme.typography.bodySmall)
                             }
                         } else {
                             Text(
@@ -1493,10 +1527,17 @@ private fun ReviewPhase(
                     ReviewDetailRow(
                         label = { Text(tr("Network Fee"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     ) {
-                        when {
-                            feeLoading -> CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            feeError != null -> Text(tr("Error"), style = MaterialTheme.typography.bodyMedium, color = ErrorRed)
-                            else -> Column(horizontalAlignment = Alignment.End) {
+                        // Gray placeholders hold the row until the fee is known; an error shows in the status slot.
+                        FillIn(
+                            ready = feeReady,
+                            placeholder = {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    ValuePlaceholder(width = 104.dp, style = MaterialTheme.typography.bodyMedium)
+                                    if (xmrPrice != null) ValuePlaceholder(width = 44.dp, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        ) {
+                            Column(horizontalAlignment = Alignment.End) {
                                 Text("${formatXmr(estimatedFee)} XMR", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                                 xmrPrice?.let { price ->
                                     val fiat = atomicToXmr(estimatedFee) * price
@@ -1518,7 +1559,15 @@ private fun ReviewPhase(
                     ReviewDetailRow(
                         label = { Text(tr("Total"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
                     ) {
-                        if (feeReady) {
+                        FillIn(
+                            ready = feeReady,
+                            placeholder = {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    ValuePlaceholder(width = 132.dp, style = MaterialTheme.typography.titleSmall)
+                                    if (xmrPrice != null) ValuePlaceholder(width = 56.dp, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        ) {
                             val total = reviewFee.prepared?.total ?: (parsedAmount + estimatedFee)
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
@@ -1587,12 +1636,22 @@ private fun ReviewPhase(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // One status slot directly above Send: the wait for the wallet, or a real failure.
+        SendStatusSlot(
+            wait = wait,
+            pending = feeLoading,
+            error = feeError,
+            onRetryWait = onRetryWait,
+            onRetryBuild = { attempt++ }
+        )
+
         // Send button
         @OptIn(ExperimentalComposeUiApi::class)
         PrimaryButton(
             onClick = onConfirm,
             modifier = Modifier
                 .fillMaxWidth()
+                .sendWaitHint(feeLoading && wait != SendWait.Ready)
                 .pointerInteropFilter { event ->
                     (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0
                 },

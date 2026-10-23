@@ -1226,6 +1226,7 @@
     <string name="l10n_wait_for_your_wallet_to_finish_syncing_then_try_again_b26130ac" formatted="false">"Așteaptă să se termine sincronizarea portofelului, apoi încearcă din nou."</string>
     <string name="l10n_waiting_6e293a8c" formatted="false">"În așteptare"</string>
     <string name="l10n_waiting_for_fee_estimate_44418c72" formatted="false">"Se așteaptă estimarea comisionului"</string>
+    <string name="l10n_waiting_for_your_wallet_to_sync_dcd5cbde" formatted="false">"Se așteaptă sincronizarea portofelului"</string>
     <string name="l10n_wallet_d1c9a01d" formatted="false">"Portofel"</string>
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"Portofel %1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"Data creării portofelului"</string>

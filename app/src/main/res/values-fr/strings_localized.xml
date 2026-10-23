@@ -1226,6 +1226,7 @@
     <string name="l10n_wait_for_your_wallet_to_finish_syncing_then_try_again_b26130ac" formatted="false">"Attendez que votre portefeuille ait fini de se synchroniser, puis réessayez."</string>
     <string name="l10n_waiting_6e293a8c" formatted="false">"En attente"</string>
     <string name="l10n_waiting_for_fee_estimate_44418c72" formatted="false">"En attente de l’estimation des frais"</string>
+    <string name="l10n_waiting_for_your_wallet_to_sync_dcd5cbde" formatted="false">"En attente de la synchronisation de votre portefeuille"</string>
     <string name="l10n_wallet_d1c9a01d" formatted="false">"Portefeuille"</string>
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"Portefeuille %1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"Date de création du portefeuille"</string>
