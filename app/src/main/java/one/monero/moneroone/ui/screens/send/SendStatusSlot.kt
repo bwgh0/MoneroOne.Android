@@ -242,12 +242,13 @@ private fun SlotBanner(icon: ImageVector, tint: Color, text: String, onRetry: ()
 }
 
 /**
- * A value still to come: a gray bar in a line of [style], as iOS `.redacted(reason: .placeholder)`. The line keeps
- * the value's height, so nothing moves when the value fills in.
+ * A value still to come: a gray bar in a line of [style], as iOS `.redacted(reason: .placeholder)`: the label
+ * color at 16% (black 16% on the card is the iOS bar's #CBCBCF) and 2 dp corners. The line keeps the value's
+ * height, so nothing moves when the value fills in.
  */
 @Composable
 internal fun ValuePlaceholder(width: Dp, style: TextStyle, modifier: Modifier = Modifier) {
-    val color = MoneroTheme.colors.gray.copy(alpha = 0.28f)
+    val color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f)
     // The bar is about three quarters of the font size tall (11 on a 15 line, 9 on a 12 line).
     val barHeight = with(LocalDensity.current) { style.fontSize.toDp() } * 0.74f
     Text(
@@ -258,11 +259,12 @@ internal fun ValuePlaceholder(width: Dp, style: TextStyle, modifier: Modifier = 
             .clearAndSetSemantics {}
             .drawBehind {
                 val h = barHeight.toPx()
+                val r = 2.dp.toPx()
                 drawRoundRect(
                     color = color,
                     topLeft = Offset(0f, (size.height - h) / 2),
                     size = Size(size.width, h),
-                    cornerRadius = CornerRadius(h / 2)
+                    cornerRadius = CornerRadius(r)
                 )
             }
     )
