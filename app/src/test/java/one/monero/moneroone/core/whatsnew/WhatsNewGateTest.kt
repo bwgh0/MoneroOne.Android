@@ -174,10 +174,10 @@ class WhatsNewGateTest {
     }
 
     @Test
-    fun `the shipped notes have a 1_1 entry with four highlights`() {
+    fun `the shipped notes have a 1_1 entry with five highlights`() {
         val shipped = WhatsNewNotes.newest(NotesVersion(1, 1))
         assertEquals(v11, shipped?.version)
-        assertEquals(4, shipped?.highlights?.size)
-        assertEquals(7, shipped?.improvements?.size)
+        assertEquals(5, shipped?.highlights?.size)
+        assertEquals(9, shipped?.improvements?.size)
     }
 }

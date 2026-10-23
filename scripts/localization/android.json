@@ -1988,6 +1988,23 @@
     "zh-Hans": "新钱包创建更快。",
     "zh-Hant": "新錢包建立更快。"
   },
+  "Fixed a crash when you create a wallet or set a wallet birthday with some phone languages.": {
+    "de": "Absturz beim Erstellen eines Wallets oder beim Festlegen des Wallet-Erstelldatums bei manchen Telefonsprachen behoben.",
+    "es": "Se corrigió un cierre inesperado al crear una cartera o fijar la fecha de creación de la cartera con algunos idiomas del teléfono.",
+    "fr": "Correction d’un plantage lors de la création d’un portefeuille ou du choix de la date de création du portefeuille avec certaines langues du téléphone.",
+    "it": "Corretto un arresto anomalo durante la creazione di un portafoglio o l’impostazione della data di nascita del portafoglio con alcune lingue del telefono.",
+    "ja": "一部の端末言語で、ウォレットの作成時やウォレット作成日の設定時にアプリが終了する問題を修正しました。",
+    "ko": "일부 휴대폰 언어에서 지갑을 만들거나 지갑 생성일을 설정할 때 앱이 종료되는 문제를 수정했습니다.",
+    "nl": "Crash opgelost bij het aanmaken van een portemonnee of het instellen van de aanmaakdatum bij sommige telefoontalen.",
+    "pl": "Naprawiono awarię przy tworzeniu portfela lub ustawianiu daty utworzenia portfela w niektórych językach telefonu.",
+    "pt-BR": "Corrigido um travamento ao criar uma carteira ou definir a data de criação da carteira com alguns idiomas do celular.",
+    "ro": "Am remediat o închidere neașteptată la crearea unui portofel sau la setarea datei de creare a portofelului cu unele limbi ale telefonului.",
+    "ru": "Исправлен сбой при создании кошелька или выборе даты создания кошелька на некоторых языках телефона.",
+    "tr": "Bazı telefon dillerinde cüzdan oluştururken veya cüzdan doğum tarihini ayarlarken yaşanan çökme düzeltildi.",
+    "uk": "Виправлено збій під час створення гаманця або встановлення дати створення гаманця за деяких мов телефона.",
+    "zh-Hans": "修复了在某些手机语言下创建钱包或设置钱包生日时崩溃的问题。",
+    "zh-Hant": "修正了在某些手機語言下建立錢包或設定錢包生日時當機的問題。"
+  },
   "Reorder": {
     "de": "Neu anordnen",
     "es": "Reordenar",

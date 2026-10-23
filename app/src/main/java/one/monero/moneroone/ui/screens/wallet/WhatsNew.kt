@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -249,6 +250,7 @@ private val WhatsNewGlyph.icon: ImageVector
     get() = when (this) {
         WhatsNewGlyph.TRANSFER -> Icons.Default.SwapHoriz
         WhatsNewGlyph.LINK -> Icons.Default.Link
+        WhatsNewGlyph.CONTACTS -> Icons.Outlined.AccountCircle
         WhatsNewGlyph.AT -> Icons.Default.AlternateEmail
         WhatsNewGlyph.KEY -> Icons.Default.Key
     }

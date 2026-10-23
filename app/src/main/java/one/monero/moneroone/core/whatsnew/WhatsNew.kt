@@ -25,7 +25,7 @@ data class NotesVersion(val major: Int, val minor: Int) : Comparable<NotesVersio
 }
 
 /** The glyph on a highlight's tile. */
-enum class WhatsNewGlyph { TRANSFER, LINK, AT, KEY }
+enum class WhatsNewGlyph { TRANSFER, LINK, CONTACTS, AT, KEY }
 
 /** One highlight row: English source strings, translated with `tr` when shown. */
 data class WhatsNewHighlight(val glyph: WhatsNewGlyph, val title: String, val text: String)
@@ -54,6 +54,11 @@ object WhatsNewNotes {
                     "Whoever opens it claims the funds in Monero One. In Send, choose Link."
                 ),
                 WhatsNewHighlight(
+                    WhatsNewGlyph.CONTACTS,
+                    "Contacts",
+                    "Save the people you pay. Tap the contacts icon in Send."
+                ),
+                WhatsNewHighlight(
                     WhatsNewGlyph.AT,
                     "Send to a name",
                     "Enter an OpenAlias name in place of an address, checked with DNSSEC."
@@ -66,10 +71,12 @@ object WhatsNewNotes {
             ),
             improvements = listOf(
                 "Review shows the exact network fee you pay.",
+                "Send waits for your wallet to sync and shows its progress.",
+                "Reorder your wallets with the handle on the left.",
                 "Rounded QR codes.",
                 "New wallets are created faster.",
                 "Fixes for custom node logins.",
-                "With the Tor proxy on, OpenAlias name lookups also go through Tor.",
+                "With Tor on, all app traffic goes through your Tor proxy.",
                 "Fixed a crash when you create a wallet or set a wallet birthday with some phone languages.",
                 "General stability improvements and bug fixes."
             )

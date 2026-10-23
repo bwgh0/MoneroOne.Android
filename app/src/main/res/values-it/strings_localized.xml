@@ -17,6 +17,7 @@
     <string name="l10n_s_is_up_to_date_48532316" formatted="false">"%s è aggiornato"</string>
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$s km"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"Raggio di %1$s km"</string>
+    <string name="l10n_s_of_s_confirmations_f0f22b2a" formatted="false">"Conferme: %1$s su %2$s"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s parole su %2$s"</string>
     <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"Conferme: %s su 10"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%1$s su %2$s"</string>
@@ -480,6 +481,7 @@
     <string name="l10n_export_view_key_2068ca52" formatted="false">"Esporta chiave di visualizzazione"</string>
     <string name="l10n_exporting_your_view_key_835f2bf2" formatted="false">"Esportazione della chiave di visualizzazione…"</string>
     <string name="l10n_face_id_33811c75" formatted="false">"Face ID"</string>
+    <string name="l10n_face_id_now_turns_on_for_trezor_and_view_only_wallets_893389cc" formatted="false">"Face ID ora si attiva anche per i portafogli Trezor e di sola visualizzazione."</string>
     <string name="l10n_failed_031a8f0f" formatted="false">"Non riuscita"</string>
     <string name="l10n_failed_to_change_pin_c4ae272f" formatted="false">"Impossibile cambiare il PIN"</string>
     <string name="l10n_failed_to_connect_s_42c6ccb5" formatted="false">"Connessione non riuscita: %1$s"</string>
@@ -496,6 +498,8 @@
     <string name="l10n_filter_transactions_00d87315" formatted="false">"Filtra transazioni"</string>
     <string name="l10n_first_payment_to_this_name_check_the_address_with_the_r_5e52f2f6" formatted="false">"Primo pagamento a questo nome. Verifica l’indirizzo con il destinatario."</string>
     <string name="l10n_first_time_sync_can_take_a_few_minutes_2b7fc90b" formatted="false">"La prima sincronizzazione può richiedere alcuni minuti."</string>
+    <string name="l10n_fixed_a_crash_when_you_create_a_wallet_or_set_a_wallet__215cccbe" formatted="false">"Corretto un arresto anomalo durante la creazione di un portafoglio o l’impostazione della data di nascita del portafoglio con alcune lingue del telefono."</string>
+    <string name="l10n_fixed_a_slow_first_sync_for_new_wallets_with_some_regio_697ffada" formatted="false">"Corretta una prima sincronizzazione lenta dei nuovi portafogli con alcune impostazioni di area geografica."</string>
     <string name="l10n_fixes_for_custom_node_logins_19731e0d" formatted="false">"Correzioni per l’accesso ai nodi personalizzati."</string>
     <string name="l10n_forgot_pin_74ad27db" formatted="false">"PIN dimenticato"</string>
     <string name="l10n_forgot_pin_9c7eb279" formatted="false">"PIN dimenticato?"</string>
@@ -628,6 +632,7 @@
     <string name="l10n_monero_receive_qr_code_40323332" formatted="false">"Codice QR per ricevere Monero"</string>
     <string name="l10n_more_on_the_emoji_keyboard_aa3c3d9d" formatted="false">"Altre emoji sulla tastiera"</string>
     <string name="l10n_moroccan_dirham_2f23f1e7" formatted="false">"Dirham marocchino"</string>
+    <string name="l10n_move_xmr_from_one_of_your_wallets_to_another_tap_the_wa_8cc6455b" formatted="false">"Sposta XMR da uno dei tuoi portafogli a un altro. Tocca il nome del portafoglio in alto, poi Trasferisci."</string>
     <string name="l10n_move_down_40bb50da" formatted="false">"Sposta giù"</string>
     <string name="l10n_move_forward_in_history_or_return_to_now_de977881" formatted="false">"Vai avanti nella cronologia o torna ad “Adesso”."</string>
     <string name="l10n_move_up_c66feb5e" formatted="false">"Sposta su"</string>
@@ -850,6 +855,7 @@
     <string name="l10n_receive_xmr_36808f57" formatted="false">"Ricevi XMR"</string>
     <string name="l10n_receive_xmr_to_start_tracking_your_wallet_s_value_2ca47a95" formatted="false">"Ricevi XMR per iniziare a monitorare il valore del tuo portafoglio."</string>
     <string name="l10n_received_49f19bee" formatted="false">"Ricevuto"</string>
+    <string name="l10n_received_s_1cbab545" formatted="false">"Ricevuti %1$s"</string>
     <string name="l10n_received_s_xmr_c7cf4364" formatted="false">"Ricevuti %1$s XMR"</string>
     <string name="l10n_received_an_implausible_xmr_price_keeping_the_last_know_ba5ee207" formatted="false">"È arrivato un prezzo XMR non plausibile. Viene mantenuto l’ultimo valore noto."</string>
     <string name="l10n_received_an_out_of_date_price_response_keeping_the_last_6012a12e" formatted="false">"È arrivata una risposta di prezzo non aggiornata. Viene mantenuto l’ultimo valore noto."</string>
@@ -899,6 +905,7 @@
     <string name="l10n_rename_s_37736fea" formatted="false">"Rinomina, %1$s"</string>
     <string name="l10n_renames_the_link_1efc85b4" formatted="false">"Rinomina il link"</string>
     <string name="l10n_reorder_14ac200e" formatted="false">"Riordina"</string>
+    <string name="l10n_reorder_your_wallets_with_the_handle_on_the_left_fd3ac7d9" formatted="false">"Riordina i tuoi portafogli con la maniglia a sinistra."</string>
     <string name="l10n_request_amount_optional_a62bd939" formatted="false">"Importo richiesto (facoltativo)"</string>
     <string name="l10n_request_amount_in_s_faaa0bea" formatted="false">"Richiedi importo in %1$s"</string>
     <string name="l10n_request_amount_in_xmr_08acf2d7" formatted="false">"Richiedi importo in XMR"</string>
@@ -939,6 +946,7 @@
     <string name="l10n_same_address_as_your_last_payment_0c07a4bf" formatted="false">"Stesso indirizzo del tuo ultimo pagamento"</string>
     <string name="l10n_save_1509f561" formatted="false">"Salva"</string>
     <string name="l10n_save_alert_c04ad8f9" formatted="false">"Salva avviso"</string>
+    <string name="l10n_save_the_people_you_pay_tap_the_contacts_icon_in_send_a8569be9" formatted="false">"Salva le persone che paghi. Tocca l’icona dei contatti in Invia."</string>
     <string name="l10n_save_to_photos_50eaa390" formatted="false">"Salva in Foto"</string>
     <string name="l10n_scan_all_35da003e" formatted="false">"Tutto"</string>
     <string name="l10n_scan_monero_address_837d6df3" formatted="false">"Scansiona indirizzo Monero"</string>
@@ -991,6 +999,7 @@
     <string name="l10n_send_to_s_eb35ff2a" formatted="false">"Invia a %1$s"</string>
     <string name="l10n_send_to_a_name_ae1d1417" formatted="false">"Invia a un nome"</string>
     <string name="l10n_send_transaction_7bc085c4" formatted="false">"Invia transazione"</string>
+    <string name="l10n_send_waits_for_your_wallet_to_sync_and_shows_its_progre_496638a7" formatted="false">"Invia attende la sincronizzazione del portafoglio e ne mostra l’avanzamento."</string>
     <string name="l10n_send_with_a_link_86a321a8" formatted="false">"Invia con un link"</string>
     <string name="l10n_send_with_a_link_5d2460f7" formatted="false">"Invia con un link"</string>
     <string name="l10n_sender_address_hidden_by_monero_privacy_db9424c6" formatted="false">"Indirizzo del mittente nascosto dalla privacy di Monero"</string>
@@ -1180,6 +1189,7 @@
     <string name="l10n_transaction_not_found_eb7c4fd4" formatted="false">"Transazione non trovata"</string>
     <string name="l10n_transactions_are_irreversible_95e5dd6b" formatted="false">"Le transazioni sono irreversibili"</string>
     <string name="l10n_transfer_dde8bef7" formatted="false">"Trasferisci"</string>
+    <string name="l10n_transfer_between_your_wallets_e34d212c" formatted="false">"Trasferisci tra i tuoi portafogli"</string>
     <string name="l10n_trezor_ble_write_timed_out_efeed4ff" formatted="false">"Tempo scaduto per la scrittura BLE sul Trezor"</string>
     <string name="l10n_trezor_ready_0a4b6158" formatted="false">"Trezor pronto"</string>
     <string name="l10n_trezor_didn_t_complete_the_key_image_export_confirm_the_2161fef2" formatted="false">"Il Trezor non ha completato l’esportazione delle immagini della chiave. Conferma la richiesta sul dispositivo e riprova."</string>
@@ -1308,6 +1318,7 @@
     <string name="l10n_widget_7dd7a28c" formatted="false">"Widget"</string>
     <string name="l10n_will_scan_from_the_beginning_29785ed9" formatted="false">"La scansione partirà dall’inizio"</string>
     <string name="l10n_will_scan_from_the_beginning_slower_ce4e8589" formatted="false">"La scansione partirà dall’inizio (più lenta)"</string>
+    <string name="l10n_with_tor_on_all_app_traffic_goes_through_your_tor_proxy_f7b2ba86" formatted="false">"Con Tor attivo, tutto il traffico dell’app passa dal tuo proxy Tor."</string>
     <string name="l10n_word_s_98e9bd6f" formatted="false">"Parola %s"</string>
     <string name="l10n_word_s_s_119250bc" formatted="false">"Parola %1$s: %2$s"</string>
     <string name="l10n_working_b93900bd" formatted="false">"Caricamento…"</string>
@@ -1327,6 +1338,7 @@
     <string name="l10n_your_pin_is_required_to_access_your_recovery_phrase_636df823" formatted="false">"È necessario il PIN per accedere alla frase di recupero"</string>
     <string name="l10n_your_payment_link_d7e13524" formatted="false">"Il tuo link di pagamento"</string>
     <string name="l10n_your_seed_phrase_dd4949d6" formatted="false">"La tua frase seed"</string>
+    <string name="l10n_your_history_shows_as_soon_as_a_wallet_opens_even_on_a__2de2ef35" formatted="false">"La cronologia appare appena si apre un portafoglio, anche con un nodo lento."</string>
     <string name="l10n_your_history_starts_here_9357da77" formatted="false">"La tua cronologia inizia qui"</string>
     <string name="l10n_your_location_data_stays_on_your_device_it_s_only_used__e37b3c21" formatted="false">"I dati sulla posizione restano sul tuo dispositivo. Vengono usati solo per verificare se ti trovi in una zona attendibile – mai salvati, registrati o trasmessi altrove."</string>
     <string name="l10n_your_screen_reader_will_read_your_recovery_phrase_out_l_5b850931" formatted="false">"Il lettore schermo leggerà ad alta voce la frase di recupero. Chiunque la senta può rubare i tuoi fondi. Usa le cuffie o assicurati che nessuno possa sentire il dispositivo prima di continuare."</string>
