@@ -127,9 +127,8 @@ private sealed interface SlotContent {
 /**
  * The one status slot directly above Review's Send (mockup send-wait-sync): the balance card's sync ladder while
  * the wallet connects, loads or scans, green "Synced" while the transaction builds, or a banner for a real
- * failure: gray offline, red node or build error, each with Retry. It shows only once the wait (for the wallet,
- * or for the build of a wallet that was synced on arrival) passes [SLOT_DELAY_MS]; a build failure shows at once.
- * It fades out when the values fill in.
+ * failure: gray offline, red node or build error, each with Retry. It shows only once the wait passes
+ * [SLOT_DELAY_MS]; a build failure shows at once. It fades out when the values fill in.
  */
 @Composable
 internal fun SendStatusSlot(
@@ -144,7 +143,7 @@ internal fun SendStatusSlot(
     onRetryBuild: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val waiting = pending && error == null
+    val waiting = pending && error == null && wait != SendWait.Ready
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(waiting) {
         if (waiting) {
