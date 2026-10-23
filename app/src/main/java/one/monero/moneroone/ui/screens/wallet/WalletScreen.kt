@@ -82,6 +82,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -346,6 +347,19 @@ fun WalletScreen(
             whatsNewBanner = false
         }
     }
+    // Money arrives: new payments play on the balance card while the tab is idle (no sheet, the wallet
+    // list closed, no chart point picked); payments found while away play at the next idle look.
+    val arrivals = rememberMoneyArrives(
+        walletId = activeWallet?.id,
+        sessionId = walletSessionId,
+        synced = walletState.syncState is SyncState.Synced,
+        idle = !switcherExpanded && asOf == null && !claimSheetOpen && !linkProblemShowing && !linkAlertShowing &&
+            !whatsNewSheet,
+        balance = walletState.balance.all,
+        transactions = walletState.transactions,
+        isClaim = { linkIndex.match(it)?.kind == one.monero.moneroone.paymentlinks.LinkActivityKind.CLAIM },
+        isReclaim = { linkIndex.match(it)?.kind == one.monero.moneroone.paymentlinks.LinkActivityKind.RECLAIM }
+    )
 
     LazyColumn(
         state = listState,
@@ -514,6 +528,8 @@ fun WalletScreen(
                                 nodeLoginFailed = walletState.nodeLoginFailed,
                                 history = history,
                                 historicalPoint = historicalPoint,
+                                arrival = arrivals,
+                                heldBalance = arrivals.hold,
                                 openLinks = { isPast ->
                                     // Kept in place, hidden, while History shows the past.
                                     AnimatedVisibility(
@@ -734,15 +750,22 @@ internal fun BalanceCard(
     history: BalanceHistoryState,
     /** The past moment picked on the chart; null is now. */
     historicalPoint: PortfolioPoint?,
+    /** Money arrives: the +amount, the green and the shine. */
+    arrival: ArrivalPlay? = null,
+    /** Money arrives: the balance the hero shows until the moment rolls it; null shows [balance]. */
+    heldBalance: Long? = null,
     /** The open payment links line, last in the card; told when History shows the past. */
     openLinks: @Composable (isPast: Boolean) -> Unit = {},
     historyChart: @Composable (isActive: Boolean) -> Unit
 ) {
     val dates = rememberChartDateFormats()
     val isPast = historicalPoint != null
-    val shownBalance = historicalPoint?.balance ?: balance
+    // Money arrives holds the old value until the moment rolls it.
+    val liveBalance = heldBalance ?: balance
+    val holding = liveBalance != balance
+    val shownBalance = historicalPoint?.balance ?: liveBalance
     // A past amount takes the price sampled at that same moment.
-    val fiatBalance = if (historicalPoint != null) formatFiat(historicalPoint.value) else liveFiat(balance)
+    val fiatBalance = if (historicalPoint != null) formatFiat(historicalPoint.value) else liveFiat(liveBalance)
     // Fiat Mode puts fiat on top and XMR under it; with no price yet XMR stays on top.
     val fiatFirst = fiatMode && fiatBalance != null
     val xmrText = formatXmr(shownBalance)
@@ -876,11 +899,15 @@ internal fun BalanceCard(
                             else -> 18.sp
                         }
                         // Digits roll on change (iOS .contentTransition(.numericText())).
+                        val label = MaterialTheme.colorScheme.onSurface
+                        val positive = SuccessGreen
                         RollingText(
                             text = hero,
                             style = heroStyle,
                             fontSize = balanceFontSize,
-                            durationMillis = digitMs
+                            durationMillis = digitMs,
+                            color = arrival?.heroGreen?.value?.takeIf { it > 0f }?.let { lerp(label, positive, it) } ?: Color.Unspecified,
+                            modifier = if (arrival != null) Modifier.heroShine { arrival.shine.value } else Modifier
                         )
                         if (!fiatFirst) {
                             Spacer(modifier = Modifier.width(8.dp))
@@ -895,14 +922,39 @@ internal fun BalanceCard(
                         }
                     }
 
-                    // The other currency below the amount.
-                    if (caption != null) {
-                        RollingText(
-                            text = caption,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            durationMillis = digitMs
+                    // The other currency below the amount; Money arrives shows the +amount in its place.
+                    val plus = arrival?.plus
+                    if (caption != null || plus != null) Box {
+                        // TalkBack: "Received <amount>" once per moment, in the Fiat Mode currency.
+                        if (arrival != null) ArrivalAnnouncement(
+                            play = arrival,
+                            words = { tr("Received") + " " + (liveFiat(it.total)?.takeIf { fiatMode } ?: "${formatXmr(it.total)} XMR") },
+                            modifier = Modifier.matchParentSize()
                         )
+                        if (caption != null) {
+                            RollingText(
+                                text = caption,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                durationMillis = digitMs,
+                                modifier = if (arrival != null) Modifier.graphicsLayer { alpha = arrival.captionAlpha.value } else Modifier
+                            )
+                        }
+                        if (plus != null && arrival != null) {
+                            Text(
+                                text = "+" + (liveFiat(plus.total)?.takeIf { fiatMode } ?: "${formatXmr(plus.total)} XMR"),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontSize = if (plus.big) 20.sp else MaterialTheme.typography.bodyMedium.fontSize,
+                                fontWeight = FontWeight.SemiBold,
+                                color = SuccessGreen,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.graphicsLayer {
+                                    alpha = arrival.plusAlpha.value
+                                    translationY = arrival.plusRise.value * density
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -923,7 +975,12 @@ internal fun BalanceCard(
 
             // Available (unlocked) balance if different from total. Kept in
             // place, hidden, while viewing the past, so the card does not shrink.
-            if (balance != unlockedBalance) {
+            // It opens with disclose (Money arrives opens it as the balance rolls).
+            AnimatedVisibility(
+                visible = balance != unlockedBalance && !holding,
+                enter = expandVertically(Motion.disclose(), expandFrom = Alignment.Top) + fadeIn(Motion.crossFade()),
+                exit = shrinkVertically(Motion.disclose(), shrinkTowards = Alignment.Top) + fadeOut(Motion.crossFade())
+            ) {
                 val unlockedXmr = formatXmr(unlockedBalance)
                 val unlockedFiat = liveFiat(unlockedBalance)
                 val amounts = if (fiatFirst && unlockedFiat != null) "$unlockedFiat, $unlockedXmr XMR"
@@ -1266,7 +1323,9 @@ private fun TransactionCard(
         onClick = onClick,
         linkBadge = link != null,
         walletBadge = name is SendName.ToWallet || name is SendName.FromWallet || name == SendName.ToThisWallet,
-        personBadge = name is SendName.ToContact
+        personBadge = name is SendName.ToContact,
+        confirmations = transaction.confirmations,
+        failed = transaction.isFailed
     ) {
         if (link != null) {
             LinkRowAmounts(link, one.monero.moneroone.ui.components.transactionStatus(transaction))

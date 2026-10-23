@@ -4,6 +4,9 @@ import one.monero.moneroone.core.contacts.Contact
 import one.monero.moneroone.core.contacts.ContactStore
 import one.monero.moneroone.core.contacts.Contacts
 import one.monero.moneroone.core.locale.tr
+import one.monero.moneroone.core.wallet.SendWait
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.DisposableEffect
 import android.view.MotionEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -156,7 +159,10 @@ import one.monero.moneroone.paymentlinks.EnvelopeDraft
 import one.monero.moneroone.paymentlinks.LinkNames
 import one.monero.moneroone.paymentlinks.PaymentLinkCodec
 import one.monero.moneroone.paymentlinks.PaymentLinkParse
-import one.monero.moneroone.paymentlinks.PaymentLinkReadyPhase
+import one.monero.moneroone.paymentlinks.EnvelopeCardFace
+import one.monero.moneroone.paymentlinks.LinkSendResult
+import one.monero.moneroone.paymentlinks.envelopeFigures
+import one.monero.moneroone.paymentlinks.shareLink
 import one.monero.moneroone.paymentlinks.PaymentLinkRecipientToken
 import one.monero.moneroone.paymentlinks.PaymentLinkReview
 import one.monero.moneroone.paymentlinks.PaymentLinksViewModel
@@ -316,6 +322,8 @@ fun SendScreen(
     // A prefilled address or name (from a scan) is classified at once, like a paste.
     LaunchedEffect(Unit) { if (recipientInput.isNotEmpty()) openAlias.onInputChanged(recipientInput, immediate = true) }
     var amount by rememberSaveable { mutableStateOf(prefilledAmount ?: "") }
+    // What the recipient gets, kept for the Sending and Sent amount (a sweep sends the balance less the fee).
+    var sentAtomic by rememberSaveable { mutableLongStateOf(0L) }
     var isSweepAll by rememberSaveable { mutableStateOf(false) }
     var memo by rememberSaveable { mutableStateOf("") }
     // A link's note: this phone only, never in the link or the tx memo.
@@ -376,6 +384,16 @@ fun SendScreen(
     // Send clears its result when it leaves the back stack. A recreation also
     // disposes the screen, but the recreated screen still needs the result.
     OnNavEntryEnd("send-flow") { walletViewModel.resetSendState(flow) }
+
+    // Send opens at any time; Review builds once the main wallet runs and is synced. A link check stops the main
+    // wallet, so the one that runs stops and no new one starts while Send is open.
+    val sendWaitGate = rememberSendWaitGate(walletViewModel)
+    DisposableEffect(paymentLinks) {
+        paymentLinks?.sendOpened()
+        onDispose { paymentLinks?.sendClosed() }
+    }
+    // Retry on the offline or node banner: open the wallet again (offline, the wait goes on by itself).
+    val retryWait: () -> Unit = { if (NetworkMonitor.isConnected.value) walletViewModel.refreshSync() }
 
     fun goForward(to: SendPhase) {
         navigatingForward = true
@@ -493,6 +511,9 @@ fun SendScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
+            // Sending and Sent are one screen: the amount stays put while the spinner becomes the check
+            // (a link: the check becomes the note in its envelope).
+            contentKey = { if (it == SendPhase.SENDING || it == SendPhase.SUCCESS) "status" else it },
             label = "sendPhase"
         ) { currentPhase ->
             when (currentPhase) {
@@ -577,6 +598,8 @@ fun SendScreen(
                         formatXmr = walletViewModel::formatXmr,
                         estimateFee = { to, amt -> walletViewModel.estimateFee(to, amt) },
                         prepareFunding = { to, amt -> walletViewModel.prepareSend(to, amt, memo = "Payment link") },
+                        gate = sendWaitGate,
+                        onRetryWait = retryWait,
                         rebuild = linkRebuild,
                         xmrPrice = currentPrice?.price,
                         currencySymbol = selectedCurrency.symbol,
@@ -620,24 +643,46 @@ fun SendScreen(
                         xmrPrice = currentPrice?.price,
                         currencySymbol = selectedCurrency.symbol,
                         sendInProgress = sendInProgress,
+                        gate = sendWaitGate,
+                        onRetryWait = retryWait,
                         onConfirm = {
                         sendInProgress = true
                         showAuthGate = true
                     }
                 )
                 }
-                SendPhase.SENDING -> SendingPhase()
-                SendPhase.SUCCESS -> {
+                SendPhase.SENDING, SendPhase.SUCCESS -> {
                     val draft = linkDraft
-                    if (linkMode && draft != null) {
-                        PaymentLinkReadyPhase(draft.link, walletViewModel.formatXmr(draft.amount), onDone = onSent)
-                    } else {
-                        SuccessPhase(
-                            txHash = (sendState as? SendState.Success)?.txHash ?: "",
-                            detail = transferTo?.let { tr("It shows in %s when you next open that wallet.", it.name) },
-                            onDone = onSent
-                        )
+                    val fiatMode by walletViewModel.fiatMode.collectAsState()
+                    val currentPrice by walletViewModel.currentPrice.collectAsState()
+                    val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+                    val context = LocalContext.current
+                    // A link's amount is the note's: what the link holds.
+                    val sent = if (linkMode) draft?.amount ?: 0L else sentAtomic
+                    val xmr = walletViewModel.formatXmr(sent)
+                    val fiat = currentPrice?.price?.let { "${selectedCurrency.symbol}${"%.2f".format(sent / 1_000_000_000_000.0 * it)}" }
+                    val amount = when {
+                        sent <= 0L -> null
+                        fiatMode && fiat != null -> SentAmount(fiat, null, "$xmr XMR")
+                        else -> SentAmount(xmr, "XMR", fiat?.let { "≈ $it" })
                     }
+                    SendStatusPhase(
+                        // A link with no draft keeps its sending screen (it has nothing to share).
+                        success = currentPhase == SendPhase.SUCCESS && (!linkMode || draft != null),
+                        amount = amount,
+                        txHash = (sendState as? SendState.Success)?.txHash ?: "",
+                        note = transferTo?.let { tr("It shows in %s when you next open that wallet.", it.name) },
+                        onDone = onSent,
+                        link = if (linkMode && draft != null && amount != null) {
+                            LinkSendResult(
+                                face = EnvelopeCardFace(amount.big, unit = amount.unit != null),
+                                spoken = envelopeFigures(xmr, fiat, estimated = false, fiatMode = fiatMode).spoken,
+                                onShare = { shareLink(context, xmr, draft.link) }
+                            )
+                        } else {
+                            null
+                        }
+                    )
                 }
                 SendPhase.ERROR -> ErrorPhase(
                     message = linkFundingError
@@ -702,7 +747,9 @@ fun SendScreen(
                             prepared?.amount ?: (draft.amount + linkFeeReserve),
                             memo = "Payment link",
                             beforeCommit = { signed -> paymentLinks.fundingSigned(id, signed.txids) },
-                            prepared = prepared
+                            prepared = prepared,
+                            // The sending screen plays the chime with its check.
+                            playChime = false
                         )
                     }
                 } else {
@@ -720,13 +767,16 @@ fun SendScreen(
                         val fromId = flow.walletId
                         val toId = transferTo?.id ?: SendNames.matchWallet(address, wallets)?.id
                         // The transfer the review built goes out as it is: its fee is the one the review showed.
+                        sentAtomic = prepared.sentAmount
+                        // The Sent screen plays the chime when its circle closes.
                         walletViewModel.send(
                             flow,
                             SendRequest.of(address, walletViewModel.parseXmr(amount), memo, isSweepAll),
                             prepared = prepared,
                             beforeCommit = if (fromId != null && toId != null) {
                                 { signed -> nameStore.recordSend(signed.txids, fromId, toId) }
-                            } else null
+                            } else null,
+                            playChime = false
                         )
                     }
                 }
@@ -1401,20 +1451,37 @@ private fun ReviewPhase(
     xmrPrice: Double?,
     currencySymbol: String,
     sendInProgress: Boolean,
+    /** The wait for the main wallet: the review builds only once it runs and is synced. */
+    gate: SendWaitGate,
+    /** Retry on the slot's offline or node banner. */
+    onRetryWait: () -> Unit,
     onConfirm: () -> Unit
 ) {
     val parsedAmount = parseXmr(amount)
+    // The balance when the build starts: the wait for the wallet can outlast the one Review opened with.
+    val currentUnlocked by rememberUpdatedState(unlockedBalance)
+    var attempt by remember { mutableIntStateOf(0) }
+    val wait by gate.collectAsState()
 
     // Build and sign the transfer when the review opens, and again for a sweep or when the one built is gone.
     // wallet2's fee estimate counts one input; the fee shown is the one this transfer pays, and Send broadcasts it.
-    LaunchedEffect(isSweepAll, rebuild) {
+    // The build waits until the main wallet runs and is synced (a link check stops it for a moment).
+    LaunchedEffect(isSweepAll, rebuild, attempt) {
         onReviewFee(ReviewFeeState(loading = true))
-        val result = try {
-            withContext(Dispatchers.IO) { buildFee(parsedAmount, isSweepAll, unlockedBalance) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            ReviewFeeResult.Failed(e.message)
+        var result: ReviewFeeResult
+        while (true) {
+            gate.awaitReady()
+            result = try {
+                withContext(Dispatchers.IO) { buildFee(parsedAmount, isSweepAll, currentUnlocked) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ReviewFeeResult.Failed(e.message)
+            }
+            // The wallet stopped while the transfer was built, or the network just came back: build again
+            // instead of failing.
+            if (result is ReviewFeeResult.Failed && gate.retriesFailure()) continue
+            break
         }
         when (result) {
             is ReviewFeeResult.Ready -> onReviewFee(ReviewFeeState(fee = result.prepared.fee, prepared = result.prepared))
@@ -1562,8 +1629,9 @@ private fun ReviewPhase(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                            } else if (feeLoading) {
-                                CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            } else {
+                                ValuePlaceholder(width = 132.dp, style = MaterialTheme.typography.bodyMedium)
+                                if (xmrPrice != null) ValuePlaceholder(width = 56.dp, style = MaterialTheme.typography.bodySmall)
                             }
                         } else {
                             Text(
@@ -1589,10 +1657,17 @@ private fun ReviewPhase(
                     ReviewDetailRow(
                         label = { Text(tr("Network Fee"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     ) {
-                        when {
-                            feeLoading -> CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            feeError != null -> Text(tr("Error"), style = MaterialTheme.typography.bodyMedium, color = ErrorRed)
-                            else -> Column(horizontalAlignment = Alignment.End) {
+                        // Gray placeholders hold the row until the fee is known; an error shows in the status slot.
+                        FillIn(
+                            ready = feeReady,
+                            placeholder = {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    ValuePlaceholder(width = 104.dp, style = MaterialTheme.typography.bodyMedium)
+                                    if (xmrPrice != null) ValuePlaceholder(width = 44.dp, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        ) {
+                            Column(horizontalAlignment = Alignment.End) {
                                 Text("${formatXmr(estimatedFee)} XMR", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                                 xmrPrice?.let { price ->
                                     val fiat = atomicToXmr(estimatedFee) * price
@@ -1614,7 +1689,15 @@ private fun ReviewPhase(
                     ReviewDetailRow(
                         label = { Text(tr("Total"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
                     ) {
-                        if (feeReady) {
+                        FillIn(
+                            ready = feeReady,
+                            placeholder = {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    ValuePlaceholder(width = 132.dp, style = MaterialTheme.typography.titleSmall)
+                                    if (xmrPrice != null) ValuePlaceholder(width = 56.dp, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        ) {
                             val total = reviewFee.prepared?.total ?: (parsedAmount + estimatedFee)
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
@@ -1683,12 +1766,22 @@ private fun ReviewPhase(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // One status slot directly above Send: the wait for the wallet, or a real failure.
+        SendStatusSlot(
+            wait = wait,
+            pending = feeLoading,
+            error = feeError,
+            onRetryWait = onRetryWait,
+            onRetryBuild = { attempt++ }
+        )
+
         // Send button
         @OptIn(ExperimentalComposeUiApi::class)
         PrimaryButton(
             onClick = onConfirm,
             modifier = Modifier
                 .fillMaxWidth()
+                .sendWaitHint(feeLoading && wait != SendWait.Ready)
                 .pointerInteropFilter { event ->
                     (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0
                 },
@@ -1789,167 +1882,6 @@ private fun ReviewDetailRow(
 // ============================================================
 
 @Composable
-private fun SendingPhase() {
-    Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 32.dp)
-        ) {
-            GradientSpinner()
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            Text(tr("Sending Transaction..."), style = MaterialTheme.typography.headlineSmall)
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                tr("Please wait while your transaction is being broadcast"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-private fun SuccessPhase(
-    txHash: String,
-    /** In place of the network line: where a Transfer shows next ("It shows in Savings when you next open that wallet."). */
-    detail: String? = null,
-    onDone: () -> Unit
-) {
-    val clipboardManager = LocalClipboardManager.current
-    var copied by remember { mutableStateOf(false) }
-    // Back to the copy label after 2 s, as on iOS
-    LaunchedEffect(copied) {
-        if (copied) {
-            delay(2000)
-            copied = false
-        }
-    }
-
-    // Animated checkmark
-    var showCheck by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { delay(200); showCheck = true }
-    val checkScale by animateFloatAsState(
-        if (showCheck) 1f else 0.3f,
-        spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-        label = "checkScale"
-    )
-    val checkAlpha by animateFloatAsState(if (showCheck) 1f else 0f, tween(300), label = "checkAlpha")
-
-    // Expanding ring
-    val ringScale by animateFloatAsState(
-        if (showCheck) 2f else 1f,
-        tween(800, easing = LinearEasing),
-        label = "ringScale"
-    )
-    val ringAlpha by animateFloatAsState(if (showCheck) 0f else 1f, tween(800), label = "ringAlpha")
-
-    // Read the adaptive green here: drawBehind is not a composable scope.
-    val successGreen = SuccessGreen
-    Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 32.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                // Expanding ring
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .graphicsLayer { scaleX = ringScale; scaleY = ringScale; alpha = ringAlpha }
-                        .drawBehind {
-                            drawCircle(
-                                color = successGreen,
-                                style = Stroke(width = 3.dp.toPx())
-                            )
-                        }
-                )
-                // Checkmark
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .graphicsLayer { scaleX = checkScale; scaleY = checkScale; alpha = checkAlpha }
-                        .clip(CircleShape)
-                        .background(SuccessGreen.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = tr("Success"), tint = SuccessGreen, modifier = Modifier.size(80.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(40.dp))
-
-            Text(tr("Sent!"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = SuccessGreen)
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                detail ?: tr("Your transaction has been submitted to the network"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            if (txHash.isNotBlank()) {
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Text(tr("Transaction ID"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(CapsuleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                ) {
-                    Text(
-                        text = if (copied) tr("Copied!") else truncateMiddle(txHash),
-                        style = MonoCaption,
-                        color = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(txHash))
-                            copied = true
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-                            contentDescription = tr("Copy"),
-                            tint = if (copied) SuccessGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            PrimaryButton(
-                onClick = onDone,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(tr("Done"))
-            }
-        }
-    }
-}
-
-@Composable
 private fun ErrorPhase(message: String, onRetry: () -> Unit, onClose: () -> Unit, canRetry: Boolean = true) {
     Box(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
@@ -2041,7 +1973,7 @@ private const val SpinnerOuterTrim = 0.7f
 private const val SpinnerInnerTrim = 0.4f
 
 @Composable
-private fun GradientSpinner() {
+internal fun GradientSpinner() {
     val infiniteTransition = rememberInfiniteTransition(label = "spinner")
     val orange = MoneroOrange  // read in the drawBehind lambdas, which are not composable
 

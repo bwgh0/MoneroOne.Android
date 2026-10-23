@@ -854,6 +854,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         ).also { added ->
             // Kept until now so that a failed add can be retried with the same words.
             if (added) createFlowSeed.discard(flowId)
+            // Its first payment gets the bigger Money arrives moment.
+            if (added) _activeWallet.value?.id?.let { MoneyArrivesStore.get(context).markCreatedInApp(it) }
         }
     }
 
@@ -2147,6 +2149,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun resetSyncLocked() {
         try {
             val active = _activeWallet.value ?: return
+            // The rescan finds every payment again: the next synced look takes them as seen.
+            MoneyArrivesStore.get(context).resetBaseline(active.id)
             val seedData = secrets.loadSeed(active.id) ?: run {
                 Timber.w("No stored seed, cannot reset sync")
                 _walletState.update { it.copy(error = "No wallet seed to reset sync") }
@@ -2268,12 +2272,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         flow: SendFlow,
         request: SendRequest,
         prepared: PreparedSend? = null,
-        beforeCommit: ((SignedTransaction) -> Unit)? = null
+        beforeCommit: ((SignedTransaction) -> Unit)? = null,
+        playChime: Boolean = true
     ) = send(
         flow, request.address, request.amount, memo = request.memo, isSweepAll = request.sweepAll,
         beforeCommit = beforeCommit,
         prepared = prepared?.signed,
-        preparedMatches = prepared?.matches(request.address, request.amount, request.sweepAll) ?: true
+        preparedMatches = prepared?.matches(request.address, request.amount, request.sweepAll) ?: true,
+        playChime = playChime
     )
 
     /**
@@ -2292,12 +2298,21 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         isSweepAll: Boolean = false,
         beforeCommit: ((SignedTransaction) -> Unit)? = null,
         prepared: SignedTransaction? = null,
-        preparedMatches: Boolean = true
+        preparedMatches: Boolean = true,
+        /** False when the screen plays the chime itself (the Sent screen plays it as its circle closes). */
+        playChime: Boolean = true
     ) {
         val operation = sendCoordinator.begin(flow, _activeWallet.value?.id, isSweepAll || amount > 0L)
             ?: return
         viewModelScope.launch {
             var error: String? = null
+            var txHash = ""
+            // The txid of the signed transaction, kept for the Sent screen. The caller's check runs first:
+            // when it throws, nothing is broadcast.
+            val signedCheck: (SignedTransaction) -> Unit = { signed ->
+                beforeCommit?.invoke(signed)
+                txHash = signed.txids.firstOrNull().orEmpty()
+            }
             try {
                 // Null kit (switch/reset/node-change teardown window) must be a
                 // LOUD failure — a silent no-op here reported Success for a
@@ -2313,20 +2328,18 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 withContext(Dispatchers.IO) {
                     // The kit saves the memo as a local note, as iOS does.
                     when {
-                        prepared == null -> kit.send(amount, address, memo, sweepAll = isSweepAll, beforeCommit = beforeCommit)
+                        prepared == null -> kit.send(amount, address, memo, sweepAll = isSweepAll, beforeCommit = signedCheck)
                         // Only the transfer the review showed may go out.
                         !preparedMatches -> throw PreparedTransactionLostException()
-                        else -> kit.sendPrepared(prepared, memo, beforeCommit = beforeCommit)
+                        else -> kit.sendPrepared(prepared, memo, beforeCommit = signedCheck)
                     }
                 }
-                one.monero.moneroone.core.util.SoundFeedback.sendComplete(context)
-                // MoneroKit.send() doesn't return txHash, we'll show success without it
-                // The transaction will appear in the transactions list after sync
+                if (playChime) one.monero.moneroone.core.util.SoundFeedback.sendComplete(context)
             } catch (e: Exception) {
                 Timber.e(e, "Failed to send transaction")
                 error = e.message ?: "Transaction failed"
             } finally {
-                sendCoordinator.finish(operation, error)
+                sendCoordinator.finish(operation, error, txHash)
             }
         }
     }

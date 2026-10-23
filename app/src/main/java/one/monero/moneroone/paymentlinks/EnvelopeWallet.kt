@@ -224,6 +224,9 @@ class EnvelopeWallet private constructor(
             return envelope
         }
 
+        /** An envelope opens, runs or closes: the main wallet's kit is stopped or about to be. */
+        val isBusy: Boolean get() = current != null || runtimeLock.isLocked
+
         /** Closes the open envelope, if any (Remove All). */
         suspend fun closeCurrent() {
             current?.close()

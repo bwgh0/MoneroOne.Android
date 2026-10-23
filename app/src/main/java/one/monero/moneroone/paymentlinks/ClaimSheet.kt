@@ -8,6 +8,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,11 +29,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.HourglassTop
-import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +42,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,11 +50,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -64,10 +67,13 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.core.wallet.addressesOf
@@ -75,7 +81,8 @@ import one.monero.moneroone.ui.components.CellFill
 import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.components.PrimaryButton
-import one.monero.moneroone.ui.theme.ErrorRed
+import one.monero.moneroone.ui.components.fiatAt
+import one.monero.moneroone.ui.components.rememberReduceMotion
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.MonoCaption
@@ -86,6 +93,9 @@ import one.monero.moneroone.ui.screens.wallet.WalletRowCheck
 
 /** SwiftUI's default ease-in-out (0.35 s), the plain cross-fade iOS uses between states. */
 private val CrossFade = tween<Float>(350, easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f))
+
+/** The envelope's entrance waits for the sheet to come to rest, at most this long. */
+private const val SHEET_REST_TIMEOUT_MS = 800L
 
 /** What the claim sheet shows. */
 private sealed interface ClaimUi {
@@ -232,6 +242,31 @@ private fun ClaimSheet(
         } ?: ClaimUi.Checking(amount)
     }
 
+    // The envelope (link-card): it opens on a link that holds money (Waiting, Ready) and stays open
+    // while the claim runs. It stays sealed while Checking and on the other states, which keep their message.
+    val fiatMode by walletViewModel.fiatMode.collectAsState()
+    val price by walletViewModel.currentPrice.collectAsState()
+    val currency by walletViewModel.selectedCurrency.collectAsState()
+    val money: Pair<Long, Boolean>? = when (ui) {
+        is ClaimUi.Waiting -> (if (ui.amount > 0) ui.amount else 0L) to ui.estimated
+        is ClaimUi.Ready -> ui.amount to ui.estimated
+        else -> null
+    }
+    val shownFigures = money?.let { (atomic, estimated) ->
+        envelopeFigures(walletViewModel.formatXmr(atomic), fiatAt(atomic, price?.price, currency), estimated, fiatMode)
+    }
+    // While the claim runs, the card keeps the amount it showed.
+    var lastFigures by remember(id) { mutableStateOf<EnvelopeFigures?>(null) }
+    SideEffect { if (shownFigures != null) lastFigures = shownFigures }
+    val figures = shownFigures ?: lastFigures
+    val opens = money != null || ui == ClaimUi.Claiming
+    val showsEnvelope = ui !is ClaimUi.Done && ui != ClaimUi.Missing
+    val reduceMotion = rememberReduceMotion()
+    val motion = remember(id) { EnvelopeMotion() }
+    // While the link is checked, the light crosses the sealed envelope.
+    val checking = ui is ClaimUi.Checking
+    SideEffect { motion.checking = checking }
+
     val ready = ui is ClaimUi.Ready
     val sweeping = current?.phase == EnvelopeSession.Phase.SWEEPING
     val canChoose = destinations.size > 1 && !sweeping
@@ -263,6 +298,18 @@ private fun ClaimSheet(
         // sit in the sheet's content: there it reaches the sheet dialog's back dispatcher, after the
         // sheet's own dismiss callback, so it wins.
         BackHandler(enabled = showList) { choosing = false }
+        // The envelope enters once the sheet is at rest, then opens for a link that holds money.
+        val view = LocalView.current
+        LaunchedEffect(motion) {
+            withTimeoutOrNull(SHEET_REST_TIMEOUT_MS) {
+                snapshotFlow { sheetState.currentValue }.first { it == SheetValue.Expanded }
+            }
+            motion.enter(reduceMotion)
+        }
+        LaunchedEffect(motion, opens) {
+            if (opens) motion.open(view, reduceMotion) else motion.seal()
+        }
+        LaunchedEffect(motion) { motion.shine(reduceMotion) }
         // The list slides in from the trailing edge and the sheet's height follows (iOS pushes it).
         AnimatedContent(
             targetState = showList,
@@ -278,7 +325,10 @@ private fun ClaimSheet(
             label = "claimPane"
         ) { list ->
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
+                modifier = Modifier.fillMaxWidth()
+                    // The claim scrolls when the envelope and the rest outgrow a small screen; the list scrolls by itself.
+                    .then(if (list) Modifier else Modifier.verticalScroll(rememberScrollState()))
+                    .padding(horizontal = 24.dp).padding(bottom = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (list) {
@@ -308,10 +358,24 @@ private fun ClaimSheet(
                         )
                     }
                     Spacer(Modifier.height(16.dp))
+                    Crossfade(targetState = showsEnvelope, animationSpec = CrossFade, label = "claimEnvelope") { shows ->
+                        if (shows) {
+                            LinkEnvelopeHero(
+                                motion = motion,
+                                face = figures?.card,
+                                spoken = figures?.spoken,
+                                reduceMotion = reduceMotion,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                        }
+                    }
                     Crossfade(targetState = ui, animationSpec = CrossFade, label = "claimState") { state ->
                         ClaimBody(
                             state = state,
                             own = own,
+                            line = figures?.line,
+                            landed = motion.landed,
+                            reduceMotion = reduceMotion,
                             destination = destination,
                             canChoose = canChoose,
                             onChoose = { choosing = true },
@@ -338,6 +402,9 @@ private fun ClaimSheet(
 private fun ClaimBody(
     state: ClaimUi,
     own: Boolean,
+    line: String?,
+    landed: Boolean,
+    reduceMotion: Boolean,
     destination: ClaimDestination?,
     canChoose: Boolean,
     onChoose: () -> Unit,
@@ -355,41 +422,51 @@ private fun ClaimBody(
     ) {
         when (state) {
             is ClaimUi.Checking -> {
-                Spinner()
-                state.amount?.let { EstimatedAmount(formatXmr(it)) }
-                Secondary(tr("Checking the link…"))
+                // The sealed envelope above; the amount from an earlier check, when there is one.
+                Message(tr("Checking the link…"), MaterialTheme.typography.headlineSmall)
+                state.amount?.let { EstimatedAmount(formatXmr(it), MaterialTheme.typography.titleLarge) }
             }
             is ClaimUi.Waiting -> {
-                Disc(Icons.Default.HourglassTop, MoneroOrange)
-                val shown = formatXmr(if (state.amount > 0) state.amount else 0)
-                if (state.estimated) EstimatedAmount(shown) else Amount("$shown XMR")
+                // The card shows the amount. The lines wait for it to land, then cross-fade in.
+                line?.let { Secondary(it, arrival(landed, rise = false, reduceMotion).clearAndSetSemantics {}) }
                 Text(
                     tr("%s/10 confirmations", state.confirmations),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MoneroOrange
+                    color = MoneroOrange,
+                    modifier = arrival(landed, rise = false, reduceMotion)
                 )
-                Secondary(tr("Ready in about %s min", state.minutes))
+                Secondary(tr("Ready in about %s min", state.minutes), arrival(landed, rise = false, reduceMotion))
                 if (own) {
-                    PrimaryButton(containerColor = sheetFill(), onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text(tr("Reclaim")) }
+                    PrimaryButton(
+                        containerColor = sheetFill(),
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth().then(arrival(landed, rise = true, reduceMotion))
+                    ) { Text(tr("Reclaim")) }
                 }
             }
             is ClaimUi.Ready -> {
-                Disc(Icons.Default.Link, MoneroOrange)
-                if (state.estimated) EstimatedAmount(formatXmr(state.amount)) else Amount("${formatXmr(state.amount)} XMR")
-                if (!own) expiry?.let { Secondary(tr("Claim by %s", formatLinkDate(it))) }
+                // The card shows the amount. Once it lands, the lines cross-fade in and the wallet row and the button arrive.
+                line?.let { Secondary(it, arrival(landed, rise = false, reduceMotion).clearAndSetSemantics {}) }
+                if (!own) expiry?.let { Secondary(tr("Claim by %s", formatLinkDate(it)), arrival(landed, rise = false, reduceMotion)) }
                 destination?.let {
                     // 24 above the row and 20 below it, with the column's 12.
                     Spacer(Modifier.height(12.dp))
-                    DestinationRow(own, it, canChoose, onChoose)
+                    DestinationRow(own, it, canChoose, onChoose, arrival(landed, rise = true, reduceMotion))
                 }
                 Spacer(Modifier.height(8.dp))
-                PrimaryButton(containerColor = sheetFill(), onClick = onSweep, enabled = canSweep, modifier = Modifier.fillMaxWidth()) {
+                PrimaryButton(
+                    containerColor = sheetFill(),
+                    onClick = onSweep,
+                    enabled = canSweep && landed,
+                    modifier = Modifier.fillMaxWidth().then(arrival(landed, rise = true, reduceMotion))
+                ) {
                     Text(if (own) tr("Reclaim") else tr("Claim"))
                 }
             }
             ClaimUi.Claiming -> {
-                Spinner()
-                Secondary(if (own) tr("Reclaiming…") else tr("Claiming…"))
+                // The open envelope stays above.
+                Message(if (own) tr("Reclaiming…") else tr("Claiming…"), MaterialTheme.typography.headlineSmall)
             }
             is ClaimUi.Done -> {
                 Disc(Icons.Default.Check, SuccessGreen)
@@ -407,13 +484,12 @@ private fun ClaimBody(
                 Spacer(Modifier.height(8.dp))
                 PrimaryButton(containerColor = sheetFill(), onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text(tr("Done")) }
             }
+            // The sealed envelope above, with today's message.
             ClaimUi.AlreadyClaimed -> {
-                Disc(Icons.Default.Check, MoneroTheme.colors.gray)
                 Message(tr("This link was already claimed."))
                 PrimaryButton(containerColor = sheetFill(), onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text(tr("Done")) }
             }
             ClaimUi.NoMoney -> {
-                Disc(Icons.Default.HourglassTop, MoneroTheme.colors.gray)
                 Message(tr("No money in this link yet."))
                 PrimaryButton(containerColor = sheetFill(), onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -421,7 +497,6 @@ private fun ClaimBody(
                 }
             }
             is ClaimUi.Error -> {
-                Disc(Icons.Default.Error, ErrorRed)
                 Message(tr("Could not check this link."))
                 state.message?.takeIf { it.isNotBlank() }?.let { Secondary(it) }
                 PrimaryButton(containerColor = sheetFill(), onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
@@ -445,11 +520,11 @@ private fun ClaimBody(
  * only shows where the money goes. Rows step up one fill so they never match the sheet in dark mode.
  */
 @Composable
-private fun DestinationRow(own: Boolean, chosen: ClaimDestination, canChoose: Boolean, onChoose: () -> Unit) {
+private fun DestinationRow(own: Boolean, chosen: ClaimDestination, canChoose: Boolean, onChoose: () -> Unit, modifier: Modifier = Modifier) {
     val label = if (own) tr("Reclaim to") else tr("Claim to")
     // TalkBack: "Claim to, Savings, 44AFFq5k…7nN3bWpQ", and with a choice, a button that chooses a wallet.
     val spoken = listOfNotNull(label, chosen.name, chosen.address?.let(::truncateMiddle)).joinToString(", ")
-    Column(Modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth()) {
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
@@ -551,10 +626,21 @@ private fun sheetFill(): Color = MaterialTheme.colorScheme.surfaceContainerHigh
 private fun sheetCircleFill(): Color =
     if (MoneroTheme.isDark) MaterialTheme.colorScheme.surfaceContainerHighest else CellFill
 
+/**
+ * The rest of the sheet waits for the envelope's card (link-card brief): text cross-fades in, and rows
+ * and buttons arrive (fade and a 20 dp rise; no rise under Reduce Motion). Shown from the start, it stays.
+ */
 @Composable
-private fun Spinner() {
-    Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(40.dp), strokeWidth = 3.dp)
+private fun arrival(shown: Boolean, rise: Boolean, reduceMotion: Boolean): Modifier {
+    val progress by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = if (rise) Motion.arrive() else Motion.crossFade(),
+        label = "arrival"
+    )
+    val lift = with(LocalDensity.current) { Motion.ARRIVE_RISE_DP.dp.toPx() }
+    return Modifier.graphicsLayer {
+        alpha = progress
+        if (rise && !reduceMotion) translationY = (1f - progress) * lift
     }
 }
 
@@ -569,10 +655,10 @@ private fun Disc(icon: ImageVector, hue: Color) {
 }
 
 @Composable
-private fun Amount(text: String, spoken: String? = null) {
+private fun Amount(text: String, spoken: String? = null, style: TextStyle = MaterialTheme.typography.headlineMedium) {
     Text(
         text,
-        style = MaterialTheme.typography.headlineMedium,
+        style = style,
         textAlign = TextAlign.Center,
         modifier = Modifier.semantics { if (spoken != null) contentDescription = spoken }
     )
@@ -580,21 +666,22 @@ private fun Amount(text: String, spoken: String? = null) {
 
 /** An estimate: "~" on screen, "About" for TalkBack (it would read "tilde"). */
 @Composable
-private fun EstimatedAmount(xmr: String) {
-    Amount(tr("~%s XMR", xmr), spoken = tr("About %s XMR", xmr))
+private fun EstimatedAmount(xmr: String, style: TextStyle = MaterialTheme.typography.headlineMedium) {
+    Amount(tr("~%s XMR", xmr), spoken = tr("About %s XMR", xmr), style = style)
 }
 
 @Composable
-private fun Message(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+private fun Message(text: String, style: TextStyle = MaterialTheme.typography.titleMedium) {
+    Text(text, style = style, textAlign = TextAlign.Center)
 }
 
 @Composable
-private fun Secondary(text: String) {
+private fun Secondary(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center
+        textAlign = TextAlign.Center,
+        modifier = modifier
     )
 }

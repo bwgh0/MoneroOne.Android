@@ -456,7 +456,9 @@ private fun TransactionListItem(
         onClick = onClick,
         linkBadge = link != null,
         walletBadge = name is SendName.ToWallet || name is SendName.FromWallet || name == SendName.ToThisWallet,
-        personBadge = name is SendName.ToContact
+        personBadge = name is SendName.ToContact,
+        confirmations = transaction.confirmations,
+        failed = transaction.isFailed
     ) {
         if (link != null) {
             LinkRowAmounts(link, transactionStatus(transaction))

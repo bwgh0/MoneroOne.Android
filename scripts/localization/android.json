@@ -2021,5 +2021,39 @@
     "uk": "Немає результатів",
     "zh-Hans": "无结果",
     "zh-Hant": "無結果"
+  },
+  "%s of 10 confirmations": {
+    "de": "%s von 10 Bestätigungen",
+    "es": "%s de 10 confirmaciones",
+    "fr": "Confirmations : %s sur 10",
+    "it": "Conferme: %s su 10",
+    "ja": "承認数 %s/10",
+    "ko": "확인 수 %s/10",
+    "nl": "%s van 10 bevestigingen",
+    "pl": "%s z 10 potwierdzeń",
+    "pt-BR": "%s de 10 confirmações",
+    "ro": "%s din 10 confirmări",
+    "ru": "%s из 10 подтверждений",
+    "tr": "%s/10 onay",
+    "uk": "%s з 10 підтверджень",
+    "zh-Hans": "确认数 %s/10",
+    "zh-Hant": "確認次數 %s/10"
+  },
+  "Waiting for your wallet to sync": {
+    "de": "Warte auf die Synchronisierung deiner Wallet",
+    "es": "Esperando a que tu cartera se sincronice",
+    "fr": "En attente de la synchronisation de votre portefeuille",
+    "it": "In attesa della sincronizzazione del portafoglio",
+    "ja": "ウォレットの同期を待機中",
+    "ko": "지갑 동기화 대기 중",
+    "nl": "Wachten tot je portemonnee is gesynchroniseerd",
+    "pl": "Oczekiwanie na synchronizację portfela",
+    "pt-BR": "Aguardando a sincronização da carteira",
+    "ro": "Se așteaptă sincronizarea portofelului",
+    "ru": "Ожидание синхронизации кошелька",
+    "tr": "Cüzdanınızın eşzamanlanması bekleniyor",
+    "uk": "Очікування синхронізації гаманця",
+    "zh-Hans": "正在等待钱包同步",
+    "zh-Hant": "正在等待錢包同步"
   }
 }

@@ -18,6 +18,7 @@
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$s 公里"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"半径 %1$s 公里"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s / %2$s 个单词"</string>
+    <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"确认数 %s/10"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%2$s：%1$s"</string>
     <string name="l10n_s_open_af891b0e" formatted="false">"%s 个未领取"</string>
     <string name="l10n_s_to_claim_4a220b89" formatted="false">"%1$s 待领取"</string>
@@ -1271,6 +1272,7 @@
     <string name="l10n_wait_for_your_wallet_to_finish_syncing_then_try_again_b26130ac" formatted="false">"请等待钱包同步完成，然后重试。"</string>
     <string name="l10n_waiting_6e293a8c" formatted="false">"等待中"</string>
     <string name="l10n_waiting_for_fee_estimate_44418c72" formatted="false">"正在等待手续费估算"</string>
+    <string name="l10n_waiting_for_your_wallet_to_sync_dcd5cbde" formatted="false">"正在等待钱包同步"</string>
     <string name="l10n_wallet_d1c9a01d" formatted="false">"钱包"</string>
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"钱包 %1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"钱包生日"</string>

@@ -18,6 +18,7 @@
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$s km"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"Raggio di %1$s km"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s parole su %2$s"</string>
+    <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"Conferme: %s su 10"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%1$s su %2$s"</string>
     <string name="l10n_s_open_af891b0e" formatted="false">"aperti: %s"</string>
     <string name="l10n_s_to_claim_4a220b89" formatted="false">"%1$s da riscattare"</string>
@@ -1271,6 +1272,7 @@
     <string name="l10n_wait_for_your_wallet_to_finish_syncing_then_try_again_b26130ac" formatted="false">"Attendi che il portafoglio finisca di sincronizzarsi, poi riprova."</string>
     <string name="l10n_waiting_6e293a8c" formatted="false">"In attesa"</string>
     <string name="l10n_waiting_for_fee_estimate_44418c72" formatted="false">"In attesa della stima della commissione"</string>
+    <string name="l10n_waiting_for_your_wallet_to_sync_dcd5cbde" formatted="false">"In attesa della sincronizzazione del portafoglio"</string>
     <string name="l10n_wallet_d1c9a01d" formatted="false">"Portafoglio"</string>
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"Portafoglio %1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"Data di nascita del portafoglio"</string>

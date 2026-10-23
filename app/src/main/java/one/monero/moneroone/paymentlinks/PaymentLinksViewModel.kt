@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import one.monero.moneroone.core.locale.tr
+import one.monero.moneroone.core.wallet.SendGate
 import one.monero.moneroone.core.wallet.WalletManager
 import timber.log.Timber
 
@@ -519,7 +520,7 @@ class PaymentLinksViewModel(application: Application) : AndroidViewModel(applica
      * check was conclusive.
      */
     fun checkLeftover(id: String) {
-        if (sweeping || _session.value != null || leftoverJob?.isActive == true || id in leftoverDone) return
+        if (sweeping || _session.value != null || sendOpen || leftoverJob?.isActive == true || id in leftoverDone) return
         val sent = store.sent(id)
         val received = if (sent == null) store.received(id) else null
         val settled = sent?.let(LinkStatusRules::isSettled) ?: received?.isSettled ?: return
@@ -536,8 +537,8 @@ class PaymentLinksViewModel(application: Application) : AndroidViewModel(applica
         val number = sent?.number ?: received?.number
         leftoverJob = viewModelScope.launch {
             sessionLock.withLock {
-                // A claim sheet or detail took the envelope runtime meanwhile.
-                if (_session.value != null) return@withLock
+                // A claim sheet or detail took the envelope runtime meanwhile, or Send opened.
+                if (_session.value != null || sendOpen) return@withLock
                 var opened: EnvelopeWallet? = null
                 try {
                     openChecked(id, link) { opened = it }?.let { snapshot ->
@@ -600,8 +601,8 @@ class PaymentLinksViewModel(application: Application) : AndroidViewModel(applica
      * [refreshSent] covers that filter.
      */
     suspend fun lookAtOpenLinks(walletId: String, walletIds: Set<String> = emptySet()) = coroutineScope {
-        if (refreshJob?.isActive == true || _session.value != null) {
-            Timber.d("PaymentLinks: open link check skipped: the envelope runtime is busy")
+        if (refreshJob?.isActive == true || _session.value != null || sendOpen) {
+            Timber.d("PaymentLinks: open link check skipped: the envelope runtime is busy or Send is open")
             return@coroutineScope
         }
         fillNetAmounts()
@@ -666,7 +667,7 @@ class PaymentLinksViewModel(application: Application) : AndroidViewModel(applica
         val wallet = walletHistory()
         for (link in due) {
             // A claim sheet or detail screen has the envelope runtime: leave it alone.
-            if (_session.value != null) return
+            if (_session.value != null || sendOpen) return
             sessionLock.withLock {
                 var opened: EnvelopeWallet? = null
                 try {
@@ -690,7 +691,7 @@ class PaymentLinksViewModel(application: Application) : AndroidViewModel(applica
         if (due.isEmpty()) return
         val wallet = walletHistory()
         for (record in due) {
-            if (_session.value != null) return
+            if (_session.value != null || sendOpen) return
             val link = record.link ?: continue
             sessionLock.withLock {
                 var opened: EnvelopeWallet? = null
@@ -732,7 +733,22 @@ class PaymentLinksViewModel(application: Application) : AndroidViewModel(applica
 
     /** Waits until the main wallet's kit runs and is synced again (after an envelope closed). */
     suspend fun awaitMainWalletSynced(timeoutMs: Long = 90_000): Boolean =
-        withTimeoutOrNull(timeoutMs) { WalletManager.syncStateFlow.first { it is SyncState.Synced } } != null
+        withTimeoutOrNull(timeoutMs) { SendGate.awaitReady() } != null
+
+    /** Open Send screens. A link check stops the main wallet, so none starts while Send is open. */
+    private var sendsOpen = 0
+
+    private val sendOpen: Boolean get() = sendsOpen > 0
+
+    /** Send opened: the link check that runs stops (its envelope closes, the main wallet starts again). */
+    fun sendOpened() {
+        sendsOpen++
+        openLookJob?.cancel()
+    }
+
+    fun sendClosed() {
+        sendsOpen = (sendsOpen - 1).coerceAtLeast(0)
+    }
 
     override fun onCleared() {
         super.onCleared()

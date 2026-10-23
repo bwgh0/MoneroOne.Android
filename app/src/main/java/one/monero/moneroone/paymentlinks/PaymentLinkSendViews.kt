@@ -1,12 +1,15 @@
 package one.monero.moneroone.paymentlinks
 
+import one.monero.moneroone.ui.screens.send.sendWaitHint
+import one.monero.moneroone.ui.screens.send.collectAsState
+import one.monero.moneroone.ui.screens.send.ValuePlaceholder
+import one.monero.moneroone.ui.screens.send.SendWaitGate
+import one.monero.moneroone.ui.screens.send.SendStatusSlot
+import one.monero.moneroone.ui.screens.send.FillIn
+import one.monero.moneroone.core.wallet.SendWait
+import androidx.compose.runtime.rememberUpdatedState
 import android.content.Context
-import android.content.Intent
 import android.view.MotionEvent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,11 +29,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,19 +52,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInteropFilter
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.horizontalsystems.monerokit.SignedTransaction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.ui.components.GlassCard
@@ -73,7 +70,6 @@ import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.MoneroOrange
-import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.WarningYellow
 import java.text.DateFormat
 import java.util.Date
@@ -127,13 +123,12 @@ private val PRE_BROADCAST_ERRORS = listOf(
     "Invalid amount"
 )
 
-/** Opens the system share sheet with the spec's share text. The link never goes to the clipboard. */
+/**
+ * Opens the system share sheet with the spec's share text, and the sealed envelope with the amount
+ * as its preview. The link never goes to the clipboard.
+ */
 internal fun shareLink(context: Context, amountXmr: String, link: PaymentLink) {
-    val send = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, shareText(amountXmr, link))
-    }
-    context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    shareLinkWithPreview(context, amountXmr, shareText(amountXmr, link))
 }
 
 /**
@@ -248,6 +243,10 @@ fun PaymentLinkReview(
      * transaction. Throws when the build fails.
      */
     prepareFunding: (address: String, amount: Long) -> SignedTransaction,
+    /** The wait for the main wallet: the link and its funding are built only once it runs and is synced. */
+    gate: SendWaitGate,
+    /** Retry on the status slot's offline or node banner. */
+    onRetryWait: () -> Unit,
     /** A new value builds the funding again (the one built here is gone). */
     rebuild: Int = 0,
     xmrPrice: Double?,
@@ -265,28 +264,27 @@ fun PaymentLinkReview(
     var tooMuch by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
+    // The link and its funding are being built, or wait for the wallet.
+    var building by remember { mutableStateOf(true) }
+    // The balance when the build starts: the wait for the wallet can outlast the one Review opened with.
+    val currentUnlocked by rememberUpdatedState(unlockedBalance)
+    val wait by gate.collectAsState()
 
-    LaunchedEffect(attempt, rebuild) {
-        error = null
-        prepared = null
-        tooMuch = false
-        networkFee = 0L
+    /** Builds the link and its funding. Returns the failure's message, or null. */
+    suspend fun build(): String? {
         try {
             val ready = draft ?: paymentLinks.prepare(amount).also { draft = it; onDraft(it) }
             // The reserve pays the claim's sweep (one input): wallet2's estimate fits it. The network fee is the
             // funding's own, built and signed here: the estimate counts one input, and the funding pays for each
             // input it spends. Send broadcasts this same transaction.
             val r = withContext(Dispatchers.IO) { estimateFee(ready.address, amount) }
-            if (r <= 0) {
-                error = tr("Fee estimation failed")
-                return@LaunchedEffect
-            }
+            if (r <= 0) return tr("Fee estimation failed")
             reserve = r
             val estimate = withContext(Dispatchers.IO) { estimateFee(ready.address, amount + r) }
-            if (estimate > 0 && amount + r + estimate > unlockedBalance) {
+            if (estimate > 0 && amount + r + estimate > currentUnlocked) {
                 networkFee = estimate
                 tooMuch = true
-                return@LaunchedEffect
+                return null
             }
             val built = try {
                 withContext(Dispatchers.IO) { prepareFunding(ready.address, amount + r) }
@@ -297,19 +295,42 @@ fun PaymentLinkReview(
                 if (e.message?.contains("not enough", ignoreCase = true) == true) {
                     networkFee = estimate
                     tooMuch = true
-                    return@LaunchedEffect
+                    return null
                 }
                 throw e
             }
             prepared = built
             networkFee = built.fee
-            if (built.fee <= 0) error = tr("Fee estimation failed")
+            return if (built.fee <= 0) tr("Fee estimation failed") else null
         } catch (e: CancellationException) {
             throw e
         } catch (e: EnvelopeMismatchException) {
-            error = tr("Could not create the link. Nothing was sent.")
+            return tr("Could not create the link. Nothing was sent.")
         } catch (e: Exception) {
-            error = e.message ?: tr("Fee estimation failed")
+            return e.message ?: tr("Fee estimation failed")
+        }
+    }
+
+    LaunchedEffect(attempt, rebuild) {
+        error = null
+        prepared = null
+        tooMuch = false
+        networkFee = 0L
+        building = true
+        try {
+            while (true) {
+                // The link needs the main wallet's height and the funding its outputs: wait until it runs and is
+                // synced (a link check stops it for a moment).
+                gate.awaitReady()
+                val failure = build()
+                // The wallet stopped while the link was built, or the network just came back: build again
+                // instead of failing.
+                if (failure != null && gate.retriesFailure()) continue
+                error = failure
+                break
+            }
+        } finally {
+            building = false
         }
     }
 
@@ -380,19 +401,17 @@ fun PaymentLinkReview(
 
                     RowDivider()
 
+                    // Gray placeholders hold each value until it is known; an error shows in the status slot.
+                    val valueStyle = MaterialTheme.typography.bodyMedium
                     ReviewRow(tr("Network Fee")) {
-                        when {
-                            error != null -> Text(tr("Error"), style = MaterialTheme.typography.bodyMedium, color = ErrorRed)
-                            !feeReady -> CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            else -> Text("${formatXmr(networkFee)} XMR", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        FillIn(feeReady, placeholder = { ValuePlaceholder(104.dp, valueStyle) }) {
+                            Text("${formatXmr(networkFee)} XMR", style = valueStyle, fontWeight = FontWeight.Medium)
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     ReviewRow(tr("Claim fee reserve")) {
-                        if (feeReady) {
-                            Text("${formatXmr(reserve)} XMR", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                        } else if (error == null) {
-                            CircularProgressIndicator(color = MoneroOrange, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        FillIn(feeReady, placeholder = { ValuePlaceholder(104.dp, valueStyle) }) {
+                            Text("${formatXmr(reserve)} XMR", style = valueStyle, fontWeight = FontWeight.Medium)
                         }
                     }
                     Text(
@@ -403,8 +422,9 @@ fun PaymentLinkReview(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     ReviewRow(tr("Expires")) {
-                        draft?.let {
-                            Text(formatLinkDate(it.expiry), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        val expiry = draft?.expiry
+                        FillIn(expiry != null, placeholder = { ValuePlaceholder(92.dp, valueStyle) }) {
+                            if (expiry != null) Text(formatLinkDate(expiry), style = valueStyle, fontWeight = FontWeight.Medium)
                         }
                     }
 
@@ -413,7 +433,15 @@ fun PaymentLinkReview(
                     Row(modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}) {
                         Text(tr("Total"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.weight(1f))
-                        if (feeReady) {
+                        FillIn(
+                            ready = feeReady,
+                            placeholder = {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    ValuePlaceholder(120.dp, MaterialTheme.typography.titleSmall)
+                                    if (xmrPrice != null) ValuePlaceholder(56.dp, MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        ) {
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
                                     "${formatXmr(total)} XMR",
@@ -441,23 +469,24 @@ fun PaymentLinkReview(
                     color = ErrorRed
                 )
             }
-            error?.let { message ->
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(message, style = MaterialTheme.typography.bodyMedium, color = ErrorRed)
-                Spacer(modifier = Modifier.height(8.dp))
-                PrimaryButton(onClick = { attempt++ }, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text(tr("Retry"))
-                }
-            }
             Spacer(modifier = Modifier.height(16.dp))
         }
+
+        // One status slot directly above Send: the wait for the wallet, or a real failure with Retry.
+        SendStatusSlot(
+            wait = wait,
+            pending = building,
+            error = error,
+            onRetryWait = onRetryWait,
+            onRetryBuild = { attempt++ }
+        )
 
         @OptIn(ExperimentalComposeUiApi::class)
         PrimaryButton(
             onClick = { draft?.let { onConfirm(it, reserve, prepared) } },
             modifier = Modifier
                 .fillMaxWidth()
+                .sendWaitHint(building && wait != SendWait.Ready)
                 .pointerInteropFilter { event -> (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0 },
             enabled = feeReady && !overBalance && prepared != null && !sendInProgress
         ) {
@@ -468,62 +497,11 @@ fun PaymentLinkReview(
     }
 }
 
-/** "Link ready" after the funding broadcast: Share (system share sheet) and Done. */
-@Composable
-fun PaymentLinkReadyPhase(link: PaymentLink, amountXmr: String, onDone: () -> Unit) {
-    val context = LocalContext.current
-    var showCheck by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { delay(200); showCheck = true }
-    val checkScale by animateFloatAsState(
-        if (showCheck) 1f else 0.3f,
-        spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-        label = "linkCheckScale"
-    )
-    val checkAlpha by animateFloatAsState(if (showCheck) 1f else 0f, tween(300), label = "linkCheckAlpha")
-
-    Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 32.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .graphicsLayer { scaleX = checkScale; scaleY = checkScale; alpha = checkAlpha }
-                    .clip(CircleShape)
-                    .background(SuccessGreen.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(80.dp))
-            }
-            Spacer(modifier = Modifier.height(40.dp))
-            Text(
-                tr("Link ready"),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = SuccessGreen
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "$amountXmr XMR",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            CautionBanner(bearerWarning)
-            Spacer(modifier = Modifier.height(32.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PrimaryButton(onClick = { shareLink(context, amountXmr, link) }, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text(tr("Share"))
-                }
-                PrimaryButton(onClick = onDone, modifier = Modifier.weight(1f)) {
-                    Text(tr("Done"))
-                }
-            }
-        }
-    }
-}
+/**
+ * The link Send funded, for its sending screen: the note's face (Fiat Mode, as the claim card),
+ * TalkBack's words for it, and Share.
+ */
+internal class LinkSendResult(val face: EnvelopeCardFace, val spoken: String, val onShare: () -> Unit)
 
 /** TalkBack: one spoken label for a status chip. */
 internal fun Modifier.spoken(label: String): Modifier = clearAndSetSemantics { contentDescription = label }

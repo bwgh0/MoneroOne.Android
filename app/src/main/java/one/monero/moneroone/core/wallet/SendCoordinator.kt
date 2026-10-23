@@ -43,12 +43,13 @@ class SendCoordinator {
         }
     }
 
+    /** [txHash]: the first txid of the broadcast transaction; the Sent screen shows it. */
     @Synchronized
-    fun finish(operation: Operation, error: String? = null) {
+    fun finish(operation: Operation, error: String? = null, txHash: String = "") {
         if (inFlight != operation) return
         inFlight = null
         if (mutableState.value is SendState.Sending && mutableState.value.flow == operation.flow) {
-            mutableState.value = if (error == null) SendState.Success(operation.flow, "")
+            mutableState.value = if (error == null) SendState.Success(operation.flow, txHash)
             else SendState.Error(operation.flow, error)
         }
     }
