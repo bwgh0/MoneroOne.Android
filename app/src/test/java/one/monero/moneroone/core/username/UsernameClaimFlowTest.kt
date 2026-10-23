@@ -128,6 +128,28 @@ class UsernameClaimFlowTest {
         }
     }
 
+    @Test fun aBlockedRegionClearsThePendingClaim() = assertRefusalClears("geo.blocked")
+
+    @Test fun anInvalidDeviceProofClearsThePendingClaim() = assertRefusalClears("device.invalid")
+
+    @Test fun anUnsupportedDeviceClearsThePendingClaim() = assertRefusalClears("device.unsupported")
+
+    @Test fun anUnavailableDeviceCheckKeepsThePendingClaim() {
+        api.claimError = "device.unavailable"
+        assertEquals("device.unavailable", code { claim(integrity = tokens(), developmentClaims = false) })
+        assertNotNull(api.savedAtPost)
+        assertNotNull(store.state.value.pending)
+    }
+
+    /** The registry refused before it wrote anything, so the next claim starts fresh. */
+    private fun assertRefusalClears(error: String) {
+        api.claimError = error
+        assertEquals(error, code { claim(integrity = tokens(), developmentClaims = false) })
+        assertNotNull(api.savedAtPost)
+        assertNull(store.state.value.pending)
+        assertNull(UsernameStore(disk).state.value.pending)
+    }
+
     @Test fun aServerErrorKeepsThePendingClaim() {
         api.claimError = "server"
         assertEquals("server", code { claim() })

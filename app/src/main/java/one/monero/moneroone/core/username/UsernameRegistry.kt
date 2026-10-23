@@ -206,7 +206,10 @@ class UsernameRegistry internal constructor(
             if (handle != pending.handle || !core.isOwnClaim(record, pending)) throw UsernameException("verification")
             return bind(record, pending, store)
         } catch (e: UsernameException) {
-            if (e.code in listOf("nonce.invalid", "device.slot_used", "name.unavailable")) store.savePending(null)
+            // The registry refused before it wrote anything: the claim is gone. A device check that
+            // was unavailable keeps it, as on iOS.
+            if (e.code in listOf("nonce.invalid", "device.slot_used", "name.unavailable", "geo.blocked", "device.invalid",
+                    "device.unsupported")) store.savePending(null)
             throw e
         }
     }
