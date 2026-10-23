@@ -380,10 +380,10 @@ fun WalletManagerRows(
     deleteCandidate?.let { candidate ->
         AlertDialog(
             onDismissRequest = { deleteCandidate = null },
-            title = { Text(tr("Remove \"%s\"?", candidate.name)) },
+            title = { Text(tr("Delete Wallet?")) },
             text = {
                 Text(
-                    tr("This removes the wallet from this device only. It still exists on the blockchain and can be recovered with its seed phrase.")
+                    tr("This removes the wallet from this device. You can recover it with the seed phrase.")
                 )
             },
             confirmButton = {
@@ -401,7 +401,7 @@ fun WalletManagerRows(
                         deleteCandidate = null
                     }
                 ) {
-                    Text(tr("Remove"), color = ErrorRed)
+                    Text(tr("Delete"), color = ErrorRed)
                 }
             },
             dismissButton = {
