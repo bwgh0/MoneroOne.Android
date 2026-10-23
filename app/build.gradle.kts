@@ -19,6 +19,16 @@ val keystoreProperties = Properties().apply {
 fun usernameSetting(name: String): String = "\"" + providers.gradleProperty(name).orElse("").get()
     .replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "").replace("\r", "") + "\""
 
+// The Google Cloud project number for Play Integrity, from the Gradle property or the environment
+// variable PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER. Empty by default: a release build then claims no
+// username, and a debug build sends the development device proof.
+fun playIntegrityCloudProjectNumber(): String {
+    val name = "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
+    val value = providers.gradleProperty(name).orElse(providers.environmentVariable(name)).orElse("").get().trim()
+    require(value.all { it in '0'..'9' }) { "$name must hold digits only" }
+    return "\"" + value + "\""
+}
+
 android {
     namespace = "one.monero.moneroone"
     compileSdk = 36
@@ -51,6 +61,7 @@ android {
         buildConfigField("String", "USERNAME_RULES_HASH", "\"\"")
         buildConfigField("String", "USERNAME_MIRROR_URL", "\"\"")
         buildConfigField("String", "USERNAME_GENESIS_ROOT", "\"\"")
+        buildConfigField("String", "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER", playIntegrityCloudProjectNumber())
     }
 
     buildTypes {
@@ -163,6 +174,9 @@ dependencies {
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
+
+    // Username claims: the device check (Play Integrity, standard API)
+    implementation(libs.play.integrity)
 
     // Logging
     implementation(libs.timber)

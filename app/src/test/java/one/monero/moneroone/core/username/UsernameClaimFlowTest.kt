@@ -7,6 +7,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import one.monero.moneroone.BuildConfig
 import org.junit.Test
 import java.io.IOException
 
@@ -19,15 +20,24 @@ class UsernameClaimFlowTest {
     private val signed = mutableListOf<Pair<String, String>>()
     private var current = true
     private var changeWalletAfterSubaddress = false
+    private var claimKeys = 0
+    /** The request hashes that the phone asked Play Integrity to sign. */
+    private val requestHashes = mutableListOf<String>()
 
-    private fun claim(handle: String = "Joe", wallet: String = "wallet-a", developmentClaims: Boolean = true): UsernameBinding = runBlocking {
-        testRegistry(api, developmentClaims = developmentClaims).claim(handle, wallet, "mainnet", store,
+    private fun claim(handle: String = "Joe", wallet: String = "wallet-a", developmentClaims: Boolean = true,
+                      integrity: IntegrityTokenSource? = null): UsernameBinding = runBlocking {
+        testRegistry(api, developmentClaims = developmentClaims, integrity = integrity).claim(handle, wallet, "mainnet", store,
             makeSubaddress = {
                 "subaddress-${made.size + 1}".also { made += it; if (changeWalletAfterSubaddress) current = false }
             },
             sign = { message, address -> signed += message to address; "signature" },
+            // Made from the wallet at each claim, as the app does.
+            claimKey = { claimKeys++; UsernameDeviceProof.claimKey(testViewKey) },
             isCurrentWallet = { current })
     }
+
+    private fun tokens(token: String = "token") = IntegrityTokenSource { requestHashes += it; token }
+    private fun failing(failure: IntegrityFailure) = IntegrityTokenSource { throw IntegrityTokenException(failure) }
 
     private fun failure(block: () -> Unit): Exception {
         try { block() } catch (e: Exception) { return e }
@@ -139,5 +149,51 @@ class UsernameClaimFlowTest {
     @Test fun aReleaseBuildPostsNoDevelopmentClaim() {
         assertEquals("not_configured", code { claim(developmentClaims = false) })
         assertEquals(0, api.claims)
+        assertNull(store.state.value.pending)
+        assertEquals(0, claimKeys)
     }
+
+    @Test fun aDebugBuildWithoutACloudProjectSendsTheDevelopmentProof() {
+        claim()
+        if (BuildConfig.DEBUG) {
+            assertEquals(UsernameDeviceProof.development(store.state.value.deviceId), api.device)
+            assertEquals(0, claimKeys)
+        }
+    }
+
+    @Test fun aPlayIntegrityClaimSendsTheTokenAndTheClaimKey() {
+        val binding = claim(integrity = tokens("integrity-token"), developmentClaims = false)
+        val saved = present(api.savedAtPost)
+        val digest = UsernameDeviceProof.claimDigest(saved)
+        assertEquals(listOf(UsernameDeviceProof.requestHash(digest)), requestHashes)
+        assertEquals(UsernameDeviceProof.android("integrity-token", testClaimKey), api.device)
+        assertEquals(1, claimKeys)
+        assertEquals("joe", binding.handle)
+    }
+
+    @Test fun aRetryOfTheSameClaimSendsTheSameClaimKey() {
+        api.loseReply = true
+        failure { claim(integrity = tokens(), developmentClaims = false) }
+        val first = present(api.device)
+        api.handles.clear()
+        api.loseReply = false
+        claim(integrity = tokens(), developmentClaims = false)
+        val second = present(api.device)
+        assertEquals(proofClaimKey(first), proofClaimKey(second))
+        // A new nonce binds the retry, so its token asks for another hash.
+        assertEquals(2, requestHashes.distinct().size)
+    }
+
+    @Test fun aPhoneThatCannotMakeATokenSavesNoPendingClaim() {
+        for ((failure, release) in listOf(IntegrityFailure.PERMANENT to "device.unsupported", IntegrityFailure.TRANSIENT to "device.unavailable",
+                                          IntegrityFailure.NOT_CONFIGURED to "not_configured")) {
+            assertEquals(release, code { claim(integrity = failing(failure), developmentClaims = false) })
+            assertNull(store.state.value.pending)
+        }
+        assertEquals(0, api.claims)
+    }
+
+    private fun proofClaimKey(device: DeviceProof): String =
+        kotlinx.serialization.json.Json.parseToJsonElement(String(java.util.Base64.getUrlDecoder().decode(device.proof)))
+            .let { (it as kotlinx.serialization.json.JsonObject)["claim_key"].toString() }
 }

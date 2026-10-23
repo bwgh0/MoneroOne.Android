@@ -1,5 +1,6 @@
 package one.monero.moneroone.core.username
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,7 +10,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import one.monero.moneroone.BuildConfig
 import org.json.JSONObject
 import java.net.URI
-import java.util.Base64
 import java.util.concurrent.TimeUnit
 
 data class UsernameConfiguration(val url: String, val registrarKey: String, val rulesHash: String) {
@@ -33,7 +33,7 @@ interface UsernameRegistryApi {
     suspend fun records(handle: String): List<String>?
     suspend fun nonce(handle: String, subaddress: String): String
     /** Posts the signed claim. Returns the handle and the record the registry admitted. */
-    suspend fun claim(pending: PendingUsernameClaim, deviceProof: String): Pair<String, String>
+    suspend fun claim(pending: PendingUsernameClaim, device: DeviceProof): Pair<String, String>
 }
 
 /** The shared Rust core's claim operations. Unit tests replace it. */
@@ -82,9 +82,9 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
     override suspend fun nonce(handle: String, subaddress: String): String =
         JSONObject(request("nonce", json("handle" to handle, "subaddress" to subaddress))).getString("nonce")
 
-    override suspend fun claim(pending: PendingUsernameClaim, deviceProof: String): Pair<String, String> {
+    override suspend fun claim(pending: PendingUsernameClaim, device: DeviceProof): Pair<String, String> {
         val response = JSONObject(request("claims", json("nonce" to pending.nonce, "record" to pending.unsignedRecord,
-            "owner_signature" to pending.ownerSignature, "device" to json("platform" to "dev", "proof" to deviceProof),
+            "owner_signature" to pending.ownerSignature, "device" to json("platform" to device.platform, "proof" to device.proof),
             "terms_version" to "local-development-v1")))
         return response.optString("handle") to response.getString("record")
     }
@@ -105,15 +105,16 @@ private object OahClaimCore : UsernameClaimCore {
     } catch (_: Exception) { false }
 }
 
-/** Local development claim client. All record construction and verification is in oah-core. */
+/** The claim client. All record construction and verification is in oah-core. */
 class UsernameRegistry internal constructor(
     private val configuration: UsernameConfiguration,
     private val api: UsernameRegistryApi,
     private val core: UsernameClaimCore,
-    private val developmentClaims: Boolean,
+    private val deviceGate: UsernameDeviceGate,
 ) {
-    constructor(configuration: UsernameConfiguration) :
-        this(configuration, HttpUsernameRegistryApi(configuration), OahClaimCore, BuildConfig.DEBUG)
+    constructor(configuration: UsernameConfiguration, context: Context) :
+        this(configuration, HttpUsernameRegistryApi(configuration), OahClaimCore,
+            UsernameDeviceGate(BuildConfig.DEBUG, PlayIntegrityTokenSource.forBuild(context)))
 
     /** What a re-check of a saved pending claim found. */
     private sealed interface Recheck {
@@ -123,9 +124,10 @@ class UsernameRegistry internal constructor(
         data class Cleared(val taken: Boolean) : Recheck
     }
 
+    /** [claimKey] gives the claiming wallet's claim key ([UsernameDeviceProof.claimKey]). */
     suspend fun claim(displayHandle: String, walletKey: String, network: String, store: UsernameStore,
                       makeSubaddress: suspend () -> String, sign: suspend (String, String) -> String,
-                      isCurrentWallet: () -> Boolean): UsernameBinding {
+                      claimKey: suspend () -> String, isCurrentWallet: () -> Boolean): UsernameBinding {
         if (!isCurrentWallet() || walletKey.isEmpty()) throw UsernameException("wallet_changed")
         if (store.storageError) throw UsernameException("storage")
         if (!store.claimMutex.tryLock()) throw UsernameException("pending")
@@ -167,9 +169,12 @@ class UsernameRegistry internal constructor(
             if (!isCurrentWallet()) throw UsernameException("wallet_changed")
             val pending = PendingUsernameClaim(walletKey, network, handle, displayHandle, address, nonce,
                 record, recordHash, signature, configuration.registrarKey, rules, configuration.rulesHash)
+            // The device proof comes first: a phone that cannot claim saves no pending claim.
+            val device = deviceGate.proof(pending, store.state.value.deviceId, claimKey)
+            if (!isCurrentWallet()) throw UsernameException("wallet_changed")
             // Saved before the POST: after a lost reply, the next claim re-checks this exact signed genesis.
             store.savePending(pending)
-            return submit(pending, store)
+            return submit(pending, device, store)
         } finally { store.claimMutex.unlock() }
     }
 
@@ -195,11 +200,9 @@ class UsernameRegistry internal constructor(
         return Recheck.Cleared(taken = true)
     }
 
-    private suspend fun submit(pending: PendingUsernameClaim, store: UsernameStore): UsernameBinding {
-        if (!developmentClaims) throw UsernameException("not_configured")
+    private suspend fun submit(pending: PendingUsernameClaim, device: DeviceProof, store: UsernameStore): UsernameBinding {
         try {
-            val proof = Base64.getUrlEncoder().withoutPadding().encodeToString(store.state.value.deviceId.toByteArray(Charsets.UTF_8))
-            val (handle, record) = api.claim(pending, proof)
+            val (handle, record) = api.claim(pending, device)
             if (handle != pending.handle || !core.isOwnClaim(record, pending)) throw UsernameException("verification")
             return bind(record, pending, store)
         } catch (e: UsernameException) {

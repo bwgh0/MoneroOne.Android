@@ -2438,6 +2438,21 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         signature
     }
 
+    /** The claiming wallet's username claim key, made from its private view key. Never log or store it. */
+    suspend fun usernameClaimKey(expectedSession: Long): String = walletMutationMutex.withLock {
+        val info = _activeWallet.value ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        val kit = WalletManager.kit ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        if (_isLocked.value || _walletSessionId.value != expectedSession || info.isViewOnly || info.deviceWalletId != null ||
+            WalletManager.currentWalletId != info.derivedWalletId) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        val viewKey = withContext(Dispatchers.IO) { kit.getKeys()?.privateViewKey }
+            ?.takeIf { Regex("[0-9a-fA-F]{64}").matches(it) }
+            ?.chunked(2)?.map { it.toInt(16).toByte() }?.toByteArray()
+            ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        val claimKey = try { one.monero.moneroone.core.username.UsernameDeviceProof.claimKey(viewKey) } finally { viewKey.fill(0) }
+        if (_isLocked.value || _walletSessionId.value != expectedSession) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        claimKey
+    }
+
     private suspend fun createSubaddressLocked(walletId: String, manual: Boolean): Boolean {
         val info = _activeWallet.value?.takeIf { it.id == walletId } ?: return false
         val kit = WalletManager.kit ?: return false

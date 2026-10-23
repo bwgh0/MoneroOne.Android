@@ -1,6 +1,7 @@
 package one.monero.moneroone.core.username
 
 import java.io.IOException
+import java.util.Base64
 
 /** In-memory persistence for [UsernameStore]. */
 internal class MemoryUsernames : UsernamePersistence {
@@ -25,6 +26,8 @@ internal class FakeRegistryApi : UsernameRegistryApi {
     var afterRecords: (() -> Unit)? = null
     /** The pending claim saved on the phone when the POST went out. */
     var savedAtPost: PendingUsernameClaim? = null
+    /** The device object of the last POST. */
+    var device: DeviceProof? = null
     var store: UsernameStore? = null
     private var nonces = 0
 
@@ -34,11 +37,13 @@ internal class FakeRegistryApi : UsernameRegistryApi {
         reach()
         return handles[handle].also { afterRecords?.invoke() }
     }
-    override suspend fun nonce(handle: String, subaddress: String): String { reach(); return "nonce-${++nonces}" }
-    override suspend fun claim(pending: PendingUsernameClaim, deviceProof: String): Pair<String, String> {
+    /** 32 bytes in lowercase hex, as the registry sends them. */
+    override suspend fun nonce(handle: String, subaddress: String): String { reach(); return "%064x".format(++nonces) }
+    override suspend fun claim(pending: PendingUsernameClaim, device: DeviceProof): Pair<String, String> {
         reach()
         claims++
         savedAtPost = store?.state?.value?.pending
+        this.device = device
         claimError?.let { throw UsernameException(it) }
         if (pending.handle in handles) throw UsernameException("name.unavailable")
         val record = "admitted:${pending.recordHash}"
@@ -51,12 +56,21 @@ internal class FakeRegistryApi : UsernameRegistryApi {
 /** Stands in for the Rust core: a record belongs to a claim when it carries the claim's hash. */
 internal object FakeClaimCore : UsernameClaimCore {
     override fun normalize(input: String) = input.lowercase()
+    /** The unsigned record is base64url without padding, as the core makes it. */
     override fun prepare(handle: String, subaddress: String, nonce: String, network: String, rules: String, rulesHash: String) =
-        Triple("record:$handle:$subaddress:$nonce", "hash:$handle:$subaddress:$nonce", "message:$handle")
+        Triple(Base64.getUrlEncoder().withoutPadding().encodeToString("record:$handle:$subaddress:$nonce".toByteArray()),
+            "hash:$handle:$subaddress:$nonce", "message:$handle")
     override fun isOwnClaim(record: String, pending: PendingUsernameClaim) = record == "admitted:${pending.recordHash}"
 }
 
 internal val testConfiguration = UsernameConfiguration("http://localhost:8787", "a".repeat(64), "b".repeat(64))
 
-internal fun testRegistry(api: FakeRegistryApi, configuration: UsernameConfiguration = testConfiguration, developmentClaims: Boolean = true) =
-    UsernameRegistry(configuration, api, FakeClaimCore, developmentClaims)
+/** The test wallet's private view key: the bytes 0x00 to 0x1f. */
+internal val testViewKey get() = ByteArray(32) { it.toByte() }
+/** Its claim key: the shared test vector of both apps. */
+internal const val testClaimKey = "6f19b34dced9cf703d2e0222e085d6a475695543cce6b912af942a541524ba6a"
+
+/** [developmentClaims] is a debug build; [integrity] null is a build without a cloud project number. */
+internal fun testRegistry(api: FakeRegistryApi, configuration: UsernameConfiguration = testConfiguration, developmentClaims: Boolean = true,
+                          integrity: IntegrityTokenSource? = null) =
+    UsernameRegistry(configuration, api, FakeClaimCore, UsernameDeviceGate(developmentClaims, integrity))
