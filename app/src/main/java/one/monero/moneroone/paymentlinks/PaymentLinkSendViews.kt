@@ -336,7 +336,9 @@ fun PaymentLinkReview(
 
     val feeReady = error == null && reserve > 0 && networkFee > 0 && draft != null && (prepared != null || tooMuch)
     val total = amount + reserve + networkFee
-    val overBalance = feeReady && (tooMuch || total > unlockedBalance)
+    // Only the build says the funds fall short (as on iOS): the unlocked balance drops while the funding commits,
+    // and Review is still on screen then.
+    val overBalance = feeReady && tooMuch
 
     fun fiat(atomic: Long): String? = xmrPrice?.let { "≈ $currencySymbol${"%.2f".format(atomic / 1_000_000_000_000.0 * it)}" }
 
