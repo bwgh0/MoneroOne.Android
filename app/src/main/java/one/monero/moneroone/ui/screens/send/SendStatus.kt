@@ -115,7 +115,7 @@ internal fun SendStatusPhase(
     txHash: String,
     onDone: () -> Unit,
     link: LinkSendResult? = null,
-    /** Under "Sent!": where a Transfer shows next ("It shows in Savings when you next open that wallet."). */
+    /** Under the transaction ID: where a Transfer shows next ("It shows in Savings when you next open that wallet."). */
     note: String? = null
 ) {
     val reduceMotion = rememberReduceMotion()
@@ -233,6 +233,11 @@ internal fun SendStatusPhase(
                             color = SuccessGreen,
                             modifier = Modifier.arrive(sentIn.value, reduceMotion)
                         )
+                        if (txHash.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HashPill(txHash, Modifier.arrive(pillIn.value, reduceMotion))
+                        }
+                        // Under the transaction ID, with it, as on iOS.
                         if (note != null) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
@@ -240,12 +245,8 @@ internal fun SendStatusPhase(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.arrive(sentIn.value, reduceMotion)
+                                modifier = Modifier.arrive(pillIn.value, reduceMotion)
                             )
-                        }
-                        if (txHash.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HashPill(txHash, Modifier.arrive(pillIn.value, reduceMotion))
                         }
                     }
                 }
