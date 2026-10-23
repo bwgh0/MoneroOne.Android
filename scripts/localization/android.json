@@ -2038,5 +2038,39 @@
     "uk": "Відкрити картку вашого імені користувача",
     "zh-Hans": "打开你的用户名卡片",
     "zh-Hant": "打開你的使用者名稱卡片"
+  },
+  "Username registration isn't available in your region.": {
+    "de": "Die Registrierung von Benutzernamen ist in deiner Region nicht verfügbar.",
+    "es": "El registro de nombres de usuario no está disponible en tu región.",
+    "fr": "L’enregistrement des noms d’utilisateur n’est pas disponible dans votre région.",
+    "it": "La registrazione dei nomi utente non è disponibile nella tua zona.",
+    "ja": "お住まいの地域ではユーザ名の登録は利用できません。",
+    "ko": "이 지역에서는 사용자 이름 등록을 사용할 수 없습니다.",
+    "nl": "Registratie van gebruikersnamen is niet beschikbaar in jouw regio.",
+    "pl": "Rejestracja nazw użytkownika nie jest dostępna w Twoim regionie.",
+    "pt-BR": "O registro de nomes de usuário não está disponível na sua região.",
+    "ro": "Înregistrarea numelor de utilizator nu este disponibilă în regiunea ta.",
+    "ru": "Регистрация имён пользователей недоступна в вашем регионе.",
+    "tr": "Kullanıcı adı kaydı bölgenizde kullanılamıyor.",
+    "uk": "Реєстрація імен користувачів недоступна у вашому регіоні.",
+    "zh-Hans": "你所在的地区不提供用户名注册。",
+    "zh-Hant": "你所在的地區不提供使用者名稱註冊。"
+  },
+  "This phone can't claim a username.": {
+    "de": "Mit diesem Telefon kann kein Benutzername registriert werden.",
+    "es": "Este teléfono no puede reservar un nombre de usuario.",
+    "fr": "Ce téléphone ne peut pas réserver de nom d’utilisateur.",
+    "it": "Questo telefono non può richiedere un nome utente.",
+    "ja": "この端末ではユーザ名を取得できません。",
+    "ko": "이 휴대폰에서는 사용자 이름을 등록할 수 없습니다.",
+    "nl": "Met deze telefoon kun je geen gebruikersnaam claimen.",
+    "pl": "Na tym telefonie nie można zarezerwować nazwy użytkownika.",
+    "pt-BR": "Este telefone não pode reservar um nome de usuário.",
+    "ro": "Pe acest telefon nu se poate rezerva un nume de utilizator.",
+    "ru": "На этом телефоне нельзя зарегистрировать имя пользователя.",
+    "tr": "Bu telefonda kullanıcı adı talep edilemiyor.",
+    "uk": "На цьому телефоні не можна зареєструвати ім’я користувача.",
+    "zh-Hans": "此手机无法注册用户名。",
+    "zh-Hant": "此手機無法註冊使用者名稱。"
   }
 }

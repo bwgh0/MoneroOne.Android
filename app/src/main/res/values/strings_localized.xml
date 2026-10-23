@@ -1131,6 +1131,7 @@
     <string name="l10n_this_name_lists_more_than_one_monero_address_a3832633" formatted="false">"This name lists more than one Monero address"</string>
     <string name="l10n_this_name_uses_a_payment_id_which_monero_no_longer_supp_ca5f6521" formatted="false">"This name uses a payment ID, which Monero no longer supports. Ask the recipient for a subaddress or an integrated address."</string>
     <string name="l10n_this_node_is_already_in_the_list_0720642a" formatted="false">"This node is already in the list"</string>
+    <string name="l10n_this_phone_can_t_claim_a_username_0111694b" formatted="false">"This phone can\'t claim a username."</string>
     <string name="l10n_this_protects_you_from_wallet_activity_on_untrusted_net_91dd1d1c" formatted="false">"This protects you from wallet activity on untrusted networks like public Wi-Fi or unknown locations."</string>
     <string name="l10n_this_recovery_phrase_does_not_match_any_of_these_wallet_0982b5b5" formatted="false">"This recovery phrase does not match any of these wallets."</string>
     <string name="l10n_this_recovery_phrase_is_for_a_different_wallet_enter_th_e885dc87" formatted="false">"This recovery phrase is for a different wallet. Enter the phrase for \"%s\"."</string>
@@ -1244,6 +1245,7 @@
     <string name="l10n_username_payments_aren_t_available_yet_8c9ff4b9" formatted="false">"Username payments aren\'t available yet"</string>
     <string name="l10n_username_records_are_out_of_date_1faf1d01" formatted="false">"Username records are out of date"</string>
     <string name="l10n_username_records_are_out_of_date_the_payment_limit_is_0_e13a7638" formatted="false">"Username records are out of date. The payment limit is 0.1 XMR."</string>
+    <string name="l10n_username_registration_isn_t_available_in_your_region_afc916b1" formatted="false">"Username registration isn\'t available in your region."</string>
     <string name="l10n_username_registration_isn_t_available_yet_b5686202" formatted="false">"Username registration isn\'t available yet."</string>
     <string name="l10n_username_signature_check_failed_do_not_send_to_this_add_f578e341" formatted="false">"Username signature check failed. Do not send to this address."</string>
     <string name="l10n_usernames_are_permanent_86694470" formatted="false">"Usernames are permanent."</string>

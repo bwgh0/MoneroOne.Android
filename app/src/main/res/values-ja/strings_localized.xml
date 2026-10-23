@@ -1131,6 +1131,7 @@
     <string name="l10n_this_name_lists_more_than_one_monero_address_a3832633" formatted="false">"この名前には複数のMoneroアドレスが登録されています"</string>
     <string name="l10n_this_name_uses_a_payment_id_which_monero_no_longer_supp_ca5f6521" formatted="false">"この名前はペイメントIDを使用していますが、Moneroではサポートされなくなりました。受取人にサブアドレスまたは統合アドレスを依頼してください。"</string>
     <string name="l10n_this_node_is_already_in_the_list_0720642a" formatted="false">"このノードはすでにリストにあります"</string>
+    <string name="l10n_this_phone_can_t_claim_a_username_0111694b" formatted="false">"この端末ではユーザ名を取得できません。"</string>
     <string name="l10n_this_protects_you_from_wallet_activity_on_untrusted_net_91dd1d1c" formatted="false">"公衆Wi-Fiや不明な場所など、信頼できないネットワークでのウォレットのアクティビティから保護します。"</string>
     <string name="l10n_this_recovery_phrase_does_not_match_any_of_these_wallet_0982b5b5" formatted="false">"このシードフレーズは、これらのどのウォレットとも一致しません。"</string>
     <string name="l10n_this_recovery_phrase_is_for_a_different_wallet_enter_th_e885dc87" formatted="false">"このシードフレーズは別のウォレットのものです。「%1$s」のシードフレーズを入力してください。"</string>
@@ -1244,6 +1245,7 @@
     <string name="l10n_username_payments_aren_t_available_yet_8c9ff4b9" formatted="false">"ユーザ名への支払いはまだ利用できません"</string>
     <string name="l10n_username_records_are_out_of_date_1faf1d01" formatted="false">"ユーザ名の記録が古くなっています"</string>
     <string name="l10n_username_records_are_out_of_date_the_payment_limit_is_0_e13a7638" formatted="false">"ユーザ名の記録が古くなっています。支払い上限は 0.1 XMR です。"</string>
+    <string name="l10n_username_registration_isn_t_available_in_your_region_afc916b1" formatted="false">"お住まいの地域ではユーザ名の登録は利用できません。"</string>
     <string name="l10n_username_registration_isn_t_available_yet_b5686202" formatted="false">"ユーザ名の登録はまだ利用できません。"</string>
     <string name="l10n_username_signature_check_failed_do_not_send_to_this_add_f578e341" formatted="false">"ユーザ名の署名の確認に失敗しました。このアドレスには送金しないでください。"</string>
     <string name="l10n_usernames_are_permanent_86694470" formatted="false">"ユーザ名は永続的です。"</string>

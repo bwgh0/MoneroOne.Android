@@ -1131,6 +1131,7 @@
     <string name="l10n_this_name_lists_more_than_one_monero_address_a3832633" formatted="false">"Este nome lista mais de um endereço Monero"</string>
     <string name="l10n_this_name_uses_a_payment_id_which_monero_no_longer_supp_ca5f6521" formatted="false">"Este nome usa um ID de pagamento, que o Monero não aceita mais. Peça ao destinatário um subendereço ou um endereço integrado."</string>
     <string name="l10n_this_node_is_already_in_the_list_0720642a" formatted="false">"Este nó já está na lista"</string>
+    <string name="l10n_this_phone_can_t_claim_a_username_0111694b" formatted="false">"Este telefone não pode reservar um nome de usuário."</string>
     <string name="l10n_this_protects_you_from_wallet_activity_on_untrusted_net_91dd1d1c" formatted="false">"Isso protege você contra atividade da carteira em redes não confiáveis, como Wi-Fi público, ou em locais desconhecidos."</string>
     <string name="l10n_this_recovery_phrase_does_not_match_any_of_these_wallet_0982b5b5" formatted="false">"Esta frase-semente não corresponde a nenhuma destas carteiras."</string>
     <string name="l10n_this_recovery_phrase_is_for_a_different_wallet_enter_th_e885dc87" formatted="false">"Esta frase-semente é de outra carteira. Digite a frase de “%1$s”."</string>
@@ -1244,6 +1245,7 @@
     <string name="l10n_username_payments_aren_t_available_yet_8c9ff4b9" formatted="false">"Pagamentos para nomes de usuário ainda não estão disponíveis"</string>
     <string name="l10n_username_records_are_out_of_date_1faf1d01" formatted="false">"Os dados de nomes de usuário estão desatualizados"</string>
     <string name="l10n_username_records_are_out_of_date_the_payment_limit_is_0_e13a7638" formatted="false">"Os dados de nomes de usuário estão desatualizados. O limite de pagamento é de 0.1 XMR."</string>
+    <string name="l10n_username_registration_isn_t_available_in_your_region_afc916b1" formatted="false">"O registro de nomes de usuário não está disponível na sua região."</string>
     <string name="l10n_username_registration_isn_t_available_yet_b5686202" formatted="false">"O registro de nomes de usuário ainda não está disponível."</string>
     <string name="l10n_username_signature_check_failed_do_not_send_to_this_add_f578e341" formatted="false">"Falha na verificação da assinatura do nome de usuário. Não envie para este endereço."</string>
     <string name="l10n_usernames_are_permanent_86694470" formatted="false">"Nomes de usuário são permanentes."</string>

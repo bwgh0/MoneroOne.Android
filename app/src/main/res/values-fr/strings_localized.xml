@@ -1131,6 +1131,7 @@
     <string name="l10n_this_name_lists_more_than_one_monero_address_a3832633" formatted="false">"Ce nom indique plusieurs adresses Monero"</string>
     <string name="l10n_this_name_uses_a_payment_id_which_monero_no_longer_supp_ca5f6521" formatted="false">"Ce nom utilise un ID de paiement, que Monero ne prend plus en charge. Demandez au destinataire une sous-adresse ou une adresse intégrée."</string>
     <string name="l10n_this_node_is_already_in_the_list_0720642a" formatted="false">"Ce nœud est déjà dans la liste"</string>
+    <string name="l10n_this_phone_can_t_claim_a_username_0111694b" formatted="false">"Ce téléphone ne peut pas réserver de nom d’utilisateur."</string>
     <string name="l10n_this_protects_you_from_wallet_activity_on_untrusted_net_91dd1d1c" formatted="false">"Cela vous protège de l’activité du portefeuille sur des réseaux non fiables, comme un Wi-Fi public ou des lieux inconnus."</string>
     <string name="l10n_this_recovery_phrase_does_not_match_any_of_these_wallet_0982b5b5" formatted="false">"Cette phrase de récupération ne correspond à aucun de ces portefeuilles."</string>
     <string name="l10n_this_recovery_phrase_is_for_a_different_wallet_enter_th_e885dc87" formatted="false">"Cette phrase de récupération correspond à un autre portefeuille. Saisissez la phrase de « %1$s »."</string>
@@ -1244,6 +1245,7 @@
     <string name="l10n_username_payments_aren_t_available_yet_8c9ff4b9" formatted="false">"Les paiements vers un nom d’utilisateur ne sont pas encore disponibles"</string>
     <string name="l10n_username_records_are_out_of_date_1faf1d01" formatted="false">"Les registres de noms d’utilisateur sont obsolètes"</string>
     <string name="l10n_username_records_are_out_of_date_the_payment_limit_is_0_e13a7638" formatted="false">"Les registres de noms d’utilisateur sont obsolètes. La limite de paiement est de 0.1 XMR."</string>
+    <string name="l10n_username_registration_isn_t_available_in_your_region_afc916b1" formatted="false">"L’enregistrement des noms d’utilisateur n’est pas disponible dans votre région."</string>
     <string name="l10n_username_registration_isn_t_available_yet_b5686202" formatted="false">"L’enregistrement des noms d’utilisateur n’est pas encore disponible."</string>
     <string name="l10n_username_signature_check_failed_do_not_send_to_this_add_f578e341" formatted="false">"La vérification de la signature du nom d’utilisateur a échoué. N’envoyez rien à cette adresse."</string>
     <string name="l10n_usernames_are_permanent_86694470" formatted="false">"Les noms d’utilisateur sont définitifs."</string>

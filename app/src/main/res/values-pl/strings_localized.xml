@@ -1131,6 +1131,7 @@
     <string name="l10n_this_name_lists_more_than_one_monero_address_a3832633" formatted="false">"Ta nazwa podaje więcej niż jeden adres Monero"</string>
     <string name="l10n_this_name_uses_a_payment_id_which_monero_no_longer_supp_ca5f6521" formatted="false">"Ta nazwa używa ID płatności, którego Monero już nie obsługuje. Poproś odbiorcę o podadres lub adres zintegrowany."</string>
     <string name="l10n_this_node_is_already_in_the_list_0720642a" formatted="false">"Ten węzeł jest już na liście"</string>
+    <string name="l10n_this_phone_can_t_claim_a_username_0111694b" formatted="false">"Na tym telefonie nie można zarezerwować nazwy użytkownika."</string>
     <string name="l10n_this_protects_you_from_wallet_activity_on_untrusted_net_91dd1d1c" formatted="false">"Chroni to przed aktywnością portfela w niezaufanych sieciach, np. publicznym Wi-Fi, lub w nieznanych miejscach."</string>
     <string name="l10n_this_recovery_phrase_does_not_match_any_of_these_wallet_0982b5b5" formatted="false">"Ta fraza seed nie pasuje do żadnego z tych portfeli."</string>
     <string name="l10n_this_recovery_phrase_is_for_a_different_wallet_enter_th_e885dc87" formatted="false">"Ta fraza seed należy do innego portfela. Wprowadź frazę dla „%1$s”."</string>
@@ -1244,6 +1245,7 @@
     <string name="l10n_username_payments_aren_t_available_yet_8c9ff4b9" formatted="false">"Płatności na nazwy użytkownika nie są jeszcze dostępne"</string>
     <string name="l10n_username_records_are_out_of_date_1faf1d01" formatted="false">"Rejestry nazw użytkownika są nieaktualne"</string>
     <string name="l10n_username_records_are_out_of_date_the_payment_limit_is_0_e13a7638" formatted="false">"Rejestry nazw użytkownika są nieaktualne. Limit płatności wynosi 0.1 XMR."</string>
+    <string name="l10n_username_registration_isn_t_available_in_your_region_afc916b1" formatted="false">"Rejestracja nazw użytkownika nie jest dostępna w Twoim regionie."</string>
     <string name="l10n_username_registration_isn_t_available_yet_b5686202" formatted="false">"Rejestracja nazw użytkownika nie jest jeszcze dostępna."</string>
     <string name="l10n_username_signature_check_failed_do_not_send_to_this_add_f578e341" formatted="false">"Weryfikacja podpisu nazwy użytkownika nie powiodła się. Nie wysyłaj na ten adres."</string>
     <string name="l10n_usernames_are_permanent_86694470" formatted="false">"Nazwy użytkownika są trwałe."</string>

@@ -1131,6 +1131,7 @@
     <string name="l10n_this_name_lists_more_than_one_monero_address_a3832633" formatted="false">"이 이름에 Monero 주소가 두 개 이상 있습니다"</string>
     <string name="l10n_this_name_uses_a_payment_id_which_monero_no_longer_supp_ca5f6521" formatted="false">"이 이름은 Monero에서 더 이상 지원하지 않는 결제 ID를 사용합니다. 받는 사람에게 하위 주소나 통합 주소를 요청하십시오."</string>
     <string name="l10n_this_node_is_already_in_the_list_0720642a" formatted="false">"이미 목록에 있는 노드입니다"</string>
+    <string name="l10n_this_phone_can_t_claim_a_username_0111694b" formatted="false">"이 휴대폰에서는 사용자 이름을 등록할 수 없습니다."</string>
     <string name="l10n_this_protects_you_from_wallet_activity_on_untrusted_net_91dd1d1c" formatted="false">"공용 Wi-Fi나 알 수 없는 위치처럼 신뢰할 수 없는 환경에서 지갑이 활동하지 않도록 보호합니다."</string>
     <string name="l10n_this_recovery_phrase_does_not_match_any_of_these_wallet_0982b5b5" formatted="false">"이 시드 문구는 이 지갑들 중 어느 것과도 일치하지 않습니다."</string>
     <string name="l10n_this_recovery_phrase_is_for_a_different_wallet_enter_th_e885dc87" formatted="false">"이 시드 문구는 다른 지갑의 것입니다. “%1$s” 지갑의 시드 문구를 입력하십시오."</string>
@@ -1244,6 +1245,7 @@
     <string name="l10n_username_payments_aren_t_available_yet_8c9ff4b9" formatted="false">"사용자 이름으로 결제는 아직 사용할 수 없습니다"</string>
     <string name="l10n_username_records_are_out_of_date_1faf1d01" formatted="false">"사용자 이름 기록이 오래되었습니다"</string>
     <string name="l10n_username_records_are_out_of_date_the_payment_limit_is_0_e13a7638" formatted="false">"사용자 이름 기록이 오래되었습니다. 결제 한도는 0.1 XMR입니다."</string>
+    <string name="l10n_username_registration_isn_t_available_in_your_region_afc916b1" formatted="false">"이 지역에서는 사용자 이름 등록을 사용할 수 없습니다."</string>
     <string name="l10n_username_registration_isn_t_available_yet_b5686202" formatted="false">"사용자 이름 등록은 아직 사용할 수 없습니다."</string>
     <string name="l10n_username_signature_check_failed_do_not_send_to_this_add_f578e341" formatted="false">"사용자 이름 서명 확인에 실패했습니다. 이 주소로 보내지 마세요."</string>
     <string name="l10n_usernames_are_permanent_86694470" formatted="false">"사용자 이름은 영구적입니다."</string>
