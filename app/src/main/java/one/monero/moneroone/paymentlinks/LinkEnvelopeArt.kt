@@ -112,13 +112,80 @@ internal data class PackingPose(
     val flapDegrees: Float,
     val sealAlpha: Float,
     val sealScale: Float,
-    /** The seal's shadow, 0 lifted to 1 pressed on. */
-    val sealPress: Float,
+    /** How much of the ring and the mark shows, 0 (a plain drop of wax) to 1. */
+    val sealMark: Float,
+    /** How round the wax still is, 0 to 1: the light on a fresh drop. */
+    val sealDome: Float,
+    /** The stamp ([StampGeometry]): its opacity, its place from its contact with the seal's middle
+     * (envelope units), its tilt about that point (degrees), and 1 above the paper to 0 on the wax. */
+    val toolAlpha: Float,
+    val toolX: Float,
+    val toolY: Float,
+    val toolTilt: Float,
+    val toolHeight: Float,
     /** The light sweep: -1 before, -0.35 to 1.35 while it runs. */
     val sweep: Float,
     /** How far the foil amount shows: -0.35 none to 1.35 all (the mockup's --fr). */
     val foilReveal: Float,
 )
+
+/**
+ * The stamp that presses the seal on the send side, seen from a little above: a graphite head, a
+ * collar with a thin orange band and a turned handle, 150 x 374 envelope units. [CONTACT] is the
+ * middle of the head's face, where it meets the wax.
+ */
+internal object StampGeometry {
+    const val W = 150f
+    const val H = 374f
+    const val CONTACT_X = 75f
+    const val CONTACT_Y = 352f
+    /** A cap's height over its width: the angle we see the tool from. */
+    const val SQUASH = 22f / 75f
+    /** Room around the tool for its blurred shadow (css blur up to 24). */
+    const val SHADOW_MARGIN = 48f
+    /** Room around the tool for its caps' bright edge. */
+    const val MARGIN = 2f
+
+    /** The front (lower) half of a cap's ellipse, from one end to the other. */
+    fun Path.front(cx: Float, cy: Float, rx: Float, leftToRight: Boolean) {
+        val ry = rx * SQUASH
+        val k = 0.5523f
+        val side = if (leftToRight) 1f else -1f
+        cubicTo(cx - side * rx, cy + k * ry, cx - side * k * rx, cy + ry, cx, cy + ry)
+        cubicTo(cx + side * k * rx, cy + ry, cx + side * rx, cy + k * ry, cx + side * rx, cy)
+    }
+
+    /** A round part's side, from its top cap's middle line down to its front edge (half an ellipse). */
+    fun side(left: Float, top: Float, width: Float, height: Float): Path = Path().apply {
+        moveTo(left, top)
+        lineTo(left, top + height)
+        front(left + width / 2, top + height, width / 2, leftToRight = true)
+        lineTo(left + width, top)
+        close()
+    }
+
+    /** The turned handle: a round knob at the top, a long taper, a narrow neck and a foot on the collar. */
+    fun handle(): Path = Path().apply {
+        moveTo(75f, 0f)
+        cubicTo(98f, 0f, 111f, 30f, 111f, 62f)
+        cubicTo(111f, 110f, 100f, 160f, 94f, 200f)
+        cubicTo(90f, 225f, 90f, 240f, 92f, 248f)
+        cubicTo(95f, 255f, 100f, 257f, 100f, 262f)
+        lineTo(100f, 272f)
+        front(75f, 272f, 25f, leftToRight = false)
+        lineTo(50f, 262f)
+        cubicTo(50f, 257f, 55f, 255f, 58f, 248f)
+        cubicTo(60f, 240f, 60f, 225f, 56f, 200f)
+        cubicTo(50f, 160f, 39f, 110f, 39f, 62f)
+        cubicTo(39f, 30f, 52f, 0f, 75f, 0f)
+        close()
+    }
+
+    val HEAD_SIDE = RectF(0f, 294f, 150f, 352f)
+    val HEAD_CAP = RectF(0f, 272f, 150f, 316f)
+    val COLLAR_SIDE = RectF(29f, 272f, 121f, 294f)
+    val COLLAR_CAP = RectF(29f, 258.5f, 121f, 285.5f)
+}
 
 private object EnvelopePaths {
     const val SEAL_BLOB =
@@ -318,8 +385,12 @@ internal class EnvelopeArt private constructor(
     private val flapOutside: Bitmap,
     private val flapInside: Bitmap,
     private val seal: Bitmap,
-    /** The send side's seal shadows, lifted and pressed on (the seal is drawn without its own). */
-    private val sealShadows: Pair<Bitmap, Bitmap>? = null,
+    /** The send side's seal shadow, on the paper (the seal is drawn without its own). */
+    private val sealShadow: Bitmap? = null,
+    /** The send side's ring and mark alone ([seal] is then the plain wax). */
+    private val sealMarks: Bitmap? = null,
+    /** The send side's stamp: its body, and its silhouette blurred on the wax and high above it. */
+    private val stamp: Triple<Bitmap, Bitmap, Bitmap>? = null,
 ) {
     private val blob = EnvelopePaths.parse(EnvelopePaths.SEAL_BLOB)
     private val sealLower = EnvelopePaths.sealLower()
@@ -408,6 +479,43 @@ internal class EnvelopeArt private constructor(
             }
             if (pose.sealAlpha > 0f) drawPressedSeal(canvas, pose, light)
         }
+        // Outside the envelope's layer: the stamp rises above the frame.
+        if (pose.toolAlpha > 0f) inEnvelope(canvas, pose.envelopeY, 1f) { drawStamp(canvas, pose) }
+    }
+
+    /**
+     * The stamp, its face's middle on the seal's middle, moved by the pose's tool place and tilted
+     * about that point. Its shadow comes in and darkens as it meets the wax: 0 30 24 at .25 high
+     * above it, 0 6 8 at .45 on it (iOS EnvelopeStampTool).
+     */
+    private fun drawStamp(canvas: Canvas, pose: PackingPose) {
+        val (body, near, far) = stamp ?: return
+        val g = EnvelopeGeometry
+        val t = StampGeometry
+        canvas.save()
+        canvas.translate(g.SEAL_X + g.SEAL / 2 + pose.toolX, g.SEAL_Y + g.SEAL / 2 + pose.toolY)
+        canvas.rotate(pose.toolTilt)
+        canvas.translate(-t.CONTACT_X, -t.CONTACT_Y)
+        val alpha = pose.toolAlpha.coerceIn(0f, 1f)
+        val count = if (alpha < 1f) canvas.saveLayerAlpha(null, (alpha * 255).roundToInt()) else canvas.save()
+        val h = pose.toolHeight.coerceIn(0f, 1f)
+        val shade = 0.45f - 0.2f * h
+        val sm = t.SHADOW_MARGIN
+        rect.set(-sm, -sm + 6f + 24f * h, t.W + sm, t.H + sm + 6f + 24f * h)
+        if (h < 1f) {
+            bitmapPaint.alpha = ((1f - h) * shade * 255).roundToInt()
+            canvas.drawBitmap(near, null, rect, bitmapPaint)
+        }
+        if (h > 0f) {
+            bitmapPaint.alpha = (h * shade * 255).roundToInt()
+            canvas.drawBitmap(far, null, rect, bitmapPaint)
+        }
+        bitmapPaint.alpha = 255
+        val m = t.MARGIN
+        rect.set(-m, -m, t.W + m, t.H + m)
+        canvas.drawBitmap(body, null, rect, bitmapPaint)
+        canvas.restoreToCount(count)
+        canvas.restore()
     }
 
     /** Runs [block] in envelope units, with the envelope [dy] object units below its rest place, at [alpha]. */
@@ -477,22 +585,15 @@ internal class EnvelopeArt private constructor(
     /** The seal pressing on: it drops from [PackingPose.sealScale] to the paper, its shadow tightening. */
     private fun drawPressedSeal(canvas: Canvas, pose: PackingPose, light: EnvelopePose) {
         val g = EnvelopeGeometry
-        val (lifted, pressed) = sealShadows ?: return
+        val shadow = sealShadow ?: return
         val s = pose.sealScale
         canvas.save()
         canvas.scale(s, s, g.SEAL_X + g.SEAL / 2, g.SEAL_Y + g.SEAL / 2)
         val count = if (pose.sealAlpha < 1f) canvas.saveLayerAlpha(null, (pose.sealAlpha * 255).roundToInt()) else canvas.save()
-        val press = pose.sealPress.coerceIn(0f, 1f)
         val sm = SEAL_SHADOW_MARGIN
         rect.set(g.SEAL_X - sm, g.SEAL_Y - sm, g.SEAL_X + g.SEAL + sm, g.SEAL_Y + g.SEAL + sm)
-        if (press < 1f) {
-            bitmapPaint.alpha = ((1f - press) * 255).roundToInt()
-            canvas.drawBitmap(lifted, null, rect, bitmapPaint)
-        }
-        bitmapPaint.alpha = (press * 255).roundToInt()
-        canvas.drawBitmap(pressed, null, rect, bitmapPaint)
-        bitmapPaint.alpha = 255
-        drawSeal(canvas, light, lowerHalf = false)
+        canvas.drawBitmap(shadow, null, rect, bitmapPaint)
+        drawSeal(canvas, light, lowerHalf = false, mark = pose.sealMark, dome = pose.sealDome)
         canvas.restoreToCount(count)
         canvas.restore()
     }
@@ -589,7 +690,7 @@ internal class EnvelopeArt private constructor(
     }
 
     /** The seal, whole or its lower half, with the light on the wax. */
-    private fun drawSeal(canvas: Canvas, pose: EnvelopePose, lowerHalf: Boolean) {
+    private fun drawSeal(canvas: Canvas, pose: EnvelopePose, lowerHalf: Boolean, mark: Float = 1f, dome: Float = 0f) {
         val g = EnvelopeGeometry
         canvas.save()
         canvas.translate(g.SEAL_X, g.SEAL_Y)
@@ -598,6 +699,12 @@ internal class EnvelopeArt private constructor(
         rect.set(-sm, -sm, g.SEAL + sm, g.SEAL + sm)
         canvas.drawBitmap(seal, null, rect, bitmapPaint)
         canvas.clipPath(blob)
+        if (dome > 0f) drawDome(canvas, dome.coerceIn(0f, 1f))
+        if (sealMarks != null && mark > 0f) {
+            bitmapPaint.alpha = (mark.coerceIn(0f, 1f) * 255).roundToInt()
+            canvas.drawBitmap(sealMarks, null, rect, bitmapPaint)
+            bitmapPaint.alpha = 255
+        }
         paint.xfermode = screen
         val spot = LinkEnvelopeColors.WaxSpot
         paint.shader = ellipse(
@@ -614,6 +721,30 @@ internal class EnvelopeArt private constructor(
         paint.shader = null
         paint.xfermode = null
         canvas.restore()
+    }
+
+    /** A fresh drop, at [alpha]: its round top catches the light and its edge falls away (seal units, clipped to the wax). */
+    private fun drawDome(canvas: Canvas, alpha: Float) {
+        val g = EnvelopeGeometry
+        val c = LinkEnvelopeColors
+        val r = g.SEAL / 2
+        paint.alpha = 255
+        paint.shader = RadialGradient(
+            r, r, r,
+            intArrayOf(c.WaxShade.withAlpha(0f), c.WaxShade.withAlpha(0f), c.WaxShade.withAlpha(0.4f)),
+            floatArrayOf(0f, 56f / 98f, 1f), Shader.TileMode.CLAMP
+        )
+        paint.alpha = (alpha * 255).roundToInt()
+        canvas.drawRect(0f, 0f, g.SEAL, g.SEAL, paint)
+        paint.xfermode = screen
+        paint.shader = RadialGradient(
+            0.4f * g.SEAL, 0.34f * g.SEAL, 62f,
+            intArrayOf(c.WaxSpot.withAlpha(0.55f), c.WaxSpot.withAlpha(0f)), null, Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, g.SEAL, g.SEAL, paint)
+        paint.xfermode = null
+        paint.shader = null
+        paint.alpha = 255
     }
 
     /** The crack through the wax: a dark stroke and a light one 2.2 below, drawn from the left. */
@@ -664,10 +795,82 @@ internal class EnvelopeArt private constructor(
             pocket = renderPocket(scale),
             flapOutside = renderFlapOutside(scale, seal = null),
             flapInside = renderFlapInside(scale),
-            seal = renderSeal(scale, shadow = false),
-            // drop-shadow(0 22 16 rgba(0,0,0,.28)) lifted, drop-shadow(0 5 6 rgba(0,0,0,.5)) pressed on.
-            sealShadows = renderSealShadow(scale, 22f, 16f, 0.28f) to renderSealShadow(scale, 5f, 6f, 0.5f),
+            seal = renderSeal(scale, shadow = false, marks = false),
+            // drop-shadow(0 5 6 rgba(0,0,0,.5)): the wax lands on the paper, the stamp presses it.
+            sealShadow = renderSealShadow(scale, 5f, 6f, 0.5f),
+            sealMarks = renderSeal(scale, shadow = false, wax = false),
+            // The stamp's shadow, blur 8 on the wax and 24 high above it (it moves with the tool).
+            stamp = Triple(renderStamp(scale), renderStampShadow(scale, 8f), renderStampShadow(scale, 24f)),
         )
+
+        /** The stamp's body ([StampGeometry]), in tool units: graphite parts lit from the upper left. */
+        private fun renderStamp(scale: Float): Bitmap {
+            val t = StampGeometry
+            val (bitmap, canvas) = layer(t.W, t.H, t.MARGIN, scale)
+            val metal = LinkEnvelopeColors.StampMetal.toArgb()
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            fun turn(minX: Float, maxX: Float): Shader = LinearGradient(
+                minX, 0f, maxX, 0f,
+                intArrayOf(
+                    Black.withAlpha(0.42f), Black.withAlpha(0.1f), White.withAlpha(0.22f),
+                    White.withAlpha(0.04f), Black.withAlpha(0.18f), Black.withAlpha(0.5f)
+                ),
+                floatArrayOf(0f, 0.14f, 0.32f, 0.5f, 0.78f, 1f), Shader.TileMode.CLAMP
+            )
+            fun metal(path: Path, minX: Float, maxX: Float) {
+                paint.shader = null; paint.color = metal; canvas.drawPath(path, paint)
+                paint.shader = turn(minX, maxX); canvas.drawPath(path, paint)
+                paint.shader = null
+            }
+            fun cap(r: RectF) {
+                paint.style = Paint.Style.FILL
+                paint.color = metal; canvas.drawOval(r, paint)
+                paint.shader = LinearGradient(r.left, r.top, r.right, r.bottom, White.withAlpha(0.2f), Black.withAlpha(0.18f), Shader.TileMode.CLAMP)
+                canvas.drawOval(r, paint)
+                paint.shader = null
+                paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.5f; paint.color = White.withAlpha(0.2f)
+                canvas.drawOval(r, paint)
+                paint.style = Paint.Style.FILL
+            }
+            val head = t.HEAD_SIDE
+            metal(t.side(head.left, head.top, head.width(), head.height()), head.left, head.right)
+            cap(t.HEAD_CAP)
+            // The collar: its side, the orange band round its front, the turn's light.
+            val c = t.COLLAR_SIDE
+            val collar = t.side(c.left, c.top, c.width(), c.height())
+            paint.color = metal; canvas.drawPath(collar, paint)
+            canvas.save()
+            canvas.clipPath(collar)
+            val band = Path().apply { moveTo(29f, 283f); with(t) { front(75f, 283f, 46f, leftToRight = true) } }
+            // brand (#FF6600), as the liner.
+            paint.style = Paint.Style.STROKE; paint.strokeWidth = 5f; paint.color = LinkEnvelopeColors.LinerTop.toArgb()
+            canvas.drawPath(band, paint)
+            paint.style = Paint.Style.FILL
+            canvas.restore()
+            paint.shader = turn(c.left, c.right); canvas.drawPath(collar, paint); paint.shader = null
+            cap(t.COLLAR_CAP)
+            val handle = t.handle()
+            metal(handle, 39f, 111f)
+            paint.shader = RadialGradient(62f, 40f, 30f, White.withAlpha(0.22f), White.withAlpha(0f), Shader.TileMode.CLAMP)
+            canvas.drawPath(handle, paint)
+            paint.shader = null
+            return bitmap
+        }
+
+        /** The stamp's silhouette in black, blurred [blurRadius] (CSS units); drawn at the shadow's alpha. */
+        private fun renderStampShadow(scale: Float, blurRadius: Float): Bitmap {
+            val t = StampGeometry
+            val (bitmap, canvas) = layer(t.W, t.H, t.SHADOW_MARGIN, scale)
+            val outline = t.side(0f, 294f, 150f, 58f).apply {
+                addOval(t.HEAD_CAP, Path.Direction.CW)
+                op(t.side(29f, 272f, 92f, 22f), Path.Op.UNION)
+                op(Path().apply { addOval(t.COLLAR_CAP, Path.Direction.CW) }, Path.Op.UNION)
+                op(t.handle(), Path.Op.UNION)
+            }
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Black.toArgb(); maskFilter = blur(blurRadius) }
+            canvas.drawPath(outline, paint)
+            return bitmap
+        }
 
         /**
          * The foil amount alone, on a clear envelope-sized layer: [number] and [unit] (none in Fiat
@@ -846,7 +1049,7 @@ internal class EnvelopeArt private constructor(
         }
 
         /** The wax seal; [shadow]: with its drop shadow (the send side draws the shadow apart). */
-        private fun renderSeal(scale: Float, shadow: Boolean = true): Bitmap {
+        private fun renderSeal(scale: Float, shadow: Boolean = true, wax: Boolean = true, marks: Boolean = true): Bitmap {
             val g = EnvelopeGeometry
             val c = LinkEnvelopeColors
             val (bitmap, canvas) = layer(g.SEAL, g.SEAL, g.SEAL_MARGIN, scale)
@@ -860,16 +1063,8 @@ internal class EnvelopeArt private constructor(
                 paint.maskFilter = null
             }
             // The wax: radial-gradient(circle at 42% 34%, ...), to the farthest corner.
-            val cx = 0.42f * g.SEAL
-            val cy = 0.34f * g.SEAL
-            val radius = kotlin.math.sqrt((g.SEAL - cx) * (g.SEAL - cx) + (g.SEAL - cy) * (g.SEAL - cy))
-            paint.shader = RadialGradient(
-                cx, cy, radius,
-                intArrayOf(c.WaxLight.toArgb(), c.WaxBright.toArgb(), c.WaxBody.toArgb(), c.WaxEdge.toArgb()),
-                floatArrayOf(0f, 0.34f, 0.64f, 1f), Shader.TileMode.CLAMP
-            )
-            canvas.drawPath(blob, paint)
-            paint.shader = null
+            if (wax) drawWax(canvas, paint, blob)
+            if (!marks) return bitmap
             // The ring, lit from above.
             val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 6.5f }
             ring.color = c.WaxGlint.withAlpha(0.6f)
@@ -889,6 +1084,21 @@ internal class EnvelopeArt private constructor(
             paint.color = c.WaxStamp.toArgb()
             canvas.drawPath(mark, paint)
             return bitmap
+        }
+
+        private fun drawWax(canvas: Canvas, paint: Paint, blob: Path) {
+            val g = EnvelopeGeometry
+            val c = LinkEnvelopeColors
+            val cx = 0.42f * g.SEAL
+            val cy = 0.34f * g.SEAL
+            val radius = kotlin.math.sqrt((g.SEAL - cx) * (g.SEAL - cx) + (g.SEAL - cy) * (g.SEAL - cy))
+            paint.shader = RadialGradient(
+                cx, cy, radius,
+                intArrayOf(c.WaxLight.toArgb(), c.WaxBright.toArgb(), c.WaxBody.toArgb(), c.WaxEdge.toArgb()),
+                floatArrayOf(0f, 0.34f, 0.64f, 1f), Shader.TileMode.CLAMP
+            )
+            canvas.drawPath(blob, paint)
+            paint.shader = null
         }
 
         /**

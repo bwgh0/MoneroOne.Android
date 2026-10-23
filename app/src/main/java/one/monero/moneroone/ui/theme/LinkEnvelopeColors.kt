@@ -40,6 +40,10 @@ object LinkEnvelopeColors {
     val WaxSweep = Color(0xFFFFF0E2)
     val Crack = Color(0xFF4A1800)
 
+    // The stamp that presses the seal on the send side: the mark's gray (logoGray, #4C4C4C), as the
+    // wax is its orange.
+    val StampMetal = Color(0xFF4C4C4C)
+
     // The ivory card.
     val CardLight = Color(0xFFFBF8F1)
     val CardMid = Color(0xFFF3EDE1)

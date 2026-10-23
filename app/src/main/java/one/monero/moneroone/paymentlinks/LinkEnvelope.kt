@@ -15,6 +15,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -65,6 +66,8 @@ import java.io.FileOutputStream
 import java.util.Locale
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.exp
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 private const val TAG = "LinkEnvelope"
 
@@ -357,32 +360,61 @@ internal fun LinkEnvelopeHero(
     }
 }
 
-/** tokens.json motion.springs settle: SwiftUI .spring(response: 0.4, dampingFraction: 0.8). */
-private fun <T> settle() = spring<T>(dampingRatio = 0.8f, stiffness = 246.7f)
+/**
+ * Every beat and motion of the packing takes this many times its time (the PACK_ times are at pace
+ * 1), all but the light sweep (iOS PaymentLinkSendHero.pace).
+ */
+private const val PACE = 1.3f
+private fun paced(ms: Long): Long = (ms * PACE).roundToLong()
+private fun pacedTween(ms: Int, easing: Easing) = tween<Float>((ms * PACE).roundToInt(), easing = easing)
 
-/** tokens.json motion.springs selector: SwiftUI .spring(response: 0.3, dampingFraction: 0.7). */
-private fun <T> selector() = spring<T>(dampingRatio = 0.7f, stiffness = 438.6f)
+/** tokens.json motion.springs settle, SwiftUI .spring(response: 0.4, dampingFraction: 0.8), at [PACE]. */
+private fun <T> pacedSettle() = spring<T>(dampingRatio = 0.8f, stiffness = 246.7f / (PACE * PACE))
 
-// The send side's moment (send-link-moment, Option 2: check, then package), in ms from the result.
+/** tokens.json motion.springs stepBack, SwiftUI .spring(response: 0.5, dampingFraction: 0.8), at [PACE]. */
+private fun <T> pacedStepBack() = spring<T>(dampingRatio = 0.8f, stiffness = 157.9f / (PACE * PACE))
+
+// The send side's moment (send-stamp spec, 2026-10-23), in ms from the result.
 /** The check springs in with today's ring, the success haptic and the chime at 0; confetti at 200. */
 private const val PACK_CONFETTI_AT_MS = 200L
 /** "Link ready" and its lines fade in (easeOut 0.4 s after 0.3 s, as the ready step did). */
 private const val PACK_READY_AT_MS = 300L
+// At pace 1, then [paced]:
 /** The check turns into the note: it fades and rises, the note grows from its disc. */
-private const val PACK_NOTE_AT_MS = 550L
+private const val PACK_NOTE_AT_MS = 750L
 /** The open envelope comes up around the note. */
-private const val PACK_ENVELOPE_AT_MS = 850L
+private const val PACK_ENVELOPE_AT_MS = 1100L
 /** The note drops into the envelope. */
-private const val PACK_DROP_AT_MS = 1050L
+private const val PACK_DROP_AT_MS = 1400L
 /** The flap folds down and the envelope lifts to the middle. */
-private const val PACK_FLAP_AT_MS = 1300L
-/** The seal presses on; it touches the paper 150 ms later (softTick), and Share and Done arrive. */
-private const val PACK_SEAL_AT_MS = 1600L
-private const val PACK_CONTACT_MS = 1750L
-/** Done arrives 100 ms after Share. */
-private const val PACK_DONE_AT_MS = 1850L
-/** One light sweep shows the foil amount. */
-private const val PACK_SWEEP_AT_MS = 1950L
+private const val PACK_FLAP_AT_MS = 1750L
+/** A plain drop of wax. */
+private const val PACK_WAX_AT_MS = 2100L
+/** The stamp comes in from the upper right and hovers over the wax. */
+private const val PACK_STAMP_AT_MS = 2250L
+/** It presses in; it meets the wax 90 ms later (softTick, the wax spreads, Share and Done arrive). */
+private const val PACK_PRESS_AT_MS = 2650L
+private const val PACK_CONTACT_MS = 2740L
+/** It lifts; the ring and the mark show in the wax 30 ms later. */
+private const val PACK_LIFT_AT_MS = 2900L
+private const val PACK_MARK_AT_MS = 2930L
+/** It goes up and to the right, gone 250 ms later. */
+private const val PACK_AWAY_AT_MS = 3000L
+/** One light sweep shows the foil amount (SWEEP_MS, not paced). */
+private const val PACK_SWEEP_AT_MS = 3100L
+/** Done arrives 100 ms after Share (not paced). */
+private const val PACK_DONE_AFTER_MS = 100L
+
+/** The wax as a plain drop, before the stamp spreads it. */
+private const val WAX_DROP_SCALE = 0.86f
+// The stamp, from its contact with the seal's middle (envelope units): where it comes in and goes,
+// its tilt there, its hover, how far it sinks into the wax and how far it lifts.
+private const val TOOL_AWAY_X = 60f
+private const val TOOL_AWAY_Y = -260f
+private const val TOOL_TILT = 10f
+private const val TOOL_HOVER = -24f
+private const val TOOL_SINK = 5f
+private const val TOOL_LIFT = 30f
 
 // Where the note and the envelope start, in the claim mockup's units (send.js G).
 /** The note as the check's disc: 406.8 envelope units under its risen place (CARD_RISE above the pocket). */
@@ -422,8 +454,15 @@ internal class LinkPacking(private val settled: Boolean) {
     val noteTint = start(0f, 1f)
     val flap = start(0f, 180f)
     val sealAlpha = start(1f, 0f)
-    val sealScale = start(1f, 1.5f)
-    val sealPress = start(1f, 0f)
+    val sealScale = start(1f, 0.3f)
+    val sealMark = start(1f, 0f)
+    val sealDome = start(0f, 1f)
+    /** The stamp: away and unseen at the start and at the end. */
+    val toolAlpha = Animatable(0f)
+    val toolX = Animatable(TOOL_AWAY_X)
+    val toolY = Animatable(TOOL_AWAY_Y)
+    val toolTilt = Animatable(TOOL_TILT)
+    val toolHeight = Animatable(1f)
     val sweep = Animatable(-1f)
     val foilReveal = start(1.35f, -0.35f)
 
@@ -441,7 +480,7 @@ internal class LinkPacking(private val settled: Boolean) {
             heroAlpha.snapTo(0f)
             envelopeY.snapTo(0f); envelopeAlpha.snapTo(1f); noteLayerY.snapTo(0f); noteY.snapTo(0f)
             noteShape.snapTo(1f); noteAlpha.snapTo(1f); noteTint.snapTo(0f); flap.snapTo(0f)
-            sealAlpha.snapTo(1f); sealScale.snapTo(1f); sealPress.snapTo(1f); foilReveal.snapTo(1.35f)
+            sealAlpha.snapTo(1f); sealScale.snapTo(1f); sealMark.snapTo(1f); sealDome.snapTo(0f); foilReveal.snapTo(1.35f)
             launch { heroAlpha.animateTo(1f, Motion.crossFade()) }
             launch { readyIn.animateTo(1f, Motion.crossFade()) }
             launch { shareIn.animateTo(1f, Motion.crossFade()) }
@@ -463,32 +502,51 @@ internal class LinkPacking(private val settled: Boolean) {
         SoundFeedback.sendComplete(context)
         at(PACK_CONFETTI_AT_MS) { confetti = true }
         at(PACK_READY_AT_MS) { readyIn.animateTo(1f, tween(400, easing = Motion.EaseOut)) }
+        fun beat(ms: Long, block: suspend () -> Unit) = at(paced(ms), block)
         // The check turns into the note and rises.
-        at(PACK_NOTE_AT_MS) { checkAlpha.animateTo(0f, tween(180, easing = Motion.EaseIn)) }
-        at(PACK_NOTE_AT_MS) { checkRise.animateTo(1f, Motion.stepForward()) }
-        at(PACK_NOTE_AT_MS) { noteAlpha.animateTo(1f, tween(140, easing = LinearEasing)) }
-        at(PACK_NOTE_AT_MS) { noteY.animateTo(-EnvelopeGeometry.CARD_RISE, Motion.stepForward()) }
-        at(PACK_NOTE_AT_MS) { noteShape.animateTo(1f, Motion.stepForward()) }
-        at(PACK_NOTE_AT_MS) { noteTint.animateTo(0f, tween(300, easing = Motion.EaseInOut)) }
+        beat(PACK_NOTE_AT_MS) { checkAlpha.animateTo(0f, pacedTween(250, Motion.EaseIn)) }
+        beat(PACK_NOTE_AT_MS) { checkRise.animateTo(1f, pacedSettle()) }
+        beat(PACK_NOTE_AT_MS) { noteAlpha.animateTo(1f, pacedTween(140, LinearEasing)) }
+        beat(PACK_NOTE_AT_MS) { noteY.animateTo(-EnvelopeGeometry.CARD_RISE, pacedSettle()) }
+        beat(PACK_NOTE_AT_MS) { noteShape.animateTo(1f, pacedSettle()) }
+        beat(PACK_NOTE_AT_MS) { noteTint.animateTo(0f, pacedTween(400, Motion.EaseInOut)) }
         // The open envelope comes up around it.
-        at(PACK_ENVELOPE_AT_MS) { envelopeAlpha.animateTo(1f, tween(300, easing = Motion.EaseOut)) }
-        at(PACK_ENVELOPE_AT_MS) { envelopeY.animateTo(EnvelopeGeometry.DROP, Motion.stepForward()) }
+        beat(PACK_ENVELOPE_AT_MS) { envelopeAlpha.animateTo(1f, pacedTween(300, Motion.EaseOut)) }
+        beat(PACK_ENVELOPE_AT_MS) { envelopeY.animateTo(EnvelopeGeometry.DROP, pacedSettle()) }
         // The note drops in.
-        at(PACK_DROP_AT_MS) { noteY.animateTo(0f, settle()) }
+        beat(PACK_DROP_AT_MS) { noteY.animateTo(0f, pacedSettle()) }
         // The flap folds down, the envelope lifts to the middle.
-        at(PACK_FLAP_AT_MS) { flap.animateTo(0f, Motion.stepForward()) }
-        at(PACK_FLAP_AT_MS) { envelopeY.animateTo(0f, Motion.stepForward()) }
-        at(PACK_FLAP_AT_MS) { noteLayerY.animateTo(0f, Motion.stepForward()) }
-        // The seal presses on.
-        at(PACK_SEAL_AT_MS) { sealAlpha.animateTo(1f, tween(90, easing = LinearEasing)) }
-        at(PACK_SEAL_AT_MS) { sealScale.animateTo(1f, selector()) }
-        at(PACK_SEAL_AT_MS) { sealPress.animateTo(1f, tween(160, easing = Motion.EaseIn)) }
-        at(PACK_CONTACT_MS) { softTickHaptic(view) }
-        at(PACK_CONTACT_MS) { shareIn.animateTo(1f, Motion.arrive()) }
-        at(PACK_DONE_AT_MS) { doneIn.animateTo(1f, Motion.arrive()) }
+        beat(PACK_FLAP_AT_MS) { flap.animateTo(0f, pacedStepBack()) }
+        beat(PACK_FLAP_AT_MS) { envelopeY.animateTo(0f, pacedStepBack()) }
+        beat(PACK_FLAP_AT_MS) { noteLayerY.animateTo(0f, pacedStepBack()) }
+        // A plain drop of wax.
+        beat(PACK_WAX_AT_MS) { sealAlpha.animateTo(1f, pacedTween(90, LinearEasing)) }
+        beat(PACK_WAX_AT_MS) { sealScale.animateTo(WAX_DROP_SCALE, pacedSettle()) }
+        // The stamp comes in from the upper right and hovers over the wax.
+        beat(PACK_STAMP_AT_MS) { toolAlpha.animateTo(1f, pacedTween(150, LinearEasing)) }
+        beat(PACK_STAMP_AT_MS) { toolX.animateTo(0f, pacedStepBack()) }
+        beat(PACK_STAMP_AT_MS) { toolY.animateTo(TOOL_HOVER, pacedStepBack()) }
+        beat(PACK_STAMP_AT_MS) { toolTilt.animateTo(0f, pacedStepBack()) }
+        // It presses in; on contact the wax spreads and flattens.
+        beat(PACK_PRESS_AT_MS) { toolY.animateTo(TOOL_SINK, pacedTween(100, Motion.EaseIn)) }
+        beat(PACK_PRESS_AT_MS) { toolHeight.animateTo(0f, pacedTween(100, Motion.EaseIn)) }
+        beat(PACK_CONTACT_MS) { softTickHaptic(view) }
+        beat(PACK_CONTACT_MS) { sealScale.animateTo(1f, pacedTween(160, Motion.EaseOut)) }
+        beat(PACK_CONTACT_MS) { sealDome.animateTo(0f, pacedTween(160, Motion.EaseOut)) }
+        beat(PACK_CONTACT_MS) { shareIn.animateTo(1f, Motion.arrive()) }
+        at(paced(PACK_CONTACT_MS) + PACK_DONE_AFTER_MS) { doneIn.animateTo(1f, Motion.arrive()) }
+        // It lifts; the ring and the mark show in the wax.
+        beat(PACK_LIFT_AT_MS) { toolY.animateTo(TOOL_SINK - TOOL_LIFT, pacedTween(100, Motion.EaseIn)) }
+        beat(PACK_LIFT_AT_MS) { toolHeight.animateTo(1f, pacedTween(100, Motion.EaseIn)) }
+        beat(PACK_MARK_AT_MS) { sealMark.animateTo(1f, pacedTween(120, Motion.EaseOut)) }
+        // It goes up and to the right.
+        beat(PACK_AWAY_AT_MS) { toolX.animateTo(TOOL_AWAY_X, pacedStepBack()) }
+        beat(PACK_AWAY_AT_MS) { toolY.animateTo(TOOL_AWAY_Y, pacedStepBack()) }
+        beat(PACK_AWAY_AT_MS) { toolTilt.animateTo(TOOL_TILT, pacedStepBack()) }
+        beat(PACK_AWAY_AT_MS) { toolAlpha.animateTo(0f, pacedTween(250, Motion.EaseIn)) }
         // One light sweep; the foil amount shows where it has passed.
-        at(PACK_SWEEP_AT_MS) { foilReveal.animateTo(1.35f, tween(SWEEP_MS, easing = Motion.EaseInOut)) }
-        at(PACK_SWEEP_AT_MS) {
+        beat(PACK_SWEEP_AT_MS) { foilReveal.animateTo(1.35f, tween(SWEEP_MS, easing = Motion.EaseInOut)) }
+        beat(PACK_SWEEP_AT_MS) {
             sweep.snapTo(-0.35f)
             sweep.animateTo(1.35f, tween(SWEEP_MS, easing = Motion.EaseInOut))
             sweep.snapTo(-1f)
@@ -506,7 +564,13 @@ internal class LinkPacking(private val settled: Boolean) {
         flapDegrees = flap.value,
         sealAlpha = sealAlpha.value.coerceIn(0f, 1f),
         sealScale = sealScale.value,
-        sealPress = sealPress.value,
+        sealMark = sealMark.value.coerceIn(0f, 1f),
+        sealDome = sealDome.value.coerceIn(0f, 1f),
+        toolAlpha = toolAlpha.value.coerceIn(0f, 1f),
+        toolX = toolX.value,
+        toolY = toolY.value,
+        toolTilt = toolTilt.value,
+        toolHeight = toolHeight.value,
         sweep = sweep.value,
         foilReveal = foilReveal.value,
     )
