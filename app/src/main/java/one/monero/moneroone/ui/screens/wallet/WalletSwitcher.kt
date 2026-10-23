@@ -326,7 +326,8 @@ fun WalletManagerRows(
                     wallet = wallet,
                     isActive = isActive,
                     isLifted = isDragging,
-                    balanceText = if (isActive) liveBalanceText else formatBalance(wallet.cachedBalance ?: 0L),
+                    // An unknown balance is "— XMR" (also in Fiat Mode), never zero, as on iOS.
+                    balanceText = if (isActive) liveBalanceText else wallet.cachedBalance?.let(formatBalance) ?: "— XMR",
                     modifier = Modifier
                         .onSizeChanged { heights[wallet.id] = it.height.toFloat() }
                         .zIndex(if (isDragging || settlingId == wallet.id) 1f else 0f)
@@ -613,8 +614,7 @@ private fun WalletRow(
         }
 
         // The drag handle: a touch here lifts the row at once and moves it with the finger.
-        // It sits over the card's leading edge, outside the card's cleared semantics, so
-        // TalkBack reads it on its own.
+        // It sits over the card's leading edge, outside the card's cleared semantics.
         val start by rememberUpdatedState(onReorderStart)
         val drag by rememberUpdatedState(onReorderDrag)
         val end by rememberUpdatedState(onReorderEnd)
@@ -625,13 +625,9 @@ private fun WalletRow(
                     .offset { IntOffset(swipe.offset.roundToInt(), 0) }
                     .fillMaxHeight()
                     .width(16.dp + HandleSlot)
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = tr("Reorder")
-                        customActions = buildList {
-                            onMoveUp?.let { add(CustomAccessibilityAction(tr("Move up")) { it(); true }) }
-                            onMoveDown?.let { add(CustomAccessibilityAction(tr("Move down")) { it(); true }) }
-                        }
-                    }
+                    // Hidden from TalkBack, as on iOS: the row has Move up / Move down, so each
+                    // wallet stays one stop.
+                    .clearAndSetSemantics {}
                     .pointerInput(Unit) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
@@ -672,8 +668,8 @@ private fun WalletRow(
     }
 }
 
-/** The drag handle's slot before the emoji: the 24dp glyph and an 8dp gap. */
-private val HandleSlot = 32.dp
+/** The drag handle's slot before the emoji: the 24dp glyph and a 14dp gap, as on iOS. */
+private val HandleSlot = 38.dp
 
 /**
  * The wallet switcher's row card (iOS WalletRow): the emoji circle, the name, an optional
