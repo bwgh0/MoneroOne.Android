@@ -28,7 +28,7 @@ class NodeDialogTest {
         val draft = NodeDraft("", "", null)
         rule.setContent {
             MoneroOneTheme {
-                NodeDialog(tr("Add Node"), tr("Add"), draft, emptySet(), torEnabled, { _, _, _ -> }, {})
+                NodeDialog(tr("Add Node"), tr("Add"), draft, emptySet(), torEnabled, { _, _, _, _ -> }, {})
             }
         }
         val uriField = field(1)
@@ -48,6 +48,19 @@ class NodeDialogTest {
         rule.onNodeWithText(unencrypted).assertExists()
     }
 
+    @Test fun httpsNodeReadsAsTlsOnAnyPort() {
+        val draft = NodeDraft("", "", null)
+        rule.setContent {
+            MoneroOneTheme {
+                NodeDialog(tr("Add Node"), tr("Add"), draft, emptySet(), false, { _, _, _, _ -> }, {})
+            }
+        }
+        // As on iOS, the https:// scheme marks a TLS node on any port.
+        field(1).performTextReplacement("https://node.example.com:18089")
+        rule.onNodeWithText(tr("Connection will be encrypted (TLS)")).assertExists()
+        rule.onNodeWithText(tr("Connection will be unencrypted (HTTP)")).assertDoesNotExist()
+    }
+
     // A theme change or a rotation recreates the Activity. The draft lives in a
     // ViewModel then, so a new composition must show what the user typed.
     @Test fun whatWasTypedOutlivesARecreatedScreen() {
@@ -55,7 +68,7 @@ class NodeDialogTest {
         var shown by mutableStateOf(true)
         rule.setContent {
             MoneroOneTheme {
-                if (shown) NodeDialog(tr("Add Node"), tr("Add"), draft, emptySet(), false, { _, _, _ -> }, {})
+                if (shown) NodeDialog(tr("Add Node"), tr("Add"), draft, emptySet(), false, { _, _, _, _ -> }, {})
             }
         }
         field(0).performTextReplacement("Home Node")
@@ -83,7 +96,7 @@ class NodeDialogTest {
         var confirmed: Triple<String, String, NodeCredentials?>? = null
         rule.setContent {
             MoneroOneTheme {
-                NodeDialog(tr("Add Node"), tr("Add"), draft, emptySet(), false, { name, uri, login ->
+                NodeDialog(tr("Add Node"), tr("Add"), draft, emptySet(), false, { name, uri, login, _ ->
                     confirmed = Triple(name, uri, login)
                 }, {})
             }
@@ -105,7 +118,7 @@ class NodeDialogTest {
         var savedName: String? = null
         rule.setContent {
             MoneroOneTheme {
-                NodeDialog(tr("Edit Node"), tr("Save"), draft, emptySet(), false, { name, _, _ -> savedName = name }, {})
+                NodeDialog(tr("Edit Node"), tr("Save"), draft, emptySet(), false, { name, _, _, _ -> savedName = name }, {})
             }
         }
         rule.onNodeWithText(tr("Custom Node")).assertExists()

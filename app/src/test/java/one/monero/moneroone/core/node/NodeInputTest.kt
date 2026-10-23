@@ -1,6 +1,7 @@
 package one.monero.moneroone.core.node
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,10 +28,28 @@ class NodeInputTest {
     }
 
     @Test
-    fun `scheme is stripped and https requires 443`() {
+    fun `scheme is stripped and https marks TLS on any port`() {
         assertEquals("node.example.com:443", valid("https://node.example.com:443/").uri)
         assertEquals("node.example.com:18081", valid("http://node.example.com:18081").uri)
-        assertEquals("TLS nodes must use port 443", invalid("https://node.example.com:18081"))
+        val https = valid("https://node.sethforprivacy.com:18089")
+        assertEquals("node.sethforprivacy.com:18089", https.uri)
+        assertTrue(https.tls)
+        assertTrue(valid("HTTPS://node.example.com:18081").tls)
+    }
+
+    @Test
+    fun `plain input is TLS only on port 443`() {
+        assertFalse(valid("node.example.com:18081").tls)
+        assertFalse(valid("http://node.example.com:18089").tls)
+        assertTrue(valid("node.example.com:443").tls)
+    }
+
+    @Test
+    fun `https with credentials keeps the TLS mark`() {
+        val parsed = valid("https://alice:s3cret@node.example.com:18089")
+        assertEquals("node.example.com:18089", parsed.uri)
+        assertEquals(NodeCredentials("alice", "s3cret"), parsed.credentials)
+        assertTrue(parsed.tls)
     }
 
     @Test

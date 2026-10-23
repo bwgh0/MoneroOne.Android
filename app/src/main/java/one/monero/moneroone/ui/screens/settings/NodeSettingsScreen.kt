@@ -96,6 +96,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import one.monero.moneroone.core.node.CustomNodeNames
+import one.monero.moneroone.core.node.CustomNodeTls
 import one.monero.moneroone.core.node.NodeBenchmark
 import one.monero.moneroone.core.node.NodeCredentialStore
 import one.monero.moneroone.core.node.NodeCredentials
@@ -116,11 +117,13 @@ import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.WarningYellow
 
+/** [tls]: the app shows and checks the node as TLS ([DefaultNodes.isTls]). */
 data class NodeInfo(
     val uri: String,
     val name: String,
     val isDefault: Boolean = false,
-    val hasCredentials: Boolean = false
+    val hasCredentials: Boolean = false,
+    val tls: Boolean = false
 )
 
 /** What the user typed in the Add or Edit Node dialog. */
@@ -148,7 +151,7 @@ internal class NodeDialogs : ViewModel() {
     var open by mutableStateOf<OpenNodeDialog?>(null)
 }
 
-private val DEFAULT_NODES = DefaultNodes.ALL.map { NodeInfo(it.uri, it.name, true) }
+private val DEFAULT_NODES = DefaultNodes.ALL.map { NodeInfo(it.uri, it.name, true, tls = it.tls) }
 
 @Composable
 fun NodeSettingsScreen(
@@ -164,6 +167,7 @@ fun NodeSettingsScreen(
         NodeCredentialStore(SecurePrefs.open(context)).also { it.migrateInline(prefs) }
     }
     val nodeNames = remember { CustomNodeNames(prefs) }
+    val customTls = remember { CustomNodeTls(prefs) }
     var benchmarkAttempt by remember { mutableIntStateOf(0) }
     val torConfig by TorNetwork.config.collectAsState()
     val json = remember { Json { ignoreUnknownKeys = true } }
@@ -195,9 +199,13 @@ fun NodeSettingsScreen(
         val customJson = prefs.getString("custom_nodes", "[]")
         try {
             val nodes = json.decodeFromString<List<String>>(customJson ?: "[]")
+            val marked = customTls.all()
             customNodes.clear()
             customNodes.addAll(nodes.map {
-                NodeInfo(it, nodeNames.displayName(it, tr("Custom Node")), false, credentialStore.has(it))
+                NodeInfo(
+                    it, nodeNames.displayName(it, tr("Custom Node")), false, credentialStore.has(it),
+                    DefaultNodes.isTls(it, marked)
+                )
             })
         } catch (e: Exception) {
             // Ignore parse errors
@@ -206,14 +214,14 @@ fun NodeSettingsScreen(
 
     // Benchmark all nodes on screen entry. Keyed on what a measurement uses, not
     // the names: a rename must not re-run auto-select, which can switch nodes.
-    LaunchedEffect(customNodes.map { it.uri to it.hasCredentials }, torConfig, benchmarkAttempt) {
+    LaunchedEffect(customNodes.map { Triple(it.uri, it.hasCredentials, it.tls) }, torConfig, benchmarkAttempt) {
         isBenchmarking = true
         latencyMap.clear()
         val allNodes = (DEFAULT_NODES + DefaultNodes.TOR.map { NodeInfo(it.uri, it.name, true) } + customNodes)
             .filter { torConfig.enabled || !isOnionNode(it.uri) }
         val results = allNodes.map { node ->
             async {
-                node.uri to NodeBenchmark.measure(node.uri, credentialsFor(node), torConfig)
+                node.uri to NodeBenchmark.measure(node.uri, credentialsFor(node), torConfig, node.tls)
             }
         }.awaitAll()
         currentCoroutineContext().ensureActive()
@@ -401,13 +409,16 @@ fun NodeSettingsScreen(
                         onEdit = {
                             val previous = credentialStore.load(node.uri)
                             // The name the row shows, so a node from before names can be saved as is.
-                            dialogs.open = OpenNodeDialog(node, previous, NodeDraft(node.name, node.uri, previous))
+                            // A TLS node shows its https://, as on iOS, so a save keeps it TLS.
+                            val shownUri = if (node.tls) "https://${node.uri}" else node.uri
+                            dialogs.open = OpenNodeDialog(node, previous, NodeDraft(node.name, shownUri, previous))
                         },
                         onDelete = {
                             customNodes.remove(node)
                             latencyMap.remove(node.uri)
                             credentialStore.remove(node.uri)
                             nodeNames.remove(node.uri)
+                            customTls.remove(node.uri)
                             persistCustomNodes()
 
                             if (selectedNode == node.uri) {
@@ -444,11 +455,12 @@ fun NodeSettingsScreen(
             draft = openDialog.draft,
             takenUris = (customNodes.map { it.uri } + (DefaultNodes.ALL + DefaultNodes.TOR).map { it.uri }).toSet(),
             torEnabled = torConfig.enabled,
-            onConfirm = { name, uri, credentials ->
+            onConfirm = { name, uri, credentials, tls ->
                 credentialStore.save(uri, credentials)
                 nodeNames.save(uri, name)
+                customTls.save(uri, tls)
                 benchmarkAttempt++
-                customNodes.add(NodeInfo(uri, name, false, credentials != null))
+                customNodes.add(NodeInfo(uri, name, false, credentials != null, tls))
                 persistCustomNodes()
                 dialogs.open = null
             },
@@ -465,18 +477,20 @@ fun NodeSettingsScreen(
             draft = openDialog.draft,
             takenUris = (customNodes.map { it.uri } + (DefaultNodes.ALL + DefaultNodes.TOR).map { it.uri }).toSet() - node.uri,
             torEnabled = torConfig.enabled,
-            onConfirm = { name, uri, credentials ->
+            onConfirm = { name, uri, credentials, tls ->
                 val uriChanged = uri != node.uri
                 val loginChanged = credentials != previous
+                val tlsChanged = tls != node.tls
                 if (uriChanged) {
                     credentialStore.remove(node.uri)
                     latencyMap.remove(node.uri)
                 }
                 credentialStore.save(uri, credentials)
                 nodeNames.update(node.uri, uri, name, tr("Custom Node"))
+                customTls.save(uri, tls, oldUri = node.uri)
                 // A rename alone changes no connection, so nothing is measured again.
-                if (uriChanged || loginChanged) benchmarkAttempt++
-                val updated = NodeInfo(uri, name, false, credentials != null)
+                if (uriChanged || loginChanged || tlsChanged) benchmarkAttempt++
+                val updated = NodeInfo(uri, name, false, credentials != null, tls)
                 val index = customNodes.indexOf(node)
                 if (index >= 0) customNodes[index] = updated else customNodes.add(updated)
                 persistCustomNodes()
@@ -510,7 +524,7 @@ private fun NodeItem(
 ) {
     val alpha = if (enabled) 1f else 0.6f
     // Tor encrypts the whole path to an onion service.
-    val tls = DefaultNodes.isTls(node.uri) || isOnionNode(node.uri)
+    val tls = node.tls || isOnionNode(node.uri)
 
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
@@ -656,7 +670,7 @@ internal fun NodeDialog(
     draft: NodeDraft,
     takenUris: Set<String>,
     torEnabled: Boolean,
-    onConfirm: (name: String, uri: String, credentials: NodeCredentials?) -> Unit,
+    onConfirm: (name: String, uri: String, credentials: NodeCredentials?, tls: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     // The state lives in [draft], never here, so it outlives this composition.
@@ -722,7 +736,7 @@ internal fun NodeDialog(
                     // Tor encrypts the whole path to an onion service: it reads "Tor" or
                     // "Requires Tor", the words iOS uses for onion nodes, never "unencrypted".
                     val onion = isOnionNode(parsed.uri)
-                    val tls = DefaultNodes.isTls(parsed.uri)
+                    val tls = parsed.tls
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -852,7 +866,7 @@ internal fun NodeDialog(
                                     } else {
                                         val credentials = parsed.credentials
                                             ?: if (typed) NodeCredentials(typedUsername, typedPassword) else null
-                                        onConfirm(name.trim(), parsed.uri, credentials)
+                                        onConfirm(name.trim(), parsed.uri, credentials, parsed.tls)
                                     }
                                 }
                             }

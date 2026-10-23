@@ -27,4 +27,37 @@ class DefaultNodesTest {
         assertEquals("node.monero.one:443", DefaultNodes.TOR_OFF_FALLBACK)
         assertFalse(isOnionNode(DefaultNodes.TOR_OFF_FALLBACK))
     }
+    @Test fun firstRunPicksMoneroOneOverTls() {
+        val pick = DefaultNodes.initial(FakeSharedPreferences())
+        assertEquals("node.monero.one:443", pick)
+        assertTrue(DefaultNodes.isTls(pick))
+    }
+    @Test fun firstRunPickIsKeptOnLaterLaunches() {
+        val prefs = FakeSharedPreferences()
+        val first = DefaultNodes.initial(prefs)
+        repeat(20) { assertEquals(first, DefaultNodes.initial(prefs)) }
+    }
+    @Test fun anInstallThatDrewAnotherDefaultKeepsIt() {
+        val prefs = FakeSharedPreferences()
+        prefs.edit().putString("initial_node", cake).apply()
+        assertEquals(cake, DefaultNodes.initial(prefs))
+    }
+    @Test fun everyClearnetDefaultIsTlsOnItsOwnPort() {
+        DefaultNodes.ALL.forEach { assertTrue(it.uri, it.tls && DefaultNodes.isTls(it.uri)) }
+        assertEquals("node.monero.one:443", DefaultNodes.ALL.first().uri)
+    }
+    @Test fun failoverAndAutoSelectCandidatesAreAllTls() {
+        assertTrue(DefaultNodes.URIS.all { DefaultNodes.isTls(it) })
+    }
+    @Test fun aCustomNodeIsTlsOnlyWhenMarkedOrOnPort443() {
+        val custom = "node.example.com:18089"
+        assertFalse(DefaultNodes.isTls(custom))
+        assertTrue(DefaultNodes.isTls(custom, setOf(custom)))
+        assertTrue(DefaultNodes.isTls("node.example.com:443"))
+        assertFalse(DefaultNodes.isTls("node.example.com:18081", setOf(custom)))
+    }
+    @Test fun onionDefaultsAreNotTlsMarked() {
+        // Tor encrypts the path; their probe stays plain HTTP as before.
+        assertTrue(DefaultNodes.TOR.none { DefaultNodes.isTls(it.uri) })
+    }
 }
