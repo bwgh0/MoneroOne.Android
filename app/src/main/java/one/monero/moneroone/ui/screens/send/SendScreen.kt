@@ -5,6 +5,7 @@ import one.monero.moneroone.core.contacts.ContactStore
 import one.monero.moneroone.core.contacts.Contacts
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.core.wallet.SendWait
+import one.monero.moneroone.data.util.AmountInput
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.DisposableEffect
 import android.view.MotionEvent
@@ -1318,12 +1319,10 @@ private fun AmountPhase(
                     .clip(CapsuleShape)
                     .background(MoneroOrange.copy(alpha = 0.15f))
                     .clickable {
-                        clipboardManager.getText()?.text?.let { clip ->
-                            val filtered = clip.filter { it.isDigit() || it == '.' }
-                            if (filtered.isNotEmpty()) {
-                                if (isFiatMode) { fiatString = filtered; syncXmrFromFiat() }
-                                else onAmountChange(filtered)
-                            }
+                        // An address or a link on the clipboard is not an amount: Paste leaves the field.
+                        clipboardManager.getText()?.text?.let(AmountInput::pasted)?.let { filtered ->
+                            if (isFiatMode) { fiatString = filtered; syncXmrFromFiat() }
+                            else onAmountChange(filtered)
                         }
                     }
                     .padding(horizontal = 12.dp, vertical = 6.dp)
