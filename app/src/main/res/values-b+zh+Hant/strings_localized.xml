@@ -376,6 +376,7 @@
     <string name="l10n_delete_contact_74ab8e34" formatted="false">"要刪除聯絡人嗎？"</string>
     <string name="l10n_delete_location_a85b0a95" formatted="false">"刪除位置"</string>
     <string name="l10n_delete_location_a3f3e9c5" formatted="false">"要刪除位置嗎？"</string>
+    <string name="l10n_delete_wallet_0f660a06" formatted="false">"刪除錢包"</string>
     <string name="l10n_delete_wallet_279d5ef5" formatted="false">"要刪除錢包嗎？"</string>
     <string name="l10n_delete_wallet_65684f30" formatted="false">"刪除"</string>
     <string name="l10n_denied_da404deb" formatted="false">"已拒絕"</string>
@@ -430,6 +431,7 @@
     <string name="l10n_edit_location_c081701b" formatted="false">"編輯位置"</string>
     <string name="l10n_edit_node_ce03c641" formatted="false">"編輯節點"</string>
     <string name="l10n_edit_proxy_ee3e6a16" formatted="false">"編輯代理伺服器"</string>
+    <string name="l10n_edit_wallet_cc6375a2" formatted="false">"編輯錢包"</string>
     <string name="l10n_emoji_61ad8976" formatted="false">"表情符號"</string>
     <string name="l10n_empty_c6c094bc" formatted="false">"空"</string>
     <string name="l10n_enable_5342e09f" formatted="false">"啟用"</string>

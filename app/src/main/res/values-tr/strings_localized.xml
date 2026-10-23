@@ -376,6 +376,7 @@
     <string name="l10n_delete_contact_74ab8e34" formatted="false">"Kişi Silinsin mi?"</string>
     <string name="l10n_delete_location_a85b0a95" formatted="false">"Konumu Sil"</string>
     <string name="l10n_delete_location_a3f3e9c5" formatted="false">"Konum Silinsin mi?"</string>
+    <string name="l10n_delete_wallet_0f660a06" formatted="false">"Cüzdanı Sil"</string>
     <string name="l10n_delete_wallet_279d5ef5" formatted="false">"Cüzdan Silinsin mi?"</string>
     <string name="l10n_delete_wallet_65684f30" formatted="false">"Sil"</string>
     <string name="l10n_denied_da404deb" formatted="false">"Reddedildi"</string>
@@ -430,6 +431,7 @@
     <string name="l10n_edit_location_c081701b" formatted="false">"Konumu Düzenle"</string>
     <string name="l10n_edit_node_ce03c641" formatted="false">"Düğümü Düzenle"</string>
     <string name="l10n_edit_proxy_ee3e6a16" formatted="false">"Proxy\'yi Düzenle"</string>
+    <string name="l10n_edit_wallet_cc6375a2" formatted="false">"Cüzdanı Düzenle"</string>
     <string name="l10n_emoji_61ad8976" formatted="false">"Emoji"</string>
     <string name="l10n_empty_c6c094bc" formatted="false">"Boş"</string>
     <string name="l10n_enable_5342e09f" formatted="false">"Etkinleştir"</string>

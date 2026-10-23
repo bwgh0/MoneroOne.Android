@@ -187,7 +187,8 @@ fun WalletSwitcherButton(
  * ring, then Add Wallet. Inline in WalletScreen, not a sheet.
  *
  * Gestures per row: tap = switch (or close when it is the active one),
- * pencil = rename, swipe left = delete (inactive rows), drag the handle on the
+ * pencil = Edit Wallet (name, icon, Delete Wallet for every wallet), swipe left =
+ * delete (inactive rows only), drag the handle on the
  * left = reorder, persisted through [onMove]. Balances follow Fiat Mode through
  * [liveBalanceText] and [formatBalance].
  */
@@ -351,7 +352,7 @@ fun WalletManagerRows(
                     onRenameRequest = { renameTarget = wallet },
                     onMoveUp = if (index > 0) ({ onMove(wallet.id, shown[index - 1].id) }) else null,
                     onMoveDown = if (index < shown.lastIndex) ({ onMove(wallet.id, shown.getOrNull(index + 2)?.id) }) else null,
-                    // The active wallet is deleted from Settings, not by a swipe.
+                    // The active wallet is deleted from Edit Wallet, not by a swipe.
                     onDeleteRequest = if (isActive) null else ({ deleteCandidate = wallet })
                 )
             }
@@ -361,12 +362,17 @@ fun WalletManagerRows(
     }
 
     renameTarget?.let { target ->
-        RenameWalletSheet(
+        EditWalletSheet(
             wallet = target,
             onDismiss = { renameTarget = null },
             onSave = { name, emoji ->
                 onRename(target, name, emoji)
                 renameTarget = null
+            },
+            onDelete = {
+                // The sheet closes; the confirmation opens as for a swipe.
+                renameTarget = null
+                deleteCandidate = target
             }
         )
     }
@@ -445,7 +451,7 @@ private enum class RowSwipe { Closed, Open }
 
 /**
  * One wallet row (iOS WalletRow): emoji, name, orange balance, address under
- * it, rename pencil, and a check when it is the active wallet. Swipe-to-delete
+ * it, Edit Wallet pencil, and a check when it is the active wallet. Swipe-to-delete
  * reveals a trash button in an overlay — only offset/alpha animate, the row
  * never re-lays-out (iOS aa8e835 lesson). The card follows the finger from the
  * touch slop on; a flick or a pull past 40% of the trash width opens it. The
@@ -585,7 +591,7 @@ private fun WalletRow(
                     selected = isActive
                     onClick(label = tr(if (isActive) "Close" else "Switch wallet")) { onClick(); true }
                     customActions = buildList {
-                        add(CustomAccessibilityAction(tr("Rename")) { onRenameRequest(); true })
+                        add(CustomAccessibilityAction(tr("Edit")) { onRenameRequest(); true })
                         onDeleteRequest?.let { add(CustomAccessibilityAction(tr("Delete")) { it(); true }) }
                         onMoveUp?.let { add(CustomAccessibilityAction(tr("Move up")) { it(); true }) }
                         onMoveDown?.let { add(CustomAccessibilityAction(tr("Move down")) { it(); true }) }
@@ -605,7 +611,7 @@ private fun WalletRow(
             IconButton(onClick = onRenameRequest) {
                 Icon(
                     imageVector = Icons.Default.Edit,
-                    contentDescription = tr("Rename Wallet"),
+                    contentDescription = tr("Edit Wallet"),
                     tint = MoneroTheme.colors.labelTertiary,
                     modifier = Modifier.size(18.dp)
                 )
@@ -867,13 +873,19 @@ fun EmojiCircle(emoji: String, size: androidx.compose.ui.unit.Dp, color: Color =
     }
 }
 
+/**
+ * Edit Wallet (iOS EditWalletSheet): the icon, the name, Save, and Delete
+ * Wallet last, for every wallet (a swipe deletes only inactive ones).
+ * [onDelete] closes the sheet and opens the caller's confirmation.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RenameWalletSheet(
+fun EditWalletSheet(
     wallet: WalletInfo,
     onDismiss: () -> Unit,
     onSave: (name: String, emoji: String) -> Unit,
-    title: String = tr("Rename Wallet")
+    onDelete: () -> Unit,
+    title: String = tr("Edit Wallet")
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var name by remember { mutableStateOf(wallet.name) }
@@ -953,6 +965,15 @@ fun RenameWalletSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(tr("Save"))
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            TextButton(
+                onClick = onDelete,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(tr("Delete Wallet"), color = ErrorRed)
             }
         }
     }

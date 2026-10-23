@@ -24,7 +24,7 @@ class WalletAccessibilityTest {
         rule.runOnIdle { block(actions) }
     }
 
-    @Test fun talkBackCanSwitchRenameAndReorderWithoutGestures() {
+    @Test fun talkBackCanSwitchEditAndReorderWithoutGestures() {
         val wallets = listOf(WalletInfo("first", "First"), WalletInfo("second", "Second"), WalletInfo("third", "Third"))
         var switched: String? = null
         var moved: Pair<String, String?>? = null
@@ -48,7 +48,7 @@ class WalletAccessibilityTest {
         }
         assertEquals("second" to "first", moved)
         second.withCustomActions() { actions ->
-            assertTrue(actions.first { it.label == tr("Rename") }.action())
+            assertTrue(actions.first { it.label == tr("Edit") }.action())
         }
         rule.onNode(hasSetTextAction()).assertExists()
     }

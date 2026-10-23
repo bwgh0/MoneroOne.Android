@@ -376,6 +376,7 @@
     <string name="l10n_delete_contact_74ab8e34" formatted="false">"連絡先を削除しますか?"</string>
     <string name="l10n_delete_location_a85b0a95" formatted="false">"場所を削除"</string>
     <string name="l10n_delete_location_a3f3e9c5" formatted="false">"場所を削除しますか?"</string>
+    <string name="l10n_delete_wallet_0f660a06" formatted="false">"ウォレットを削除"</string>
     <string name="l10n_delete_wallet_279d5ef5" formatted="false">"ウォレットを削除しますか?"</string>
     <string name="l10n_delete_wallet_65684f30" formatted="false">"削除"</string>
     <string name="l10n_denied_da404deb" formatted="false">"拒否"</string>
@@ -430,6 +431,7 @@
     <string name="l10n_edit_location_c081701b" formatted="false">"場所を編集"</string>
     <string name="l10n_edit_node_ce03c641" formatted="false">"ノードを編集"</string>
     <string name="l10n_edit_proxy_ee3e6a16" formatted="false">"プロキシを編集"</string>
+    <string name="l10n_edit_wallet_cc6375a2" formatted="false">"ウォレットを編集"</string>
     <string name="l10n_emoji_61ad8976" formatted="false">"絵文字"</string>
     <string name="l10n_empty_c6c094bc" formatted="false">"空"</string>
     <string name="l10n_enable_5342e09f" formatted="false">"有効にする"</string>
