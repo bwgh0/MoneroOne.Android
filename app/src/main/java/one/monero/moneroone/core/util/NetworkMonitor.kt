@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Build
+import android.os.SystemClock
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,11 @@ object NetworkMonitor {
      * blocking the app (Doze, the background restrictions).
      */
     val networkReturns: SharedFlow<Unit> = _networkReturns.asSharedFlow()
+
+    /** When the app last got the network back or moved to another one ([SystemClock.elapsedRealtime]); 0 before. */
+    @Volatile
+    var changedAt: Long = 0L
+        private set
 
     private lateinit var state: DefaultNetworkState<Network>
 
@@ -74,6 +80,7 @@ object NetworkMonitor {
 
     private fun publish(change: DefaultNetworkState.Change) {
         _isConnected.value = state.connected
+        if (change.switched || change.returned) changedAt = SystemClock.elapsedRealtime()
         if (change.switched) _networkChanges.tryEmit(Unit)
         if (change.returned) _networkReturns.tryEmit(Unit)
     }

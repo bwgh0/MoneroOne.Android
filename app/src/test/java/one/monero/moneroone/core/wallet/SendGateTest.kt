@@ -52,6 +52,13 @@ class SendGateTest {
         assertEquals(SendWait.NotConnected(nodeLoginFailed = true), wait(failed, kitRunning = false, nodeLoginFailed = true))
     }
 
+    @Test fun `a build fails for real only once the network has settled`() {
+        assertEquals(false, SendGate.networkSettling(now = 50_000, changedAt = 0))
+        assertEquals(true, SendGate.networkSettling(now = 50_000, changedAt = 49_926))
+        assertEquals(true, SendGate.networkSettling(now = 50_000, changedAt = 40_001))
+        assertEquals(false, SendGate.networkSettling(now = 50_000, changedAt = 40_000))
+    }
+
     @Test fun `a running link check hides the old error of the main wallet`() =
         assertEquals(
             SendWait.Syncing(SyncState.Connecting(waiting = true)),

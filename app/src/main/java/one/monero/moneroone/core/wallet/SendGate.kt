@@ -1,5 +1,6 @@
 package one.monero.moneroone.core.wallet
 
+import android.os.SystemClock
 import io.horizontalsystems.monerokit.MoneroKit
 import io.horizontalsystems.monerokit.SyncState
 import kotlinx.coroutines.delay
@@ -34,6 +35,18 @@ sealed interface SendWait {
 object SendGate {
     /** How often [states] reads the wallet: the kit's run state and a link check have no flow. */
     const val POLL_MS = 250L
+
+    /**
+     * The phone reports the network before the node can be reached again: a build that fails this soon after the
+     * network came back or changed runs again, every [SETTLE_RETRY_MS], instead of showing the error.
+     */
+    const val NETWORK_SETTLE_MS = 10_000L
+    const val SETTLE_RETRY_MS = 1_000L
+
+    /** The network came back or changed ([changedAt]) less than [NETWORK_SETTLE_MS] before [now]. */
+    fun networkSettling(now: Long, changedAt: Long): Boolean = changedAt > 0 && now - changedAt < NETWORK_SETTLE_MS
+
+    fun networkSettling(): Boolean = networkSettling(SystemClock.elapsedRealtime(), NetworkMonitor.changedAt)
 
     /**
      * [syncState]: the wallet's sync state, as the balance card shows it. [kitRunning]: the main wallet's kit has

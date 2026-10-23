@@ -67,8 +67,8 @@ import one.monero.moneroone.ui.theme.MoneroTheme
 
 /**
  * Review's wait for the main wallet ([SendGate]), on the wallet's state as the balance card shows it.
- * [states] feeds the status slot; a build waits in [awaitReady] and, after a failure, asks [readyNow]
- * whether the wallet stopped meanwhile.
+ * [states] feeds the status slot; a build waits in [awaitReady] and, after a failure, asks [retriesFailure]
+ * whether to run again.
  */
 @Stable
 class SendWaitGate(
@@ -83,6 +83,18 @@ class SendWaitGate(
 
     suspend fun awaitReady() {
         states.first { it == SendWait.Ready }
+    }
+
+    /**
+     * A build failed. True when it runs again: the wallet stopped meanwhile (the build waits for it in
+     * [awaitReady]), or the network came back or changed moments ago and the node is not reached yet (the build
+     * pauses [SendGate.SETTLE_RETRY_MS] first). False: a real failure, which the review shows.
+     */
+    suspend fun retriesFailure(): Boolean {
+        if (!readyNow()) return true
+        if (!SendGate.networkSettling()) return false
+        delay(SendGate.SETTLE_RETRY_MS)
+        return true
     }
 }
 

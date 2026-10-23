@@ -323,8 +323,9 @@ fun PaymentLinkReview(
                 // synced (a link check stops it for a moment).
                 gate.awaitReady()
                 val failure = build()
-                // The wallet stopped while the link was built: wait for it again instead of failing.
-                if (failure != null && !gate.readyNow()) continue
+                // The wallet stopped while the link was built, or the network just came back: build again
+                // instead of failing.
+                if (failure != null && gate.retriesFailure()) continue
                 error = failure
                 break
             }

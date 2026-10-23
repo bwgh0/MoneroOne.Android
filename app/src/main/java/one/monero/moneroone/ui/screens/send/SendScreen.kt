@@ -1368,8 +1368,9 @@ private fun ReviewPhase(
             } catch (e: Exception) {
                 ReviewFeeResult.Failed(e.message)
             }
-            // The wallet stopped while the transfer was built: wait for it again instead of failing.
-            if (result is ReviewFeeResult.Failed && !gate.readyNow()) continue
+            // The wallet stopped while the transfer was built, or the network just came back: build again
+            // instead of failing.
+            if (result is ReviewFeeResult.Failed && gate.retriesFailure()) continue
             break
         }
         when (result) {
