@@ -329,8 +329,9 @@ fun WalletScreen(
     // The switcher's open/closed flag outlives a wallet switch so the collapse
     // can animate (iOS batches prepareSwitchToWallet + isExpanded = false in
     // one withAnimation). Scroll position is the per-wallet state that must
-    // reset: a fresh LazyListState per wallet session epoch.
-    var switcherExpanded by remember { mutableStateOf(false) }
+    // reset: a fresh LazyListState per wallet session epoch. Saveable so the
+    // rows are still open on the way back from Transfer.
+    var switcherExpanded by rememberSaveable { mutableStateOf(false) }
     val listState = remember(walletSessionId) { LazyListState() }
 
     // The rating ask after the first send, only while nothing else is open on the home.
@@ -507,10 +508,9 @@ fun WalletScreen(
                             switcherExpanded = false
                             onAddWalletClick()
                         },
-                        onTransfer = {
-                            switcherExpanded = false
-                            onTransferClick()
-                        }
+                        // The rows stay open under Transfer, as iOS keeps them under its
+                        // sheet. Closing them here animated the home in during the push.
+                        onTransfer = onTransferClick
                     )
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
