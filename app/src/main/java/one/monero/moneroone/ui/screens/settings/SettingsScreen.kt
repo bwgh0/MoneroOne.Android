@@ -90,6 +90,7 @@ import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SettingsBlue
+import one.monero.moneroone.ui.theme.SettingsCyan
 import one.monero.moneroone.ui.theme.SettingsGray
 import one.monero.moneroone.ui.theme.SettingsGreen
 import one.monero.moneroone.ui.theme.SettingsIndigo
@@ -186,7 +187,7 @@ fun SettingsScreen(
                 title = tr("Fresh Receive Address"),
                 checked = freshAddress,
                 onCheckedChange = { freshAddress = it; walletViewModel.setFreshReceiveAddress(it) },
-                iconColor = SettingsBlue
+                iconColor = SettingsCyan
             )
         }
 
