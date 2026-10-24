@@ -598,6 +598,7 @@ fun SendScreen(
                 SendPhase.AMOUNT -> {
                     val currentPrice by walletViewModel.currentPrice.collectAsState()
                     val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+                    val fiatMode by walletViewModel.fiatMode.collectAsState()
                     AmountPhase(
                         amount = amount,
                         onAmountChange = { amount = it; isSweepAll = false; amountPrefilledFromQR = false },
@@ -614,6 +615,7 @@ fun SendScreen(
                         prefillSource = amountSource,
                         xmrPrice = currentPrice?.price,
                         currencySymbol = selectedCurrency.symbol,
+                        fiatMode = fiatMode,
                         memo = if (linkMode) linkNote else memo,
                         onMemoChange = { if (linkMode) linkNote = it.take(LinkNames.NOTE_LIMIT) else memo = it },
                         onContinue = { goForward(SendPhase.REVIEW) },
@@ -623,7 +625,6 @@ fun SendScreen(
                         recipientReady = !isTransfer || transferChoice != null,
                         header = if (isTransfer) {
                             {
-                                val fiatMode by walletViewModel.fiatMode.collectAsState()
                                 TransferToCard(
                                     wallets = wallets,
                                     current = current,
@@ -1201,6 +1202,8 @@ private fun AmountPhase(
     prefillSource: SendPrefillSource?,
     xmrPrice: Double?,
     currencySymbol: String,
+    /** Fiat Mode: the amount starts in fiat (iOS SendAmountStep.startsInFiat). */
+    fiatMode: Boolean,
     memo: String,
     onMemoChange: (String) -> Unit,
     onContinue: () -> Unit,
@@ -1218,8 +1221,11 @@ private fun AmountPhase(
     val canContinue = recipientReady && parsedAmount > 0 && parsedAmount <= unlockedBalance
     val clipboardManager = LocalClipboardManager.current
 
-    // Fiat mode toggle. Saved, as the amount is, through a recreation.
-    var isFiatMode by rememberSaveable { mutableStateOf(false) }
+    // Fiat mode toggle. Saved, as the amount is, through a recreation. Set once when the step
+    // appears, and only to fiat, so a swap to XMR stays (iOS SendAmountStep.onAppear).
+    var isFiatMode by rememberSaveable {
+        mutableStateOf(SendAmountStart.startsInFiat(fiatMode, xmrPrice, amount))
+    }
     var fiatString by rememberSaveable { mutableStateOf("") }
     var showMemo by rememberSaveable { mutableStateOf(memo.isNotEmpty()) }
 
