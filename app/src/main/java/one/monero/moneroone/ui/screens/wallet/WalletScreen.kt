@@ -330,8 +330,15 @@ fun WalletScreen(
     // can animate (iOS batches prepareSwitchToWallet + isExpanded = false in
     // one withAnimation). Scroll position is the per-wallet state that must
     // reset: a fresh LazyListState per wallet session epoch. Saveable so the
-    // rows are still open on the way back from Transfer.
-    var switcherExpanded by rememberSaveable { mutableStateOf(false) }
+    // rows are still open on the way back from Transfer or a cancelled Add
+    // Wallet. The rows are open for one wallet session: a wallet added
+    // behind them comes back to its home with the rows closed, as iOS
+    // rebuilds WalletView on walletSessionId.
+    var switcherSession by rememberSaveable { mutableStateOf<Long?>(null) }
+    val switcherExpanded = switcherSession == walletSessionId
+    fun setSwitcherExpanded(expanded: Boolean) {
+        switcherSession = if (expanded) walletSessionId else null
+    }
     val listState = remember(walletSessionId) { LazyListState() }
 
     // The rating ask after the first send, only while nothing else is open on the home.
@@ -377,7 +384,7 @@ fun WalletScreen(
             GreetingHeader(
                 activeWallet = activeWallet,
                 expanded = switcherExpanded,
-                onToggleSwitcher = { switcherExpanded = !switcherExpanded }
+                onToggleSwitcher = { setSwitcherExpanded(!switcherExpanded) }
             )
 
             // Offline banner, 8dp under the greeting as in the iOS header:
@@ -494,7 +501,7 @@ fun WalletScreen(
                             // collapse only when the switch was taken; a refused tap
                             // keeps the rows open (iOS prepareSwitchToWallet).
                             if (wallet.id == activeWallet?.id || walletViewModel.switchWallet(wallet.id)) {
-                                switcherExpanded = false
+                                setSwitcherExpanded(false)
                             }
                         },
                         onDelete = { wallet ->
@@ -504,12 +511,10 @@ fun WalletScreen(
                             walletViewModel.renameWallet(wallet.id, name, emoji)
                         },
                         onMove = walletViewModel::reorderWallets,
-                        onAddWallet = {
-                            switcherExpanded = false
-                            onAddWalletClick()
-                        },
-                        // The rows stay open under Transfer, as iOS keeps them under its
-                        // sheet. Closing them here animated the home in during the push.
+                        // The rows stay open under Add Wallet and Transfer, as iOS keeps
+                        // them under its cover and sheet. Closing them here animated the
+                        // home in during the push.
+                        onAddWallet = onAddWalletClick,
                         onTransfer = onTransferClick
                     )
                 } else {
