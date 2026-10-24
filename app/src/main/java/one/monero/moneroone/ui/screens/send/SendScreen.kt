@@ -1964,7 +1964,7 @@ private fun SampleBar(sample: String, style: TextStyle) {
 }
 
 /** TalkBack's hint on Send, given as the wait hint is: a state description. Labels only. */
-private fun Modifier.sendHint(hint: String?): Modifier =
+internal fun Modifier.sendHint(hint: String?): Modifier =
     if (hint == null) this else semantics { stateDescription = hint }
 
 /**

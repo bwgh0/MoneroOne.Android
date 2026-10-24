@@ -67,3 +67,19 @@ internal object SendReviewSpoken {
     fun sendHint(amount: Long, lines: ReviewAmountLines): String =
         lines.spokenFiatFirst?.let { tr("Double tap to send %s", it) } ?: tr("Double tap to send %s XMR", XmrFormat.format(amount))
 }
+
+/** What TalkBack reads on the Send with a Link Review (iOS PaymentLinkReviewStep). Labels only: nothing visible changes. */
+internal object LinkReviewSpoken {
+
+    /** A fee row, in the order of the screen: in Fiat Mode the fiat value, then the exact XMR; else the XMR alone. */
+    fun valueLabel(title: String, value: Long, lines: ReviewAmountLines): String =
+        "$title: ${lines.spokenFiatFirst ?: "${XmrFormat.format(value)} XMR"}"
+
+    /** A fee row while its value loads, in the app's language. */
+    fun loadingLabel(title: String): String = tr("%s: loading", title)
+
+    /** The hint on Send once the link and its fees are in: in Fiat Mode the fiat value, then the exact XMR; else the XMR alone. */
+    fun fundHint(amount: Long, lines: ReviewAmountLines): String =
+        lines.spokenFiatFirst?.let { tr("Double tap to fund the link with %s", it) }
+            ?: tr("Double tap to fund the link with %s XMR", XmrFormat.format(amount))
+}

@@ -99,8 +99,44 @@ class ReviewAmountLinesTest {
     }
 
     @Test
+    fun theLinkFeeRowsReadFiatFirstOnlyInFiatModeWithAPlausiblePrice() {
+        val fiatFirst = ReviewAmountLines.of(fee, price, Currency.USD, fiatMode = true)
+        assertEquals("Network Fee: $0.02, 0.00003152 XMR", LinkReviewSpoken.valueLabel("Network Fee", fee, fiatFirst))
+        assertEquals("Claim fee reserve: $0.02, 0.00003152 XMR", LinkReviewSpoken.valueLabel("Claim fee reserve", fee, fiatFirst))
+        val xmrFirst = ReviewAmountLines.of(fee, price, Currency.USD, fiatMode = false)
+        assertEquals("Network Fee: 0.00003152 XMR", LinkReviewSpoken.valueLabel("Network Fee", fee, xmrFirst))
+        val noPrice = ReviewAmountLines.of(fee, null, Currency.USD, fiatMode = true)
+        assertEquals("Claim fee reserve: 0.00003152 XMR", LinkReviewSpoken.valueLabel("Claim fee reserve", fee, noPrice))
+        val implausible = ReviewAmountLines.of(fee, 0.0, Currency.USD, fiatMode = true)
+        assertEquals("Network Fee: 0.00003152 XMR", LinkReviewSpoken.valueLabel("Network Fee", fee, implausible))
+    }
+
+    @Test
+    fun aLoadingLinkFeeRowReadsLoading() {
+        assertEquals("Network Fee: loading", LinkReviewSpoken.loadingLabel("Network Fee"))
+        assertEquals("Claim fee reserve: loading", LinkReviewSpoken.loadingLabel("Claim fee reserve"))
+    }
+
+    @Test
+    fun theFundHintReadsFiatFirstOnlyInFiatModeWithAPlausiblePrice() {
+        val fiatFirst = ReviewAmountLines.of(sent, price, Currency.USD, fiatMode = true)
+        assertEquals("Double tap to fund the link with $2.51, 0.004181066248 XMR", LinkReviewSpoken.fundHint(sent, fiatFirst))
+        val xmrFirst = ReviewAmountLines.of(sent, price, Currency.USD, fiatMode = false)
+        assertEquals("Double tap to fund the link with 0.004181066248 XMR", LinkReviewSpoken.fundHint(sent, xmrFirst))
+        for (fiatMode in listOf(true, false)) {
+            val noPrice = ReviewAmountLines.of(sent, null, Currency.USD, fiatMode)
+            assertEquals("Double tap to fund the link with 0.004181066248 XMR", LinkReviewSpoken.fundHint(sent, noPrice))
+        }
+        val implausible = ReviewAmountLines.of(sent, 0.0, Currency.USD, fiatMode = true)
+        assertEquals("Double tap to fund the link with 0.004181066248 XMR", LinkReviewSpoken.fundHint(sent, implausible))
+    }
+
+    @Test
     fun theSpokenStringsAreTranslated() {
-        for (source in listOf("Network fee: %s", "Network fee: %s XMR", "Network fee: loading", "Double tap to send %s", "Double tap to send %s XMR")) {
+        for (source in listOf(
+            "Network fee: %s", "Network fee: %s XMR", "Network fee: loading", "Double tap to send %s", "Double tap to send %s XMR",
+            "%s: loading", "Double tap to fund the link with %s", "Double tap to fund the link with %s XMR"
+        )) {
             assertTrue(source, localizedStrings.containsKey(source))
         }
     }

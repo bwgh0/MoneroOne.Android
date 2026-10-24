@@ -2,7 +2,9 @@ package one.monero.moneroone.paymentlinks
 
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.ui.screens.send.sendWaitHint
+import one.monero.moneroone.ui.screens.send.LinkReviewSpoken
 import one.monero.moneroone.ui.screens.send.ReviewAmountLines
+import one.monero.moneroone.ui.screens.send.sendHint
 import one.monero.moneroone.ui.screens.send.ReviewLinesPlaceholder
 import one.monero.moneroone.ui.screens.send.collectAsState
 import one.monero.moneroone.ui.screens.send.ValuePlaceholder
@@ -211,9 +213,11 @@ internal fun CautionBanner(text: String, modifier: Modifier = Modifier) {
     }
 }
 
+/** [spoken] replaces what TalkBack reads for the row (a fee row reads as one, in the order of the screen). */
 @Composable
-private fun ReviewRow(label: String, value: @Composable () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
+private fun ReviewRow(label: String, spoken: String? = null, value: @Composable () -> Unit) {
+    val semantics = if (spoken != null) Modifier.clearAndSetSemantics { contentDescription = spoken } else Modifier.semantics(mergeDescendants = true) {}
+    Row(modifier = Modifier.fillMaxWidth().then(semantics), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.weight(1f))
         value()
@@ -363,6 +367,9 @@ fun PaymentLinkReview(
 
     // An amount in the order Fiat Mode picks, as on the Send Review (iOS PaymentLinkReviewStep.lines).
     fun lines(atomic: Long) = ReviewAmountLines.of(atomic, xmrPrice, currency, fiatMode)
+    // TalkBack reads a fee row as one, in the order of the screen, or "<title>: loading" (iOS valueLabel, loadingLabel).
+    fun feeSpoken(title: String, value: Long) =
+        if (feeReady) LinkReviewSpoken.valueLabel(title, value, lines(value)) else LinkReviewSpoken.loadingLabel(title)
 
     Column(
         modifier = Modifier
@@ -428,11 +435,11 @@ fun PaymentLinkReview(
 
                     // Gray placeholders hold each value until it is known; an error shows in the status slot.
                     val valueStyle = MaterialTheme.typography.bodyMedium
-                    ReviewRow(tr("Network Fee")) {
+                    ReviewRow(tr("Network Fee"), spoken = feeSpoken(tr("Network Fee"), networkFee)) {
                         FeeValue(feeReady, lines(networkFee), feeSample = lines(ReviewAmountLines.FEE_SAMPLE_ATOMIC))
                     }
                     Spacer(modifier = Modifier.height(12.dp))
-                    ReviewRow(tr("Claim fee reserve")) {
+                    ReviewRow(tr("Claim fee reserve"), spoken = feeSpoken(tr("Claim fee reserve"), reserve)) {
                         FeeValue(feeReady, lines(reserve), feeSample = lines(ReviewAmountLines.FEE_SAMPLE_ATOMIC))
                     }
                     Text(
@@ -503,12 +510,17 @@ fun PaymentLinkReview(
             onRetryBuild = { attempt++ }
         )
 
+        // TalkBack on Send once the link and its fees are in: the amount it funds, in the order of the screen
+        // (iOS fundHint).
+        val fundHint = if (feeReady) LinkReviewSpoken.fundHint(amount, lines(amount)) else null
+
         @OptIn(ExperimentalComposeUiApi::class)
         PrimaryButton(
             onClick = { draft?.let { onConfirm(it, reserve, prepared) } },
             modifier = Modifier
                 .fillMaxWidth()
                 .sendWaitHint(building && wait != SendWait.Ready)
+                .sendHint(fundHint)
                 .pointerInteropFilter { event -> (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0 },
             enabled = feeReady && !overBalance && prepared != null && !sendInProgress
         ) {
