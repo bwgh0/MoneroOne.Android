@@ -179,7 +179,7 @@ fun RestoreWalletScreen(
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.background)
                         .navigationBarsPadding()
-                        .padding(horizontal = 24.dp)
+                        .padding(horizontal = 16.dp)
                 ) {
                     Spacer(modifier = Modifier.height(8.dp))
                     PrimaryButton(
@@ -222,7 +222,9 @@ fun RestoreWalletScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+                    // iOS: 16 on the seed step; the naming step keeps the
+                    // margins it has on Create.
+                    .padding(horizontal = if (namingStep) 24.dp else 16.dp)
                     .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -269,7 +271,8 @@ fun RestoreWalletScreen(
                     modifier = Modifier.semantics { heading() }
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                // iOS: heading, hint and word grid 24 apart.
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
                     text = tr("16 words (Polyseed), 24 words (BIP39), or 25 words (Legacy)"),
@@ -327,7 +330,7 @@ fun RestoreWalletScreen(
                 Spacer(modifier = Modifier.height(32.dp))
             }
             if (!namingStep && entry.focusedIndex != null && WindowInsets.isImeVisible) {
-                SeedSuggestionBar(entry, applyEffect, Modifier.padding(horizontal = 24.dp))
+                SeedSuggestionBar(entry, applyEffect, Modifier.padding(horizontal = 16.dp))
             }
         }
     }
