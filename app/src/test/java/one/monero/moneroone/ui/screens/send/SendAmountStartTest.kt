@@ -58,17 +58,24 @@ class SendAmountStartTest {
         assertFalse(SendAmountStart.linkKeepsFiat(linkAmount = "0.25"))
     }
 
-    @Test fun aLinkWithNoAmountKeepsTheUnitAndTheTypedFiat() {
+    @Test fun aLinkWithNoAmountKeepsTheUnit() {
+        // The amount clears; the step stays in the unit it shows (in fiat, an empty fiat amount).
         assertTrue(SendAmountStart.linkKeepsFiat(linkAmount = ""))
     }
 
     @Test fun aLinkOnTheRecipientStepOrReviewDoesNotBringTheOldFiatBack() {
-        // The link's amount equals the XMR of the typed fiat: with the typed fiat dropped, the
-        // step that comes next starts in XMR with the link's amount.
+        // The link's amount equals the XMR of the typed fiat: any link drops the typed fiat, so
+        // the step that comes next starts in XMR with the link's amount.
         val linkAmount = typed.xmr
-        val kept = if (SendAmountStart.linkKeepsFiat(linkAmount)) typed else null
-        assertNull(SendAmountStart.restoredFiat(kept, amount = linkAmount, price = price))
+        assertNull(SendAmountStart.restoredFiat(null, amount = linkAmount, price = price))
         assertFalse(SendAmountStart.startsInFiat(fiatMode = true, price = price, amount = linkAmount))
+    }
+
+    @Test fun aLinkWithNoAmountOnTheRecipientStepOrReviewStartsEmptyInFiat() {
+        // The amount cleared and the typed fiat is dropped: the step starts as on a fresh Send.
+        assertNull(SendAmountStart.restoredFiat(null, amount = "", price = price))
+        assertTrue(SendAmountStart.startsInFiat(fiatMode = true, price = price, amount = ""))
+        assertFalse(SendAmountStart.startsInFiat(fiatMode = false, price = price, amount = ""))
     }
 
     @Test fun aSwappedFiatAmountShowsAsTyped() {

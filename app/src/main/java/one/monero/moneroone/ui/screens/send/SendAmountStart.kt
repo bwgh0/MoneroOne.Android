@@ -42,9 +42,9 @@ internal object SendAmountStart {
     /**
      * A `monero:` link filled the flow (iOS SendAmountStep.linkKeepsFiat), with [linkAmount] the
      * amount it filled in ("" for none). A link with an amount shows that amount in XMR, as it
-     * came (like any filled-in amount), and the fiat the user typed before is dropped, so a later
-     * return does not bring it back. A link with no amount leaves the unit and the typed fiat as
-     * they are.
+     * came (like any filled-in amount). A link with no amount clears the amount and leaves the unit
+     * as it is: in fiat the step shows an empty fiat amount, as on a fresh Send. Either way the
+     * fiat the user typed before is dropped, so a later return does not bring it back.
      */
     fun linkKeepsFiat(linkAmount: String): Boolean = linkAmount.isEmpty()
 
