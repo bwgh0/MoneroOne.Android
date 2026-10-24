@@ -28,7 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.ui.components.AddWalletFlowEffect
-import one.monero.moneroone.ui.components.MoneroLogo
+import one.monero.moneroone.ui.components.AnimatedWalletIcon
 import one.monero.moneroone.ui.components.PrimaryButton
 
 /**
@@ -48,7 +48,8 @@ fun AddWalletScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(tr("Add Wallet"), style = MaterialTheme.typography.titleMedium) },
+                // iOS: no bar title; the hero carries the one title.
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("Back"))
@@ -58,40 +59,45 @@ fun AddWalletScreen(
             )
         }
     ) { padding ->
+        // iOS AddWalletView: one column 24 apart, the copy inset 32, the
+        // buttons 16 from the edges and 32 above the bottom.
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 24.dp),
+                .padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            MoneroLogo(size = 120.dp)
+            AnimatedWalletIcon(size = 120.dp)
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = tr("Add a Wallet"),
+                text = tr("Add Wallet"),
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = tr("Create a fresh wallet or restore one from its seed phrase. It will use your existing PIN."),
+                text = tr("Create a new wallet or restore an existing one from your seed phrase."),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 32.dp)
             )
 
+            Spacer(modifier = Modifier.height(24.dp))
             Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // iOS Add Wallet: every action is a glass button with a brand label.
             PrimaryButton(
                 onClick = onCreateWallet,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             ) {
                 Icon(Icons.Filled.AddCircle, contentDescription = null, modifier = Modifier.size(20.dp))
                 Text(tr("Create New Wallet"))
@@ -101,7 +107,7 @@ fun AddWalletScreen(
 
             PrimaryButton(
                 onClick = onRestoreWallet,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             ) {
                 Icon(Icons.Filled.ReplayCircleFilled, contentDescription = null, modifier = Modifier.size(20.dp))
                 Text(tr("Restore Wallet"))

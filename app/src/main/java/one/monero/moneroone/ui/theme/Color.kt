@@ -38,6 +38,11 @@ val MoneroOrangePressed: Color
     @Composable @ReadOnlyComposable
     get() = if (LocalDarkTheme.current) MoneroOrangePressedNight else MoneroOrangePressedDay
 
+// The Add Wallet glyph's gradient ends (tokens.json motion.hero heroGlow:
+// brandHighlight to brand to brandShade, decorative only; iOS BrandColors).
+val BrandHighlight = Color(0xFFFF8533)
+val BrandShade = Color(0xFFD95700)
+
 /** Pending and in-flight states (connecting, syncing, 0-9 confirmations) use the brand orange. */
 val PendingOrange: Color
     @Composable @ReadOnlyComposable

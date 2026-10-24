@@ -180,14 +180,26 @@ fun AnimatedMoneroLogo(
     }
 }
 
-/** The shine band, drawn centered and moved so its left edge sits at [offset] x [logoSize]. */
+/**
+ * The shine band, drawn centered and moved so its left edge sits at [offset] x
+ * [logoSize]. Its white profile runs 0 / [mid] / [peak] / [mid] / 0 across
+ * [width] x [logoSize], blurred by [sigma]. The defaults are the logo's
+ * (heroShine); the Add Wallet glyph passes its own (iOS AnimatedWalletIcon).
+ */
 @Composable
-private fun ShineBand(logoSize: Dp, offset: () -> Float) {
+internal fun ShineBand(
+    logoSize: Dp,
+    offset: () -> Float,
+    width: Float = ShineWidth,
+    sigma: Dp = ShineSigma,
+    mid: Float = 0.3f,
+    peak: Float = 0.6f
+) {
     val density = LocalDensity.current
-    val band = logoSize * ShineWidth
-    val pad = ShineSigma * 3
-    val preBlurred: Brush? = if (Build.VERSION.SDK_INT >= 31) null else remember(logoSize, density) {
-        with(density) { blurredBandBrush(band.toPx(), ShineSigma.toPx(), pad.toPx()) }
+    val band = logoSize * width
+    val pad = sigma * 3
+    val preBlurred: Brush? = if (Build.VERSION.SDK_INT >= 31) null else remember(logoSize, width, sigma, mid, peak, density) {
+        with(density) { blurredBandBrush(band.toPx(), sigma.toPx(), pad.toPx(), mid, peak) }
     }
     Box(
         modifier = Modifier
@@ -198,7 +210,7 @@ private fun ShineBand(logoSize: Dp, offset: () -> Float) {
             }
             .then(
                 if (preBlurred == null) {
-                    Modifier.blur(with(density) { blurRadius(ShineSigma) }, BlurredEdgeTreatment.Unbounded)
+                    Modifier.blur(with(density) { blurRadius(sigma) }, BlurredEdgeTreatment.Unbounded)
                 } else {
                     Modifier
                 }
@@ -213,9 +225,9 @@ private fun ShineBand(logoSize: Dp, offset: () -> Float) {
                     drawRect(
                         brush = Brush.horizontalGradient(
                             0f to Clear,
-                            0.25f to Color.White.copy(alpha = 0.3f),
-                            0.5f to Color.White.copy(alpha = 0.6f),
-                            0.75f to Color.White.copy(alpha = 0.3f),
+                            0.25f to Color.White.copy(alpha = mid),
+                            0.5f to Color.White.copy(alpha = peak),
+                            0.75f to Color.White.copy(alpha = mid),
                             1f to Clear,
                             startX = p,
                             endX = p + w
@@ -228,18 +240,19 @@ private fun ShineBand(logoSize: Dp, offset: () -> Float) {
     )
 }
 
-/** The glow ellipse, blurred, with room around it for the blur to spread. */
+/** The glow ellipse, blurred by [sigma], with room around it for the blur to spread. */
 @Composable
-private fun GlowEllipse(
+internal fun GlowEllipse(
     width: Dp,
     height: Dp,
     color: Color,
+    sigma: Dp = GlowSigma,
     layer: GraphicsLayerScope.() -> Unit
 ) {
     val density = LocalDensity.current
-    val pad = GlowSigma * 3
-    val preBlurred: ImageBitmap? = if (Build.VERSION.SDK_INT >= 31) null else remember(width, height, color, density) {
-        with(density) { blurredOval(width.toPx(), height.toPx(), pad.toPx(), GlowSigma.toPx(), color) }
+    val pad = sigma * 3
+    val preBlurred: ImageBitmap? = if (Build.VERSION.SDK_INT >= 31) null else remember(width, height, color, sigma, density) {
+        with(density) { blurredOval(width.toPx(), height.toPx(), pad.toPx(), sigma.toPx(), color) }
     }
     Box(
         modifier = Modifier
@@ -247,7 +260,7 @@ private fun GlowEllipse(
             .graphicsLayer(layer)
             .then(
                 if (preBlurred == null) {
-                    Modifier.blur(with(density) { blurRadius(GlowSigma) }, BlurredEdgeTreatment.Unbounded)
+                    Modifier.blur(with(density) { blurRadius(sigma) }, BlurredEdgeTreatment.Unbounded)
                 } else {
                     Modifier
                 }
@@ -267,9 +280,9 @@ private fun GlowEllipse(
 private val Clear = Color.White.copy(alpha = 0f)
 
 /** The Android blur radius (Modifier.blur, BlurMaskFilter) that draws a Gaussian of [sigma]. */
-private fun Density.blurRadius(sigma: Dp): Dp = radiusForSigma(sigma.toPx()).toDp()
+internal fun Density.blurRadius(sigma: Dp): Dp = radiusForSigma(sigma.toPx()).toDp()
 
-private fun radiusForSigma(sigmaPx: Float): Float = ((sigmaPx - 0.5f) / 0.57735f).coerceAtLeast(0f)
+internal fun radiusForSigma(sigmaPx: Float): Float = ((sigmaPx - 0.5f) / 0.57735f).coerceAtLeast(0f)
 
 /** API 27-30: the glow ellipse blurred once in software (BlurMaskFilter is software only there). */
 private fun blurredOval(width: Float, height: Float, pad: Float, sigma: Float, color: Color): ImageBitmap {
@@ -289,8 +302,10 @@ private fun blurredOval(width: Float, height: Float, pad: Float, sigma: Float, c
 /**
  * API 27-30: the shine band's gradient already blurred sideways (the band
  * profile convolved with the Gaussian), across a node [band] + 2 x [pad] wide.
+ * The profile is linear between 0 at the edges, [mid] at the quarters and
+ * [peak] at the center.
  */
-private fun blurredBandBrush(band: Float, sigma: Float, pad: Float): Brush {
+private fun blurredBandBrush(band: Float, sigma: Float, pad: Float, mid: Float, peak: Float): Brush {
     val total = band + pad * 2
     val half = band / 2
     val steps = 32
@@ -302,7 +317,8 @@ private fun blurredBandBrush(band: Float, sigma: Float, pad: Float): Brush {
         var sum = 0f
         for (j in 0..fine) {
             val u = -half + du * j
-            val tri = 0.6f * (1f - abs(u) / half)
+            val q = abs(u) / half * 2f   // 0 at the center, 1 at a quarter, 2 at an edge
+            val tri = if (q <= 1f) peak + (mid - peak) * q else mid * (2f - q)
             sum += tri * exp(-((x - u) * (x - u)) / (2f * sigma * sigma)) * du
         }
         (i.toFloat() / steps) to Color.White.copy(alpha = (sum / norm).coerceIn(0f, 1f))
