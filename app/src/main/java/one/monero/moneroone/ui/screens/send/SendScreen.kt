@@ -1299,7 +1299,8 @@ private fun AmountPhase(
                         if (xmrVal > 0) "≈ ${currencySymbol}${"%.2f".format(xmrVal * xmrPrice)}" else "≈ ${currencySymbol}0"
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    // iOS: .secondary inside a Button, the brand tint at the secondary level.
+                    color = MoneroOrange.copy(alpha = 0.5f)
                 )
                 Text("⇅", style = MaterialTheme.typography.bodyMedium, color = MoneroOrange)
             }
@@ -1364,7 +1365,7 @@ private fun AmountPhase(
         ) {
             Icon(Icons.Default.Description, contentDescription = null, tint = memoTint, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text(memoToggleText(showMemo, linkMode), style = MaterialTheme.typography.bodyMedium, color = memoTint)
+            Text(memoToggleText(showMemo, linkMode), style = MaterialTheme.typography.bodySmall, color = memoTint)
             Spacer(modifier = Modifier.weight(1f))
             Icon(
                 Icons.Default.KeyboardArrowDown,
