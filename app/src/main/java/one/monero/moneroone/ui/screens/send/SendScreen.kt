@@ -352,6 +352,9 @@ fun SendScreen(
     var showAuthGate by remember { mutableStateOf(false) }
     var amountPrefilledFromQR by rememberSaveable { mutableStateOf(prefilledAmount != null) }
     var amountSource by rememberSaveable { mutableStateOf(prefillSource) }
+    // The amount as typed in fiat, kept while the amount step is gone (back to the recipient,
+    // on to Review), so the amount comes back in fiat (iOS SendFlowView.typedFiat).
+    var typedFiat by rememberSaveable(stateSaver = TypedFiat.Saver) { mutableStateOf<TypedFiat?>(null) }
 
     // Fee state, built on the REVIEW phase: the review builds and signs the transfer, shows its real fee, and
     // Send broadcasts that same transfer (reviewFee.prepared).
@@ -616,6 +619,8 @@ fun SendScreen(
                         xmrPrice = currentPrice?.price,
                         currencySymbol = selectedCurrency.symbol,
                         fiatMode = fiatMode,
+                        typedFiat = typedFiat,
+                        onTypedFiat = { typedFiat = it },
                         memo = if (linkMode) linkNote else memo,
                         onMemoChange = { if (linkMode) linkNote = it.take(LinkNames.NOTE_LIMIT) else memo = it },
                         onContinue = { goForward(SendPhase.REVIEW) },
@@ -1204,6 +1209,10 @@ private fun AmountPhase(
     currencySymbol: String,
     /** Fiat Mode: the amount starts in fiat (iOS SendAmountStep.startsInFiat). */
     fiatMode: Boolean,
+    /** The amount typed in fiat when the step last went away; it comes back in fiat. */
+    typedFiat: TypedFiat?,
+    /** The step goes away: the fiat text and its XMR, or null when it shows XMR. */
+    onTypedFiat: (TypedFiat?) -> Unit,
     memo: String,
     onMemoChange: (String) -> Unit,
     onContinue: () -> Unit,
@@ -1222,11 +1231,13 @@ private fun AmountPhase(
     val clipboardManager = LocalClipboardManager.current
 
     // Fiat mode toggle. Saved, as the amount is, through a recreation. Set once when the step
-    // appears, and only to fiat, so a swap to XMR stays (iOS SendAmountStep.onAppear).
+    // appears, and only to fiat, so a swap to XMR stays (iOS SendAmountStep.onAppear): the fiat
+    // the user typed comes back while the amount is still its XMR; else Fiat Mode decides.
+    val restoredFiat = remember { SendAmountStart.restoredFiat(typedFiat, amount, xmrPrice) }
     var isFiatMode by rememberSaveable {
-        mutableStateOf(SendAmountStart.startsInFiat(fiatMode, xmrPrice, amount))
+        mutableStateOf(restoredFiat != null || SendAmountStart.startsInFiat(fiatMode, xmrPrice, amount))
     }
-    var fiatString by rememberSaveable { mutableStateOf("") }
+    var fiatString by rememberSaveable { mutableStateOf(restoredFiat.orEmpty()) }
     var showMemo by rememberSaveable { mutableStateOf(memo.isNotEmpty()) }
 
     // Sync fiat ↔ XMR when toggling or typing
@@ -1243,6 +1254,13 @@ private fun AmountPhase(
         val xmr = fiatVal / price
         onAmountChange(if (xmr > 0) "%.12f".format(java.util.Locale.US, xmr).trimEnd('0').trimEnd('.') else "")
     }
+
+    // The fiat that came back keeps its text; its XMR follows the current price (iOS onChange(of: fiatString)).
+    LaunchedEffect(Unit) { if (restoredFiat != null && isFiatMode) syncXmrFromFiat() }
+    // The step goes away: the flow keeps the fiat text and its XMR (iOS SendAmountStep.onDisappear).
+    val leaving by rememberUpdatedState(if (isFiatMode) TypedFiat(fiatString, amount) else null)
+    val keepTypedFiat by rememberUpdatedState(onTypedFiat)
+    DisposableEffect(Unit) { onDispose { keepTypedFiat(leaving) } }
 
     // Entrance animation
     var visible by remember { mutableStateOf(false) }
