@@ -702,7 +702,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
      * primary address carries a null spend key, or when the open wallet file
      * does not derive from the stored seed: a burn address, or an address the
      * backed-up words cannot spend from, must never be shown (fail closed, iOS
-     * parity). Only a checked primary address from the open wallet file is
+     * parity). Only a primary address checked against the wallet file is
      * cached on the wallet's row.
      */
     private suspend fun publishAddresses(info: WalletInfo, kit: MoneroKit) {
@@ -748,7 +748,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 )
             )
         }
-        if (!blocked && read.complete && primary != null) {
+        // A node that does not answer closes the file again before start() returns: the address that
+        // the file showed during the open is checked, so the row caches it without a node.
+        if (!blocked && read.fileChecked && primary != null) {
             mergeWalletUpdate(info.id) {
                 if (it.cachedPrimaryAddress == primary) it else it.copy(cachedPrimaryAddress = primary)
             }
