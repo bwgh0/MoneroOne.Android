@@ -52,4 +52,12 @@ class SendAmountStartTest {
         assertNull(SendAmountStart.restoredFiat(typed, amount = "0.302260911618", price = null))
         assertNull(SendAmountStart.restoredFiat(typed, amount = "0.302260911618", price = Double.NaN))
     }
+
+    @Test fun aSwappedFiatAmountShowsAsTyped() {
+        // iOS formatFiatNumber: two decimals at most, no trailing zeros, no thousands separator.
+        assertEquals("1223.56", SendAmountStart.fiatInput(1223.564))
+        assertEquals("2.5", SendAmountStart.fiatInput(2.5))
+        assertEquals("100", SendAmountStart.fiatInput(100.0))
+        assertEquals("0", SendAmountStart.fiatInput(0.001))
+    }
 }

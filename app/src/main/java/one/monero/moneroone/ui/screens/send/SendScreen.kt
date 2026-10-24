@@ -5,7 +5,9 @@ import one.monero.moneroone.core.contacts.ContactStore
 import one.monero.moneroone.core.contacts.Contacts
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.core.wallet.SendWait
+import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.util.AmountInput
+import one.monero.moneroone.data.util.MoneyFormat
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.DisposableEffect
 import android.view.MotionEvent
@@ -617,7 +619,7 @@ fun SendScreen(
                         amountPrefilledFromQR = amountPrefilledFromQR,
                         prefillSource = amountSource,
                         xmrPrice = currentPrice?.price,
-                        currencySymbol = selectedCurrency.symbol,
+                        currency = selectedCurrency,
                         fiatMode = fiatMode,
                         typedFiat = typedFiat,
                         onTypedFiat = { typedFiat = it },
@@ -637,7 +639,7 @@ fun SendScreen(
                                     destinationOf = destinationOf,
                                     balanceText = { atomic ->
                                         currentPrice?.price?.takeIf { fiatMode }?.let { price ->
-                                            formatFiatAmount(atomic / 1_000_000_000_000.0 * price, selectedCurrency.symbol)
+                                            MoneyFormat.format(atomic / 1_000_000_000_000.0 * price, selectedCurrency, fractionDigits = 2)
                                         } ?: "${walletViewModel.formatXmr(atomic)} XMR"
                                     },
                                     onChoose = { transferChosenId = it.id }
@@ -662,7 +664,7 @@ fun SendScreen(
                         onRetryWait = retryWait,
                         rebuild = linkRebuild,
                         xmrPrice = currentPrice?.price,
-                        currencySymbol = selectedCurrency.symbol,
+                        currency = selectedCurrency,
                         sendInProgress = sendInProgress,
                         note = LinkNames.cleanNote(linkNote).orEmpty(),
                         onConfirm = { draft, reserve, prepared ->
@@ -701,7 +703,7 @@ fun SendScreen(
                             )
                         },
                         xmrPrice = currentPrice?.price,
-                        currencySymbol = selectedCurrency.symbol,
+                        currency = selectedCurrency,
                         sendInProgress = sendInProgress,
                         gate = sendWaitGate,
                         onRetryWait = retryWait,
@@ -720,7 +722,7 @@ fun SendScreen(
                     // A link's amount is the note's: what the link holds.
                     val sent = if (linkMode) draft?.amount ?: 0L else sentAtomic
                     val xmr = walletViewModel.formatXmr(sent)
-                    val fiat = currentPrice?.price?.let { "${selectedCurrency.symbol}${"%.2f".format(sent / 1_000_000_000_000.0 * it)}" }
+                    val fiat = currentPrice?.price?.let { MoneyFormat.format(sent / 1_000_000_000_000.0 * it, selectedCurrency, fractionDigits = 2) }
                     val amount = when {
                         sent <= 0L -> null
                         fiatMode && fiat != null -> SentAmount(fiat, null, "$xmr XMR")
@@ -1206,7 +1208,8 @@ private fun AmountPhase(
     amountPrefilledFromQR: Boolean,
     prefillSource: SendPrefillSource?,
     xmrPrice: Double?,
-    currencySymbol: String,
+    /** The selected currency: its symbol before a fiat amount, its format for fiat lines. */
+    currency: Currency,
     /** Fiat Mode: the amount starts in fiat (iOS SendAmountStep.startsInFiat). */
     fiatMode: Boolean,
     /** The amount typed in fiat when the step last went away; it comes back in fiat. */
@@ -1244,7 +1247,7 @@ private fun AmountPhase(
     fun syncFiatFromXmr() {
         val price = xmrPrice ?: return
         val xmrVal = amount.toDoubleOrNull() ?: 0.0
-        fiatString = if (xmrVal > 0) "%.2f".format(java.util.Locale.US, xmrVal * price) else ""
+        fiatString = if (xmrVal > 0) SendAmountStart.fiatInput(xmrVal * price) else ""
     }
 
     fun syncXmrFromFiat() {
@@ -1308,7 +1311,7 @@ private fun AmountPhase(
         if (isFiatMode) {
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {
                 Text(
-                    text = currencySymbol,
+                    text = currency.symbol,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1382,7 +1385,7 @@ private fun AmountPhase(
                         "≈ ${amount.ifEmpty { "0" }} XMR"
                     } else {
                         val xmrVal = amount.toDoubleOrNull() ?: 0.0
-                        if (xmrVal > 0) "≈ ${currencySymbol}${"%.2f".format(xmrVal * xmrPrice)}" else "≈ ${currencySymbol}0"
+                        if (xmrVal > 0) "≈ ${MoneyFormat.format(xmrVal * xmrPrice, currency, fractionDigits = 2)}" else "≈ ${currency.symbol}0"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     // iOS: .secondary inside a Button, the brand tint at the secondary level.
@@ -1547,7 +1550,7 @@ private fun ReviewPhase(
     /** Builds and signs the transfer (amount, sweep, unlocked balance). Blocking: called off Main. */
     buildFee: (Long, Boolean, Long) -> ReviewFeeResult,
     xmrPrice: Double?,
-    currencySymbol: String,
+    currency: Currency,
     sendInProgress: Boolean,
     /** The wait for the main wallet: the review builds only once it runs and is synced. */
     gate: SendWaitGate,
@@ -1727,7 +1730,7 @@ private fun ReviewPhase(
                                 xmrPrice?.let { price ->
                                     val fiat = atomicToXmr(sendAmount) * price
                                     Text(
-                                        "≈ ${currencySymbol}${"%.2f".format(fiat)}",
+                                        "≈ ${MoneyFormat.format(fiat, currency, fractionDigits = 2)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1744,7 +1747,7 @@ private fun ReviewPhase(
                             xmrPrice?.let { price ->
                                 val fiat = atomicToXmr(parsedAmount) * price
                                 Text(
-                                    "≈ ${currencySymbol}${"%.2f".format(fiat)}",
+                                    "≈ ${MoneyFormat.format(fiat, currency, fractionDigits = 2)}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1775,7 +1778,7 @@ private fun ReviewPhase(
                                 xmrPrice?.let { price ->
                                     val fiat = atomicToXmr(estimatedFee) * price
                                     Text(
-                                        "≈ ${currencySymbol}${"%.2f".format(fiat)}",
+                                        "≈ ${MoneyFormat.format(fiat, currency, fractionDigits = 2)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1813,7 +1816,7 @@ private fun ReviewPhase(
                                     xmrPrice?.let { price ->
                                         val fiat = atomicToXmr(total) * price
                                         Text(
-                                            "≈ ${currencySymbol}${"%.2f".format(fiat)}",
+                                            "≈ ${MoneyFormat.format(fiat, currency, fractionDigits = 2)}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )

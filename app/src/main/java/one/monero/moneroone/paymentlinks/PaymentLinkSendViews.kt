@@ -1,5 +1,7 @@
 package one.monero.moneroone.paymentlinks
 
+import one.monero.moneroone.data.model.Currency
+import one.monero.moneroone.data.util.MoneyFormat
 import one.monero.moneroone.ui.screens.send.sendWaitHint
 import one.monero.moneroone.ui.screens.send.collectAsState
 import one.monero.moneroone.ui.screens.send.ValuePlaceholder
@@ -250,7 +252,7 @@ fun PaymentLinkReview(
     /** A new value builds the funding again (the one built here is gone). */
     rebuild: Int = 0,
     xmrPrice: Double?,
-    currencySymbol: String,
+    currency: Currency,
     sendInProgress: Boolean,
     /** The link's note, trimmed; empty for none. Shown here, never sent. */
     note: String = "",
@@ -340,7 +342,7 @@ fun PaymentLinkReview(
     // and Review is still on screen then.
     val overBalance = feeReady && tooMuch
 
-    fun fiat(atomic: Long): String? = xmrPrice?.let { "≈ $currencySymbol${"%.2f".format(atomic / 1_000_000_000_000.0 * it)}" }
+    fun fiat(atomic: Long): String? = xmrPrice?.let { "≈ ${MoneyFormat.format(atomic / 1_000_000_000_000.0 * it, currency, fractionDigits = 2)}" }
 
     Column(
         modifier = Modifier

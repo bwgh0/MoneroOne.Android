@@ -2,6 +2,7 @@ package one.monero.moneroone.ui.screens.send
 
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
+import java.util.Locale
 
 /** A fiat amount as the user typed it, and the XMR amount it made (iOS SendAmountStep.TypedFiat). */
 internal data class TypedFiat(val fiat: String, val xmr: String) {
@@ -37,6 +38,13 @@ internal object SendAmountStart {
      */
     fun restoredFiat(typed: TypedFiat?, amount: String, price: Double?): String? =
         typed?.fiat?.takeIf { amount.isNotEmpty() && typed.xmr == amount && isPlausiblePrice(price) }
+
+    /**
+     * A fiat amount as the amount step shows it when it swaps from XMR (iOS formatFiatNumber): two
+     * decimals at most, no trailing zeros, no thousands separator, as the user would type it.
+     */
+    fun fiatInput(value: Double): String =
+        String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
 
     private const val MIN_PLAUSIBLE_PRICE = 0.5
     private const val MAX_PLAUSIBLE_PRICE = 1_000_000.0
