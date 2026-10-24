@@ -141,6 +141,8 @@ private fun pressScale(interactionSource: MutableInteractionSource, enabled: Boo
  * Card: radius 20, surface fill, no border, the card shadow in light mode
  * only. Settings groups and table cards pass `cornerRadius = 16.dp`; cards on
  * a grouped (gray) page pass `shadow = false`, as iOS grouped lists have none.
+ * Rows drawn as iOS glass buttons (wallet and contact rows) pass
+ * `shape = CapsuleShape`.
  */
 @Composable
 fun GlassCard(
@@ -149,9 +151,9 @@ fun GlassCard(
     cornerRadius: Dp = 20.dp,
     shadow: Boolean = true,
     color: Color = MaterialTheme.colorScheme.surfaceContainer,
+    shape: Shape = RoundedCornerShape(cornerRadius),
     content: @Composable BoxScope.() -> Unit
 ) {
-    val shape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val scale = pressScale(interactionSource, enabled = onClick != null)
 

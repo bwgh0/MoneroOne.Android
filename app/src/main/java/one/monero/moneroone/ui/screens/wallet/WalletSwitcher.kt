@@ -46,7 +46,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
@@ -74,6 +74,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -88,7 +89,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.key
 import androidx.compose.foundation.border
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
@@ -116,7 +116,6 @@ import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MonoFamily
 import one.monero.moneroone.ui.theme.MoneroOrange
-import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.truncateMiddle
 import kotlin.math.roundToInt
@@ -141,24 +140,17 @@ private val WALLET_EMOJI = listOf(
 @Composable
 fun WalletSwitcherButton(
     wallet: WalletInfo?,
-    expanded: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val ring by animateColorAsState(
-        targetValue = if (expanded) MoneroOrange.copy(alpha = 0.7f) else Color.Transparent,
-        animationSpec = Motion.snappy(),
-        label = "switcherRing"
-    )
     // 98 x 56, as iOS measures it: a 74pt label frame plus the 12pt side
-    // insets of the glass button style.
+    // insets of the glass button style. No ring while the rows are open, as on iOS.
     Box(
         modifier = modifier
             .width(98.dp)
             .cardShadow(CapsuleShape)
             .clip(CapsuleShape)
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.5.dp, ring, CapsuleShape)
             .clickable(onClick = onToggle)
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center
@@ -339,7 +331,7 @@ fun WalletManagerRows(
                             scaleX = s
                             scaleY = s
                             shadowElevation = 14.dp.toPx() * lift
-                            shape = RoundedCornerShape(20.dp)
+                            shape = CapsuleShape
                         },
                     onClick = { onSwitch(wallet) },
                     onReorderStart = { startDrag(wallet.id) },
@@ -478,7 +470,7 @@ private fun WalletRow(
     onDeleteRequest: (() -> Unit)?
 ) {
     val density = LocalDensity.current
-    val revealPx = with(density) { 72.dp.toPx() }
+    val revealPx = with(density) { 88.dp.toPx() }
     val flingPx = with(density) { 125.dp.toPx() }
     val scope = rememberCoroutineScope()
     val swipe = remember(revealPx, flingPx) {
@@ -555,28 +547,19 @@ private fun WalletRow(
             }
     ) {
         if (swipeEnabled) {
-            // Trash overlay behind the row — no layout participation.
-            Box(
+            // The Delete zone behind the row, no layout participation (iOS SwipeTrack): the 52
+            // red disc with the white trash, "Delete" in caption2 under it.
+            WalletDeleteZone(
+                label = tr("Delete wallet"),
+                enabled = trashEnabled,
+                onClick = {
+                    animateSwipe { swipe.animateTo(RowSwipe.Closed) }
+                    onDeleteRequest?.invoke()
+                },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(end = 12.dp)
-                    .graphicsLayer { alpha = (-swipe.offset / revealPx).coerceIn(0f, 1f) },
-                contentAlignment = Alignment.Center
-            ) {
-                IconButton(
-                    onClick = {
-                        animateSwipe { swipe.animateTo(RowSwipe.Closed) }
-                        onDeleteRequest?.invoke()
-                    },
-                    enabled = trashEnabled
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = tr("Delete wallet"),
-                        tint = ErrorRed
-                    )
-                }
-            }
+                    .graphicsLayer { alpha = (-swipe.offset / revealPx).coerceIn(0f, 1f) }
+            )
         }
 
         WalletRowCard(
@@ -611,11 +594,11 @@ private fun WalletRow(
             leading = { Spacer(Modifier.width(HandleSlot)) }
         ) {
             IconButton(onClick = onRenameRequest) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = tr("Edit Wallet"),
-                    tint = MoneroTheme.colors.labelTertiary,
-                    modifier = Modifier.size(18.dp)
+                // iOS pencil.circle.fill in the secondary color at 0.5; the pencil is cut out.
+                FilledCircleGlyph(
+                    icon = Icons.Default.Edit,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    contentDescription = tr("Edit Wallet")
                 )
             }
             WalletRowCheck(isActive)
@@ -707,9 +690,11 @@ fun WalletRowCard(
 ) {
     GlassCard(
         modifier = modifier.then(
-            if (isActive) Modifier.border(1.5.dp, MoneroOrange.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
+            if (isActive) Modifier.border(1.5.dp, MoneroOrange.copy(alpha = 0.7f), CapsuleShape)
             else Modifier
         ),
+        // A capsule, as the iOS glass button; the ring follows its edge.
+        shape = CapsuleShape,
         color = containerColor,
         onClick = onClick
     ) {
@@ -774,18 +759,89 @@ fun WalletRowCard(
     }
 }
 
-/** The switcher's green check on the active row, or its empty 20dp slot. */
+/** The switcher's mark in a row's last slot (iOS WalletRowCheck): a green check circle on the
+ * current wallet, an empty 24dp ring (2dp, secondary at 0.3) on the others. */
 @Composable
 fun WalletRowCheck(isActive: Boolean) {
     if (isActive) {
         Icon(
-            imageVector = Icons.Default.Check,
+            imageVector = Icons.Default.CheckCircle,
             contentDescription = tr("Current wallet"),
             tint = SuccessGreen,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(24.dp)
         )
     } else {
-        Spacer(modifier = Modifier.width(20.dp))
+        Box(
+            Modifier
+                .size(24.dp)
+                .border(2.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), CircleShape)
+        )
+    }
+}
+
+/**
+ * An SF Symbols `*.circle.fill` glyph at title3: a 20dp disc in [color] with [icon] cut out of it
+ * (drawn in [cutout], the fill under the glyph).
+ */
+@Composable
+internal fun FilledCircleGlyph(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    contentDescription: String? = null,
+    cutout: Color = MaterialTheme.colorScheme.surfaceContainer
+) {
+    Box(
+        modifier = Modifier
+            .size(20.dp)
+            .clip(CircleShape)
+            .background(color),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = cutout,
+            modifier = Modifier.size(14.dp)
+        )
+    }
+}
+
+/** The swipe's Delete zone (iOS SwipeTrack): a 52 red disc with the white trash, "Delete" in caption2
+ * under it, 6 apart, 12 from the edge. TalkBack hears [label] as one button. */
+@Composable
+private fun WalletDeleteZone(label: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier
+            .padding(end = 12.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clearAndSetSemantics {
+                contentDescription = label
+                role = Role.Button
+                if (enabled) onClick { onClick(); true } else disabled()
+            }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(ErrorRed),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Text(
+            text = tr("Delete"),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -817,7 +873,8 @@ private fun WalletActionsRow(showTransfer: Boolean, onTransfer: () -> Unit, onAd
     }
 }
 
-/** A switcher action: the 40 brand disc at 15% with its glyph, then the label (callout semibold, brand), on a card. */
+/** A switcher action (iOS glass capsule): the brand filled-circle glyph and the label (callout
+ * semibold, brand), centered, 8 apart. */
 @Composable
 private fun WalletActionCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -825,40 +882,9 @@ private fun WalletActionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    GlassCard(
-        modifier = modifier,
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MoneroOrange.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MoneroOrange,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            // A button label, as on iOS: callout semibold in brand.
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MoneroOrange,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+    PrimaryButton(onClick = onClick, modifier = modifier) {
+        FilledCircleGlyph(icon = icon, color = MoneroOrange)
+        Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

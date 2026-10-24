@@ -35,7 +35,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.AccountCircle
@@ -85,6 +84,7 @@ import one.monero.moneroone.core.contacts.ContactStore
 import one.monero.moneroone.core.contacts.Contacts
 import one.monero.moneroone.core.openalias.OpenAlias
 import one.monero.moneroone.core.openalias.RecipientInput
+import one.monero.moneroone.ui.components.CapsuleShape
 import one.monero.moneroone.ui.components.CellFill
 import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
@@ -94,8 +94,8 @@ import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
-import one.monero.moneroone.ui.theme.SuccessGreen
 import one.monero.moneroone.ui.theme.truncateMiddle
+import one.monero.moneroone.ui.screens.wallet.WalletRowCheck
 import one.monero.moneroone.core.locale.tr
 import timber.log.Timber
 
@@ -171,7 +171,8 @@ internal fun ContactRow(
     /** The card fill: the surface on Send, fillElevated on the Contacts sheet (android-4). */
     color: Color = MaterialTheme.colorScheme.surfaceContainer
 ) {
-    GlassCard(modifier = modifier.fillMaxWidth(), color = color) {
+    // The switcher's capsule row without the ring (iOS ContactRowButton).
+    GlassCard(modifier = modifier.fillMaxWidth(), color = color, shape = CapsuleShape) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -192,8 +193,8 @@ internal fun ContactRow(
                 Text(contact.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 ContactDestinationText(contact)
             }
-            // The switcher's green check (WalletRowCheck); TalkBack hears the row as selected.
-            if (checked) Icon(Icons.Default.Check, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
+            // The switcher's green check; TalkBack hears the row as selected.
+            if (checked) WalletRowCheck(isActive = true)
         }
     }
 }

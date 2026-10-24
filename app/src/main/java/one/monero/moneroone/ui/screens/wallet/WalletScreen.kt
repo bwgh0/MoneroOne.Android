@@ -387,7 +387,6 @@ fun WalletScreen(
             Column {
             GreetingHeader(
                 activeWallet = activeWallet,
-                expanded = switcherExpanded,
                 onToggleSwitcher = { setSwitcherExpanded(!switcherExpanded) }
             )
 
@@ -707,7 +706,6 @@ fun WalletScreen(
 @Composable
 private fun GreetingHeader(
     activeWallet: one.monero.moneroone.core.wallet.WalletInfo?,
-    expanded: Boolean,
     onToggleSwitcher: () -> Unit
 ) {
     val greeting = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
@@ -737,7 +735,6 @@ private fun GreetingHeader(
 
         WalletSwitcherButton(
             wallet = activeWallet,
-            expanded = expanded,
             onToggle = onToggleSwitcher
         )
     }
