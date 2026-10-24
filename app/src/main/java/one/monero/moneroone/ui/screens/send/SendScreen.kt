@@ -106,6 +106,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
@@ -155,6 +156,8 @@ import one.monero.moneroone.core.wallet.SendRequest
 import one.monero.moneroone.core.wallet.SeedValidation
 import one.monero.moneroone.core.wallet.SendNameStore
 import one.monero.moneroone.core.wallet.SendNames
+import one.monero.moneroone.core.wallet.TransferDestination
+import one.monero.moneroone.core.wallet.TransferTo
 import one.monero.moneroone.core.wallet.WalletInfo
 import one.monero.moneroone.core.wallet.WalletViewModel
 import one.monero.moneroone.paymentlinks.EnvelopeDraft
@@ -202,10 +205,11 @@ class OpenSendLink(val address: String, val amount: String?)
 /**
  * Whether an open Send takes a new payment link (iOS
  * SendFlowPhase.acceptsPaymentRequest): yes until the user confirms. From
- * Confirm on, the link must not touch this flow.
+ * Confirm on, the link must not touch this flow. A Transfer never takes one:
+ * its destination is one of your wallets (iOS SendFlowView refuses the link).
  */
-internal fun acceptsPaymentLink(phase: SendPhase, confirmed: Boolean): Boolean =
-    !confirmed && phase in listOf(SendPhase.ADDRESS, SendPhase.AMOUNT, SendPhase.REVIEW)
+internal fun acceptsPaymentLink(phase: SendPhase, confirmed: Boolean, transfer: Boolean = false): Boolean =
+    !transfer && !confirmed && phase in listOf(SendPhase.ADDRESS, SendPhase.AMOUNT, SendPhase.REVIEW)
 
 /** Keeps a Send's identity in saved state, so a recreated screen still gets its own send result. */
 private val SendFlowSaver = listSaver<SendFlow, String?>(
@@ -248,8 +252,8 @@ fun SendScreen(
     incomingLink: OpenSendLink? = null,
     onIncomingLink: (link: OpenSendLink, accepted: Boolean) -> Unit = { _, _ -> },
     initialName: String? = null,
-    /** A Transfer: Send's amount step for the wallet with this id, at its saved primary address. */
-    transferToId: String? = null,
+    /** A Transfer: Send's amount step under the To card (This Wallet or another of your wallets). */
+    transfer: Boolean = false,
     onBack: () -> Unit,
     onScanQr: () -> Unit,
     onSent: () -> Unit,
@@ -263,22 +267,27 @@ fun SendScreen(
     val sendState = sharedSendState.takeIf { it.flow == flow } ?: SendState.Idle
     val wallets by walletViewModel.wallets.collectAsState()
 
-    // A Transfer goes to the other wallet's saved primary address, checked as a typed address is.
-    // Read once: the destination never changes during this Send. Without one, Send closes.
-    val isTransfer = transferToId != null
-    val transferTo = remember { transferToId?.let { id -> walletViewModel.wallets.value.firstOrNull { it.id == id } } }
-    val transferAddress = remember { transferTo?.let { wallet -> SendNames.transferAddress(wallet) { isValidMoneroAddress(it) } } }
-    if (isTransfer && transferAddress == null) {
+    // A Transfer goes to the main address of the wallet under To, checked as a typed address is:
+    // This Wallet first, then your other wallets (iOS TransferPartiesCard). It does not remember
+    // the last choice. With no open wallet, Transfer closes.
+    val isTransfer = transfer
+    val current by walletViewModel.activeWallet.collectAsState()
+    if (isTransfer && current == null) {
         LaunchedEffect(Unit) { onBack() }
         return
     }
+    var transferChosenId by rememberSaveable { mutableStateOf<String?>(null) }
+    val restoreIds = remember(wallets) { wallets.filter { walletViewModel.needsRestore(it.id) }.map { it.id }.toSet() }
+    val destinationOf = { w: WalletInfo -> TransferDestination.of(w, w.id in restoreIds) { isValidMoneroAddress(it) } }
+    val transferChoice = if (isTransfer) TransferTo.resolve(wallets, current?.id, transferChosenId, destinationOf) else null
+    val transferTo = transferChoice?.wallet
     val nameStore = SendNameStore.get(LocalContext.current)
 
     // Pre-fill arrives via QR / deep link and is untrusted: it must pass the
     // same checks as manual entry or be dropped, so the flow can never skip
     // the phase where the dropped value would have been entered.
     val prefilledAddress = remember {
-        transferAddress ?: initialAddress?.trim()?.takeIf { isValidMoneroAddress(it) }
+        initialAddress?.trim()?.takeIf { isValidMoneroAddress(it) }
     }
     // An OpenAlias name from a QR code: the flow starts on the address step and
     // looks the name up at once.
@@ -303,6 +312,7 @@ fun SendScreen(
     // the amount step, never the review: it is someone else's text, so the
     // user confirms the amount first (iOS SendFlowView.apply).
     val startPhase = when {
+        isTransfer -> SendPhase.AMOUNT
         prefilledAddress != null && prefillCoveredByBalance && prefillSource != SendPrefillSource.LINK -> SendPhase.REVIEW
         prefilledAddress != null -> SendPhase.AMOUNT
         else -> SendPhase.ADDRESS
@@ -315,6 +325,8 @@ fun SendScreen(
 
     // Send flow state
     var address by rememberSaveable { mutableStateOf(prefilledAddress ?: "") }
+    // A Transfer sends to the wallet under To; none chosen keeps the address empty.
+    LaunchedEffect(transferChoice?.address) { if (isTransfer) address = transferChoice?.address.orEmpty() }
     // The field text (an address or an OpenAlias name). `address` stays the
     // only value that reaches the fee estimate and the send.
     var recipientInput by rememberSaveable { mutableStateOf(prefilledAddress ?: prefilledName ?: "") }
@@ -416,8 +428,8 @@ fun SendScreen(
     // is refused: holding it would fill the next Send the user opens on purpose.
     LaunchedEffect(incomingLink) {
         val link = incomingLink ?: return@LaunchedEffect
-        // A Transfer keeps its wallet: a link never replaces it.
-        val accepted = !isTransfer && acceptsPaymentLink(phase, confirmed = sendInProgress)
+        // A Transfer keeps its wallet: a link never replaces it (iOS SendFlowView refuses it).
+        val accepted = acceptsPaymentLink(phase, confirmed = sendInProgress, transfer = isTransfer)
         if (accepted) {
             linkMode = false
             linkDraft = null
@@ -462,20 +474,39 @@ fun SendScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = when (phase) {
-                            SendPhase.ADDRESS -> tr("Send XMR")
-                            SendPhase.AMOUNT -> if (linkMode) tr("Send with a Link") else toWalletShown?.let { tr("Send to %s", it.name) }
-                                ?: sendContact?.let { tr("Send to %s", it.name) }
-                                ?: openAliasSummary?.let { openAliasAmountTitle(it) }
-                                ?: if (address.length > 20) tr("Send to %s", truncateMiddle(address)) else tr("Amount")
-                            SendPhase.REVIEW -> tr("Review")
-                            else -> ""
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    // A Transfer's amount step: "Transfer" over "From <wallet name>" (iOS SendFlowView).
+                    if (isTransfer && phase == SendPhase.AMOUNT) {
+                        Column(modifier = Modifier.semantics(mergeDescendants = true) { heading() }) {
+                            Text(
+                                text = tr("Transfer"),
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = tr("From %s", current?.name.orEmpty()),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = when (phase) {
+                                SendPhase.ADDRESS -> tr("Send XMR")
+                                SendPhase.AMOUNT -> if (linkMode) tr("Send with a Link") else toWalletShown?.let { tr("Send to %s", it.name) }
+                                    ?: sendContact?.let { tr("Send to %s", it.name) }
+                                    ?: openAliasSummary?.let { openAliasAmountTitle(it) }
+                                    ?: if (address.length > 20) tr("Send to %s", truncateMiddle(address)) else tr("Amount")
+                                SendPhase.REVIEW -> tr("Review")
+                                else -> ""
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 },
                 navigationIcon = {
                     if (phase in listOf(SendPhase.ADDRESS, SendPhase.AMOUNT, SendPhase.REVIEW)) {
@@ -586,7 +617,26 @@ fun SendScreen(
                         onMemoChange = { if (linkMode) linkNote = it.take(LinkNames.NOTE_LIMIT) else memo = it },
                         onContinue = { goForward(SendPhase.REVIEW) },
                         linkMode = linkMode,
-                        notePlaceholder = if (linkMode) remember(paymentLinks) { paymentLinks?.nextName() } else null
+                        notePlaceholder = if (linkMode) remember(paymentLinks) { paymentLinks?.nextName() } else null,
+                        // A Transfer waits for a wallet under To before Continue.
+                        recipientReady = !isTransfer || transferChoice != null,
+                        header = if (isTransfer) {
+                            {
+                                val fiatMode by walletViewModel.fiatMode.collectAsState()
+                                TransferToCard(
+                                    wallets = wallets,
+                                    current = current,
+                                    shown = TransferTo.shown(wallets, current?.id, transferChosenId),
+                                    destinationOf = destinationOf,
+                                    balanceText = { atomic ->
+                                        currentPrice?.price?.takeIf { fiatMode }?.let { price ->
+                                            formatFiatAmount(atomic / 1_000_000_000_000.0 * price, selectedCurrency.symbol)
+                                        } ?: "${walletViewModel.formatXmr(atomic)} XMR"
+                                    },
+                                    onChoose = { transferChosenId = it.id }
+                                )
+                            }
+                        } else null
                     )
                 }
                 SendPhase.REVIEW -> if (linkMode && paymentLinks != null) {
@@ -674,7 +724,7 @@ fun SendScreen(
                         success = currentPhase == SendPhase.SUCCESS && (!linkMode || draft != null),
                         amount = amount,
                         txHash = (sendState as? SendState.Success)?.txHash ?: "",
-                        note = transferTo?.let { tr("It shows in %s when you next open that wallet.", it.name) },
+                        note = transferTo?.takeIf { it.id != current?.id }?.let { tr("It shows in %s when you next open that wallet.", it.name) },
                         onDone = onSent,
                         link = if (linkMode && draft != null && amount != null) {
                             LinkSendResult(
@@ -1157,10 +1207,14 @@ private fun AmountPhase(
     // note, which stays on this phone (the tx memo stays "Payment link").
     linkMode: Boolean = false,
     /** Link mode: the name the link gets without a note ("Link 9"). */
-    notePlaceholder: String? = null
+    notePlaceholder: String? = null,
+    /** False while Continue waits for a destination (a Transfer with no wallet under To yet). */
+    recipientReady: Boolean = true,
+    /** Above the amount: a Transfer's To card. */
+    header: (@Composable () -> Unit)? = null
 ) {
     val parsedAmount = parseXmr(amount)
-    val canContinue = parsedAmount > 0 && parsedAmount <= unlockedBalance
+    val canContinue = recipientReady && parsedAmount > 0 && parsedAmount <= unlockedBalance
     val clipboardManager = LocalClipboardManager.current
 
     // Fiat mode toggle. Saved, as the amount is, through a recreation.
@@ -1205,7 +1259,14 @@ private fun AmountPhase(
         }
         // The amount sits at the iOS height (SendAmountStep: a 12 spacer and the
         // stack's 16 above, the amount's 8 padding); the free space goes under the note row.
-        Spacer(modifier = Modifier.height(28.dp))
+        // A Transfer's To card sits on top instead (iOS: 4 above it, 8 under it).
+        if (header != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            header()
+            Spacer(modifier = Modifier.height(8.dp))
+        } else {
+            Spacer(modifier = Modifier.height(28.dp))
+        }
         if (amountPrefilledFromQR && prefillNote != null) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),

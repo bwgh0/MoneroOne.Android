@@ -67,4 +67,12 @@ class PaymentRequestTest {
             assertFalse(phase.name, acceptsPaymentLink(phase, confirmed = false))
         }
     }
+
+    // iOS SendFlowView: an open Transfer refuses a link at every step, so the
+    // link never replaces the wallet under To.
+    @Test fun openTransferRefusesALink() {
+        for (phase in SendPhase.entries) {
+            assertFalse(phase.name, acceptsPaymentLink(phase, confirmed = false, transfer = true))
+        }
+    }
 }

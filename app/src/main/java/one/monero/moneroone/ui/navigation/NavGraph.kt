@@ -53,7 +53,6 @@ import one.monero.moneroone.ui.screens.receive.AddressPickerScreen
 import one.monero.moneroone.ui.screens.receive.ReceiveScreen
 import one.monero.moneroone.ui.screens.send.QRScannerScreen
 import one.monero.moneroone.ui.screens.send.SendScreen
-import one.monero.moneroone.ui.screens.send.TransferScreen
 import one.monero.moneroone.ui.screens.transactions.TransactionDetailScreen
 import one.monero.moneroone.ui.screens.transactions.TransactionFilter
 import one.monero.moneroone.ui.screens.transactions.TransactionListScreen
@@ -94,28 +93,23 @@ sealed class Screen(val route: String) {
     data object SetupBiometrics : Screen("setup_biometrics")
     data object Unlock : Screen("unlock")
     data object Main : Screen("main")
-    data object Send : Screen("send?address={address}&amount={amount}&source={source}&name={name}&to={to}") {
-        /**
-         * [source]: where a pre-filled amount came from, a [SendPrefillSource] name.
-         * [transferTo]: a Transfer to the wallet with this id (its saved primary address).
-         */
+    data object Send : Screen("send?address={address}&amount={amount}&source={source}&name={name}") {
+        /** [source]: where a pre-filled amount came from, a [SendPrefillSource] name. */
         fun createRoute(
             address: String? = null,
             amount: String? = null,
             source: SendPrefillSource? = null,
-            name: String? = null,
-            transferTo: String? = null
+            name: String? = null
         ): String {
             val params = mutableListOf<String>()
             if (!address.isNullOrBlank()) params.add("address=${android.net.Uri.encode(address)}")
             if (!amount.isNullOrBlank()) params.add("amount=${android.net.Uri.encode(amount)}")
             if (source != null) params.add("source=${source.name}")
             if (!name.isNullOrBlank()) params.add("name=${android.net.Uri.encode(name)}")
-            if (!transferTo.isNullOrBlank()) params.add("to=${android.net.Uri.encode(transferTo)}")
             return if (params.isEmpty()) "send" else "send?${params.joinToString("&")}"
         }
     }
-    /** Transfer between your wallets, from the wallet switcher. */
+    /** Transfer: Send's amount step under a To card (This Wallet or another wallet), from the wallet switcher. */
     data object Transfer : Screen("transfer")
     data object QRScanner : Screen("qr_scanner")
     data object Receive : Screen("receive")
@@ -163,15 +157,16 @@ fun MoneroOneNavHost(
     val entry by navController.currentBackStackEntryAsState()
     // Keep the request until a wallet is open and authentication is complete.
     // Main opens Send with it. An open Send takes it, or refuses it once the
-    // user has confirmed (iOS SendFlowView); while the scanner is up it waits
-    // for Send. Other screens, such as wallet setup, keep it until Main.
+    // user has confirmed (iOS SendFlowView); an open Transfer refuses it; while
+    // the scanner is up it waits for Send. Other screens, such as wallet setup,
+    // keep it until Main.
     // A refused link says why in an alert, as on iOS (openPaymentLink).
     var paymentLinkError by remember { mutableStateOf<String?>(null) }
     var openSendLink by remember { mutableStateOf<OpenSendLink?>(null) }
     LaunchedEffect(paymentLink, isLocked, walletState.hasWallet, entry) {
         val route = entry?.destination?.route
         if (paymentLink == null || isLocked || !walletState.hasWallet ||
-            (route != Screen.Main.route && route != Screen.Send.route)) return@LaunchedEffect
+            (route != Screen.Main.route && route != Screen.Send.route && route != Screen.Transfer.route)) return@LaunchedEffect
         val result = readMoneroUri(paymentLink)
         onPaymentLinkConsumed()
         paymentLinkError = when {
@@ -181,7 +176,7 @@ fun MoneroOneNavHost(
                 tr("This wallet is view-only and cannot send. Switch to a wallet that can send, then open the link again.")
             else -> {
                 val request = (result as PaymentRequestResult.Valid).data
-                if (route == Screen.Send.route) openSendLink = OpenSendLink(request.address, request.amount)
+                if (route == Screen.Send.route || route == Screen.Transfer.route) openSendLink = OpenSendLink(request.address, request.amount)
                 else navController.navigate(Screen.Send.createRoute(request.address, request.amount, SendPrefillSource.LINK))
                 null
             }
@@ -471,11 +466,6 @@ fun MoneroOneNavHost(
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
-                    },
-                    navArgument("to") {
-                        type = NavType.StringType
-                        nullable = true
-                        defaultValue = null
                     }
                 )
             ) { backStackEntry ->
@@ -484,9 +474,7 @@ fun MoneroOneNavHost(
                 val source = backStackEntry.arguments?.getString("source")
                     ?.let { name -> SendPrefillSource.entries.firstOrNull { it.name == name } }
                 val name = backStackEntry.arguments?.getString("name")?.takeIf { it.isNotBlank() }
-                val transferToId = backStackEntry.arguments?.getString("to")?.takeIf { it.isNotBlank() }
                 SendScreen(
-                    transferToId = transferToId,
                     walletViewModel = walletViewModel,
                     initialAddress = address,
                     initialAmount = amount,
@@ -510,10 +498,23 @@ fun MoneroOneNavHost(
             }
 
             composable(Screen.Transfer.route) {
-                TransferScreen(
+                // A link that arrives here is refused with the Send message (iOS SendFlowView).
+                SendScreen(
+                    transfer = true,
                     walletViewModel = walletViewModel,
+                    incomingLink = openSendLink,
+                    onIncomingLink = { link, accepted ->
+                        if (openSendLink === link) openSendLink = null
+                        if (!accepted) paymentLinkError = tr("Send is still showing another payment. Close it, then open the link again.")
+                    },
                     onBack = { navController.popBackStack() },
-                    onPick = { wallet -> navController.navigate(Screen.Send.createRoute(transferTo = wallet.id)) }
+                    onScanQr = {},
+                    onSent = {
+                        navController.navigate(Screen.Main.route) {
+                            popUpTo(Screen.Main.route) { inclusive = true }
+                        }
+                    },
+                    paymentLinks = paymentLinks
                 )
             }
 
