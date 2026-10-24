@@ -92,22 +92,23 @@ internal fun OwnWalletRecipientCard(wallet: WalletInfo, onClear: () -> Unit) {
 
 /**
  * A Transfer's Review: one side of it ("From" or "To"), the wallet's emoji in the 40 disc of the
- * Recipient row, the label, the name and the address 8…8. One TalkBack element.
+ * Recipient row, the label, the name ([name]: "This Wallet" for a send back to it) and the address
+ * 8…8. One TalkBack element.
  */
 @Composable
-internal fun ReviewWalletRow(label: String, wallet: WalletInfo, address: String?) {
+internal fun ReviewWalletRow(label: String, wallet: WalletInfo, address: String?, name: String = wallet.name) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clearAndSetSemantics { contentDescription = "$label, ${wallet.name}" }
+            .clearAndSetSemantics { contentDescription = "$label, $name" }
     ) {
         EmojiCircle(emoji = wallet.emoji, size = 40.dp, color = SystemFill)
         Spacer(modifier = Modifier.width(12.dp))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                text = wallet.name,
+                text = name,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -225,7 +226,8 @@ internal fun TransferToCard(
                     enabled = true,
                     onClick = { menuOpen = false; onChoose(current) }
                 )
-                HorizontalDivider(color = MoneroTheme.colors.separator)
+                // Inset like the section divider of the iOS menu: it lines up with the items' 12 padding.
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), color = MoneroTheme.colors.separator)
                 targets.forEach { wallet ->
                     val destination = destinationOf(wallet)
                     TransferMenuItem(

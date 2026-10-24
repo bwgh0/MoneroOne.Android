@@ -1,5 +1,7 @@
 package one.monero.moneroone.core.wallet
 
+import one.monero.moneroone.core.locale.tr
+
 /** The state of one wallet under To on Transfer (iOS TransferDestinationState). */
 sealed interface TransferDestination {
     /** Can be chosen: a send goes to this saved, checked address. */
@@ -61,4 +63,35 @@ object TransferTo {
     /** This Wallet: the destination is the wallet that sends. */
     fun isThisWallet(choice: WalletInfo?, currentWalletId: String?): Boolean =
         choice != null && choice.id == currentWalletId
+}
+
+/**
+ * A send to one of your wallets on Review and Sent (iOS TransferParties and SendFlowView's
+ * successNote). [from] is the wallet that sends, [to] the wallet under To.
+ */
+object TransferReview {
+
+    /** A send back to the wallet it leaves (This Wallet). */
+    fun isToSelf(from: WalletInfo?, to: WalletInfo?): Boolean =
+        from != null && to != null && from.id == to.id
+
+    /** To's name: "This Wallet" for a send back to it, else the wallet's own name. */
+    fun toName(from: WalletInfo?, to: WalletInfo): String =
+        if (isToSelf(from, to)) tr("This Wallet") else to.name
+
+    /** A send back to this wallet has no Total row: only the fee leaves it. */
+    fun showsTotal(from: WalletInfo?, to: WalletInfo?): Boolean = !isToSelf(from, to)
+
+    /** The note 8 under Review's card, for a send back to this wallet only. */
+    fun note(from: WalletInfo?, to: WalletInfo?): String? =
+        if (isToSelf(from, to)) {
+            tr("Sends XMR back to this wallet as a new payment. You can spend it again in about 20 minutes.")
+        } else null
+
+    /** Sent's line under the hash, for a Transfer to [to]. Null for a Send. */
+    fun sentNote(to: WalletInfo?, currentWalletId: String?): String? = when {
+        to == null -> null
+        to.id == currentWalletId -> tr("You can spend it again in about 20 minutes.")
+        else -> tr("It shows in %s when you next open that wallet.", to.name)
+    }
 }

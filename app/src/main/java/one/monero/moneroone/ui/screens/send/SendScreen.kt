@@ -156,6 +156,7 @@ import one.monero.moneroone.core.wallet.SendRequest
 import one.monero.moneroone.core.wallet.SeedValidation
 import one.monero.moneroone.core.wallet.SendNameStore
 import one.monero.moneroone.core.wallet.SendNames
+import one.monero.moneroone.core.wallet.TransferReview
 import one.monero.moneroone.core.wallet.TransferDestination
 import one.monero.moneroone.core.wallet.TransferTo
 import one.monero.moneroone.core.wallet.WalletInfo
@@ -724,7 +725,7 @@ fun SendScreen(
                         success = currentPhase == SendPhase.SUCCESS && (!linkMode || draft != null),
                         amount = amount,
                         txHash = (sendState as? SendState.Success)?.txHash ?: "",
-                        note = transferTo?.takeIf { it.id != current?.id }?.let { tr("It shows in %s when you next open that wallet.", it.name) },
+                        note = TransferReview.sentNote(transferTo, current?.id),
                         onDone = onSent,
                         link = if (linkMode && draft != null && amount != null) {
                             LinkSendResult(
@@ -1629,7 +1630,12 @@ private fun ReviewPhase(
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             Spacer(modifier = Modifier.height(12.dp))
                         }
-                        ReviewWalletRow(label = tr("To"), wallet = toWallet, address = address)
+                        ReviewWalletRow(
+                            label = tr("To"),
+                            wallet = toWallet,
+                            address = address,
+                            name = TransferReview.toName(fromWallet, toWallet)
+                        )
                     } else if (toContact != null) {
                         ReviewContactRow(toContact, address)
                         // A name keeps its checks (signature, pin) under the row.
@@ -1754,38 +1760,40 @@ private fun ReviewPhase(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    // Total row. A send back to this wallet has no Total: only the fee leaves it.
+                    if (TransferReview.showsTotal(fromWallet, toWallet)) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    // Total row
-                    ReviewDetailRow(
-                        label = { Text(tr("Total"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
-                    ) {
-                        FillIn(
-                            ready = feeReady,
-                            placeholder = {
-                                Column(horizontalAlignment = Alignment.End) {
-                                    ValuePlaceholder(width = 132.dp, style = MaterialTheme.typography.titleSmall)
-                                    if (xmrPrice != null) ValuePlaceholder(width = 56.dp, style = MaterialTheme.typography.bodySmall)
-                                }
-                            }
+                        ReviewDetailRow(
+                            label = { Text(tr("Total"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
                         ) {
-                            val total = reviewFee.prepared?.total ?: (parsedAmount + estimatedFee)
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    "${formatXmr(total)} XMR",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MoneroOrange
-                                )
-                                xmrPrice?.let { price ->
-                                    val fiat = atomicToXmr(total) * price
+                            FillIn(
+                                ready = feeReady,
+                                placeholder = {
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        ValuePlaceholder(width = 132.dp, style = MaterialTheme.typography.titleSmall)
+                                        if (xmrPrice != null) ValuePlaceholder(width = 56.dp, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            ) {
+                                val total = reviewFee.prepared?.total ?: (parsedAmount + estimatedFee)
+                                Column(horizontalAlignment = Alignment.End) {
                                     Text(
-                                        "≈ ${currencySymbol}${"%.2f".format(fiat)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        "${formatXmr(total)} XMR",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MoneroOrange
                                     )
+                                    xmrPrice?.let { price ->
+                                        val fiat = atomicToXmr(total) * price
+                                        Text(
+                                            "≈ ${currencySymbol}${"%.2f".format(fiat)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1807,6 +1815,18 @@ private fun ReviewPhase(
                         ReviewMemoRow(memo)
                     }
                 }
+            }
+
+            // A send back to this wallet: what it does, 8 under the card (iOS footnote, 16 inset).
+            TransferReview.note(fromWallet, toWallet)?.let { note ->
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 8.dp, end = 16.dp)
+                )
             }
 
             // Pre-filled amount + fee no longer fits the balance

@@ -200,7 +200,7 @@ fun WalletManagerRows(
     onRename: (WalletInfo, String, String) -> Unit,
     onMove: (movedId: String, beforeId: String?) -> Unit,
     onAddWallet: () -> Unit,
-    /** Opens Transfer. The button shows with 2 or more wallets. */
+    /** Opens Transfer. The button shows when the active wallet can send ([switcherShowsTransfer]). */
     onTransfer: () -> Unit = {}
 ) {
     var renameTarget by remember { mutableStateOf<WalletInfo?>(null) }
@@ -353,7 +353,7 @@ fun WalletManagerRows(
             }
         }
 
-        WalletActionsRow(showTransfer = wallets.size >= 2, onTransfer = onTransfer, onAddWallet = onAddWallet)
+        WalletActionsRow(showTransfer = switcherShowsTransfer(activeWallet), onTransfer = onTransfer, onAddWallet = onAddWallet)
     }
 
     renameTarget?.let { target ->
@@ -897,8 +897,15 @@ internal fun WalletDeleteZone(label: String, enabled: Boolean, onClick: () -> Un
 }
 
 /**
+ * Transfer can send back to this wallet, so one wallet is enough. A wallet that cannot send
+ * (view-only) has no Transfer, and Add Wallet fills the row (iOS walletManager.canSend).
+ */
+internal fun switcherShowsTransfer(activeWallet: WalletInfo?): Boolean =
+    activeWallet != null && !activeWallet.isViewOnly
+
+/**
  * The switcher's last row: Transfer and Add Wallet side by side, 12 apart, as every button pair
- * (iOS WalletManagerRows). With one wallet there is nothing to transfer to, and Add Wallet fills the row.
+ * (iOS WalletManagerRows). Without Transfer, Add Wallet fills the row.
  * At the largest text sizes the two stack, 12 apart, so neither label is cut (iOS accessibility sizes).
  */
 @Composable
