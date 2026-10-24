@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -127,19 +128,28 @@ fun WhatsNewBanner(
 fun WhatsNewSheet(entry: WhatsNewEntry, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    // iOS presents it as a large sheet with one detent: no grabber, and the top stays clear of
+    // the status bar. The sheet draws edge to edge, so a full-height one put its handle under the
+    // camera; the 0.92 height (as the Contacts sheet) keeps it below the status bar.
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        dragHandle = null
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+        ) {
+            // Continue stays at the sheet's bottom (iOS safeAreaInset); the title starts 40 below the top.
             Column(
                 modifier = Modifier
-                    .weight(1f, fill = false)
+                    .weight(1f)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp)
-                    .padding(top = 16.dp)
+                    .padding(top = 40.dp)
             ) {
                 Text(
                     text = keepName(tr("What's New in Monero One")),
