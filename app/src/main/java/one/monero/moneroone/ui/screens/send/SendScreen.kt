@@ -654,13 +654,13 @@ fun SendScreen(
                 SendPhase.REVIEW -> if (linkMode && paymentLinks != null) {
                     val currentPrice by walletViewModel.currentPrice.collectAsState()
                     val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+                    val fiatMode by walletViewModel.fiatMode.collectAsState()
                     PaymentLinkReview(
                         paymentLinks = paymentLinks,
                         amount = walletViewModel.parseXmr(amount),
                         unlockedBalance = walletState.balance.unlocked,
                         existingDraft = linkDraft,
                         onDraft = { linkDraft = it },
-                        formatXmr = walletViewModel::formatXmr,
                         estimateFee = { to, amt -> walletViewModel.estimateFee(to, amt) },
                         prepareFunding = { to, amt -> walletViewModel.prepareSend(to, amt, memo = "Payment link") },
                         gate = sendWaitGate,
@@ -668,6 +668,7 @@ fun SendScreen(
                         rebuild = linkRebuild,
                         xmrPrice = currentPrice?.price,
                         currency = selectedCurrency,
+                        fiatMode = fiatMode,
                         sendInProgress = sendInProgress,
                         note = LinkNames.cleanNote(linkNote).orEmpty(),
                         onConfirm = { draft, reserve, prepared ->
@@ -1940,7 +1941,7 @@ private fun ReviewPhase(
  * sample, redacted), so the bars follow the order Fiat Mode picks.
  */
 @Composable
-private fun ReviewLinesPlaceholder(
+internal fun ReviewLinesPlaceholder(
     lines: ReviewAmountLines,
     style: TextStyle,
     alignment: Alignment.Horizontal = Alignment.End

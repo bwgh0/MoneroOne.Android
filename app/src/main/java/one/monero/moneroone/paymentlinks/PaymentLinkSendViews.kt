@@ -1,8 +1,9 @@
 package one.monero.moneroone.paymentlinks
 
 import one.monero.moneroone.data.model.Currency
-import one.monero.moneroone.data.util.MoneyFormat
 import one.monero.moneroone.ui.screens.send.sendWaitHint
+import one.monero.moneroone.ui.screens.send.ReviewAmountLines
+import one.monero.moneroone.ui.screens.send.ReviewLinesPlaceholder
 import one.monero.moneroone.ui.screens.send.collectAsState
 import one.monero.moneroone.ui.screens.send.ValuePlaceholder
 import one.monero.moneroone.ui.screens.send.SendWaitGate
@@ -219,6 +220,23 @@ private fun ReviewRow(label: String, value: @Composable () -> Unit) {
     }
 }
 
+/**
+ * A fee row's value in the order Fiat Mode picks, as on the Send Review: the top line, and under it the exact XMR
+ * or "≈ fiat". Gray bars the size of [feeSample] hold it until the fee is known.
+ */
+@Composable
+private fun FeeValue(ready: Boolean, lines: ReviewAmountLines, feeSample: ReviewAmountLines) {
+    val valueStyle = MaterialTheme.typography.bodyMedium
+    FillIn(ready, placeholder = { ReviewLinesPlaceholder(lines = feeSample, style = valueStyle.copy(fontWeight = FontWeight.Medium)) }) {
+        Column(horizontalAlignment = Alignment.End) {
+            Text(lines.primary, style = valueStyle, fontWeight = FontWeight.Medium)
+            lines.secondary?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
 @Composable
 private fun RowDivider() {
     Spacer(modifier = Modifier.height(12.dp))
@@ -238,7 +256,6 @@ fun PaymentLinkReview(
     unlockedBalance: Long,
     existingDraft: EnvelopeDraft?,
     onDraft: (EnvelopeDraft) -> Unit,
-    formatXmr: (Long) -> String,
     estimateFee: (address: String, amount: Long) -> Long,
     /**
      * Builds and signs the funding transfer (not sent): its fee is the one it pays. Send broadcasts this same
@@ -253,6 +270,8 @@ fun PaymentLinkReview(
     rebuild: Int = 0,
     xmrPrice: Double?,
     currency: Currency,
+    /** Fiat Mode: with a plausible price the amounts show fiat on top and the exact XMR under it. */
+    fiatMode: Boolean,
     sendInProgress: Boolean,
     /** The link's note, trimmed; empty for none. Shown here, never sent. */
     note: String = "",
@@ -342,7 +361,8 @@ fun PaymentLinkReview(
     // and Review is still on screen then.
     val overBalance = feeReady && tooMuch
 
-    fun fiat(atomic: Long): String? = xmrPrice?.let { "≈ ${MoneyFormat.format(atomic / 1_000_000_000_000.0 * it, currency, fractionDigits = 2)}" }
+    // An amount in the order Fiat Mode picks, as on the Send Review (iOS PaymentLinkReviewStep.lines).
+    fun lines(atomic: Long) = ReviewAmountLines.of(atomic, xmrPrice, currency, fiatMode)
 
     Column(
         modifier = Modifier
@@ -378,8 +398,9 @@ fun PaymentLinkReview(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).semantics(mergeDescendants = true) {},
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("${formatXmr(amount)} XMR", style = MaterialTheme.typography.headlineMedium)
-                        fiat(amount)?.let {
+                        val sent = lines(amount)
+                        Text(sent.primary, style = MaterialTheme.typography.headlineMedium)
+                        sent.secondary?.let {
                             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -408,15 +429,11 @@ fun PaymentLinkReview(
                     // Gray placeholders hold each value until it is known; an error shows in the status slot.
                     val valueStyle = MaterialTheme.typography.bodyMedium
                     ReviewRow(tr("Network Fee")) {
-                        FillIn(feeReady, placeholder = { ValuePlaceholder(104.dp, valueStyle) }) {
-                            Text("${formatXmr(networkFee)} XMR", style = valueStyle, fontWeight = FontWeight.Medium)
-                        }
+                        FeeValue(feeReady, lines(networkFee), feeSample = lines(ReviewAmountLines.FEE_SAMPLE_ATOMIC))
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     ReviewRow(tr("Claim fee reserve")) {
-                        FillIn(feeReady, placeholder = { ValuePlaceholder(104.dp, valueStyle) }) {
-                            Text("${formatXmr(reserve)} XMR", style = valueStyle, fontWeight = FontWeight.Medium)
-                        }
+                        FeeValue(feeReady, lines(reserve), feeSample = lines(ReviewAmountLines.FEE_SAMPLE_ATOMIC))
                     }
                     Text(
                         tr("Covers the fee the recipient pays to claim it."),
@@ -440,20 +457,21 @@ fun PaymentLinkReview(
                         FillIn(
                             ready = feeReady,
                             placeholder = {
-                                Column(horizontalAlignment = Alignment.End) {
-                                    ValuePlaceholder(120.dp, MaterialTheme.typography.titleSmall)
-                                    if (xmrPrice != null) ValuePlaceholder(56.dp, MaterialTheme.typography.bodySmall)
-                                }
+                                ReviewLinesPlaceholder(
+                                    lines = lines(amount),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                                )
                             }
                         ) {
+                            val totalLines = lines(total)
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
-                                    "${formatXmr(total)} XMR",
+                                    totalLines.primary,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MoneroOrange
                                 )
-                                fiat(total)?.let {
+                                totalLines.secondary?.let {
                                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
