@@ -1,6 +1,7 @@
 package one.monero.moneroone.ui.screens.wallet
 
 import one.monero.moneroone.core.locale.tr
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
@@ -339,6 +340,9 @@ fun WalletScreen(
     fun setSwitcherExpanded(expanded: Boolean) {
         switcherSession = if (expanded) walletSessionId else null
     }
+    // Back closes the open rows first, with the pill's collapse; with the
+    // rows closed it leaves as before.
+    BackHandler(enabled = switcherExpanded) { setSwitcherExpanded(false) }
     val listState = remember(walletSessionId) { LazyListState() }
 
     // The rating ask after the first send, only while nothing else is open on the home.
