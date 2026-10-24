@@ -274,6 +274,12 @@ internal object WhatsNewTransferLoop {
         Step.RECEIVED, Step.FADE -> TO_BALANCE + AMOUNT
     }
 
+    /**
+     * iOS `.numericText(value:)`: true when [balance] falls over the loop, so
+     * its digits roll down; false when it rises, so they roll up.
+     */
+    fun countsDown(balance: (Step) -> BigDecimal): Boolean = balance(Step.RECEIVED) < balance(Step.START)
+
     fun showsAmount(step: Step): Boolean = step == Step.AMOUNT || step == Step.SENT || step == Step.RECEIVED
 
     fun buttonScale(step: Step): Float = if (step == Step.PRESS) PRESS_SCALE else 1f
@@ -481,7 +487,8 @@ private fun TransferFrame(
     ) {
         Box(contentAlignment = Alignment.Center) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // The From balance falls (it rolls up, iOS numericText(value:)); the To balance rises.
+                // Each balance rolls in the direction it changes (iOS numericText(value:)):
+                // the From balance falls and rolls down, the To balance rises and rolls up.
                 SceneWalletRow(
                     emoji = "💰",
                     name = tr("Everyday Spending"),
@@ -489,7 +496,7 @@ private fun TransferFrame(
                     balanceText = WhatsNewTransferLoop.amountText(WhatsNewTransferLoop.fromBalance(step), fiat),
                     isActive = true,
                     resets = resets,
-                    countsDown = true
+                    countsDown = WhatsNewTransferLoop.countsDown(WhatsNewTransferLoop::fromBalance)
                 )
                 SceneWalletRow(
                     emoji = "🏔️",
@@ -498,7 +505,7 @@ private fun TransferFrame(
                     balanceText = WhatsNewTransferLoop.amountText(WhatsNewTransferLoop.toBalance(step), fiat),
                     isActive = false,
                     resets = resets,
-                    countsDown = false
+                    countsDown = WhatsNewTransferLoop.countsDown(WhatsNewTransferLoop::toBalance)
                 )
             }
             // Across the gap between From and To.
@@ -560,7 +567,7 @@ private fun SceneWalletRow(
     balanceText: String,
     isActive: Boolean,
     resets: Int = 0,
-    countsDown: Boolean = false
+    countsDown: Boolean? = null
 ) {
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
     val brand = MoneroTheme.colors.brand

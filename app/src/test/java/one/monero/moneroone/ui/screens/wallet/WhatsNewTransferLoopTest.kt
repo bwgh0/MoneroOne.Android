@@ -92,4 +92,32 @@ class WhatsNewTransferLoopTest {
         assertNull(WhatsNewFiat.of(fiatMode = true, price = 0.0, symbol = "$"))
         assertNull(WhatsNewFiat.of(fiatMode = true, price = Double.NaN, symbol = "$"))
     }
+
+    @Test
+    fun eachBalanceRollsInTheDirectionItChanges() {
+        // iOS numericText(value:): the From balance falls, its new digits come in from above.
+        assertTrue(loop.countsDown(loop::fromBalance))
+        assertFalse(one.monero.moneroone.ui.components.rollsUp(loop.countsDown(loop::fromBalance), '2', '0', false))
+        // The To balance rises, its new digits come in from below.
+        assertFalse(loop.countsDown(loop::toBalance))
+        assertTrue(one.monero.moneroone.ui.components.rollsUp(loop.countsDown(loop::toBalance), null, '2', true))
+    }
+
+    @Test
+    fun theToBalanceKeepsItsSharedEndWhenItGrows() {
+        // "0.2500 XMR" to "250.2500 XMR": only "25" comes in; the old text is the new one's end.
+        val xmr = one.monero.moneroone.ui.components.rollDiff(
+            loop.amountText(loop.toBalance(Step.SENT), null),
+            loop.amountText(loop.toBalance(Step.RECEIVED), null)
+        )
+        assertEquals(one.monero.moneroone.ui.components.RollDiff(start = 0, oldEnd = 0, newEnd = 2), xmr)
+        // Fiat Mode: "$37.50" to "$37,537.50": "$37" stays, ",537" comes in, ".50" keeps its characters.
+        val fiat = WhatsNewFiat(150.0, "$")
+        val from = loop.amountText(loop.toBalance(Step.SENT), fiat)
+        val to = loop.amountText(loop.toBalance(Step.RECEIVED), fiat)
+        assertEquals("$37.50" to "$37,537.50", from to to)
+        val diff = one.monero.moneroone.ui.components.rollDiff(from, to)
+        assertEquals(from.substring(0, diff.start) + from.substring(diff.oldEnd), to.substring(0, diff.start) + to.substring(diff.newEnd))
+        assertEquals(to.length - from.length, (diff.newEnd - diff.start) - (diff.oldEnd - diff.start))
+    }
 }
