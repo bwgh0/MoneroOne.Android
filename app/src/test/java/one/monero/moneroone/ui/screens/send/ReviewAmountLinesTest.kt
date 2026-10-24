@@ -1,5 +1,6 @@
 package one.monero.moneroone.ui.screens.send
 
+import one.monero.moneroone.core.locale.localizedStrings
 import one.monero.moneroone.data.model.Currency
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -64,5 +65,43 @@ class ReviewAmountLinesTest {
         val lines = ReviewAmountLines.of(2_000_000_000_000L, 611.78, Currency.USD, fiatMode = true)
         assertEquals("$1,223.56", lines.primary)
         assertEquals("2.0000 XMR", lines.secondary)
+    }
+
+    @Test
+    fun spokenFiatFirstReadsTheFiatThenTheExactXmr() {
+        val lines = ReviewAmountLines.of("0.00003152", "$0.01", fiatFirst = true)
+        assertEquals("$0.01, 0.00003152 XMR", lines.spokenFiatFirst)
+        assertNull(ReviewAmountLines.of("0.00003152", "$0.01", fiatFirst = false).spokenFiatFirst)
+        assertNull(ReviewAmountLines.of("0.00003152", null, fiatFirst = true).spokenFiatFirst)
+    }
+
+    @Test
+    fun theFeeLabelFollowsFiatMode() {
+        val fiatFirst = ReviewAmountLines.of(fee, price, Currency.USD, fiatMode = true)
+        assertEquals("Network fee: $0.02, 0.00003152 XMR", SendReviewSpoken.feeLabel(fee, fiatFirst))
+        val xmrFirst = ReviewAmountLines.of(fee, price, Currency.USD, fiatMode = false)
+        assertEquals("Network fee: 0.00003152 XMR", SendReviewSpoken.feeLabel(fee, xmrFirst))
+        assertEquals("Network fee: loading", SendReviewSpoken.feeLoadingLabel())
+    }
+
+    @Test
+    fun theSendHintReadsFiatFirstOnlyInFiatModeWithAPlausiblePrice() {
+        val fiatFirst = ReviewAmountLines.of(sent, price, Currency.USD, fiatMode = true)
+        assertEquals("Double tap to send $2.51, 0.004181066248 XMR", SendReviewSpoken.sendHint(sent, fiatFirst))
+        val xmrFirst = ReviewAmountLines.of(sent, price, Currency.USD, fiatMode = false)
+        assertEquals("Double tap to send 0.004181066248 XMR", SendReviewSpoken.sendHint(sent, xmrFirst))
+        for (fiatMode in listOf(true, false)) {
+            val noPrice = ReviewAmountLines.of(sent, null, Currency.USD, fiatMode)
+            assertEquals("Double tap to send 0.004181066248 XMR", SendReviewSpoken.sendHint(sent, noPrice))
+        }
+        val implausible = ReviewAmountLines.of(sent, 0.0, Currency.USD, fiatMode = true)
+        assertEquals("Double tap to send 0.004181066248 XMR", SendReviewSpoken.sendHint(sent, implausible))
+    }
+
+    @Test
+    fun theSpokenStringsAreTranslated() {
+        for (source in listOf("Network fee: %s", "Network fee: %s XMR", "Network fee: loading", "Double tap to send %s", "Double tap to send %s XMR")) {
+            assertTrue(source, localizedStrings.containsKey(source))
+        }
     }
 }

@@ -1,5 +1,6 @@
 package one.monero.moneroone.ui.screens.send
 
+import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.util.MoneyFormat
 import one.monero.moneroone.data.util.XmrFormat
@@ -16,6 +17,13 @@ internal data class ReviewAmountLines(
     /** The fiat value is on top. */
     val isFiatFirst: Boolean
 ) {
+    /**
+     * What TalkBack reads for a value shown fiat first: the fiat value, then the exact XMR, as on
+     * the screen. Null when XMR is on top: those labels read the XMR alone.
+     */
+    val spokenFiatFirst: String?
+        get() = if (isFiatFirst && secondary != null) "$primary, $secondary" else null
+
     companion object {
         /** Fiat on top: Fiat Mode is on and the price is plausible (iOS PriceService.isPlausiblePrice). */
         fun fiatFirst(fiatMode: Boolean, price: Double?): Boolean =
@@ -43,4 +51,19 @@ internal data class ReviewAmountLines(
 
         private const val ATOMIC_UNITS_PER_XMR = 1_000_000_000_000.0
     }
+}
+
+/** What TalkBack reads on the Send Review (iOS SendReviewFee). Labels only: nothing visible changes. */
+internal object SendReviewSpoken {
+
+    /** The fee row, in the order of the screen: in Fiat Mode the fiat value, then the exact XMR; else the XMR alone. */
+    fun feeLabel(fee: Long, lines: ReviewAmountLines): String =
+        lines.spokenFiatFirst?.let { tr("Network fee: %s", it) } ?: tr("Network fee: %s XMR", XmrFormat.format(fee))
+
+    /** The fee row while the fee is not known yet. */
+    fun feeLoadingLabel(): String = tr("Network fee: loading")
+
+    /** The hint on Send once the fee is in: in Fiat Mode the fiat value, then the exact XMR; else the XMR alone. */
+    fun sendHint(amount: Long, lines: ReviewAmountLines): String =
+        lines.spokenFiatFirst?.let { tr("Double tap to send %s", it) } ?: tr("Double tap to send %s XMR", XmrFormat.format(amount))
 }

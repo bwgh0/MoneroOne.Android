@@ -109,6 +109,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
@@ -1770,8 +1771,11 @@ private fun ReviewPhase(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Fee row
+                    // TalkBack reads the row as one, in the order of the screen (iOS SendReviewFee.accessibilityLabel).
+                    val feeLabel = if (feeReady) SendReviewSpoken.feeLabel(estimatedFee, lines(estimatedFee)) else SendReviewSpoken.feeLoadingLabel()
                     ReviewDetailRow(
-                        label = { Text(tr("Network Fee"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        label = { Text(tr("Network Fee"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        modifier = Modifier.clearAndSetSemantics { contentDescription = feeLabel }
                     ) {
                         // Gray placeholders hold the row until the fee is known; an error shows in the status slot.
                         FillIn(
@@ -1904,6 +1908,12 @@ private fun ReviewPhase(
             onRetryBuild = { attempt++ }
         )
 
+        // TalkBack on Send once the fee is in: the amount it sends, in the order of the screen (iOS sendHint).
+        val sendHint = if (feeReady) {
+            val sent = if (isSweepAll) sweepAmount else parsedAmount
+            SendReviewSpoken.sendHint(sent, lines(sent))
+        } else null
+
         // Send button
         @OptIn(ExperimentalComposeUiApi::class)
         PrimaryButton(
@@ -1911,6 +1921,7 @@ private fun ReviewPhase(
             modifier = Modifier
                 .fillMaxWidth()
                 .sendWaitHint(feeLoading && wait != SendWait.Ready)
+                .sendHint(sendHint)
                 .pointerInteropFilter { event ->
                     (event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0
                 },
@@ -1950,6 +1961,10 @@ private fun SampleBar(sample: String, style: TextStyle) {
     }
     ValuePlaceholder(width = width, style = style)
 }
+
+/** TalkBack's hint on Send, given as the wait hint is: a state description. Labels only. */
+private fun Modifier.sendHint(hint: String?): Modifier =
+    if (hint == null) this else semantics { stateDescription = hint }
 
 /**
  * The memo toggle's text, as on iOS (SendAmountStep.memoToggleTitle): "Hide memo" while the memo field shows,
@@ -1996,6 +2011,7 @@ private val ReviewRowStackGap = 2.dp
 @Composable
 private fun ReviewDetailRow(
     label: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
     value: @Composable () -> Unit
 ) {
     Layout(
@@ -2003,7 +2019,7 @@ private fun ReviewDetailRow(
             Box { label() }
             Column(horizontalAlignment = Alignment.End) { value() }
         },
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) { measurables, constraints ->
         val labelMeasurable = measurables[0]
         val valueMeasurable = measurables[1]
