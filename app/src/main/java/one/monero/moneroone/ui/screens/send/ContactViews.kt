@@ -260,6 +260,8 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
     ) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f)) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                // iOS: Cancel at the leading edge, as in the New Contact bar.
+                DismissTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) { Text(tr("Cancel")) }
                 Text(
                     tr("Contacts"),
                     style = MaterialTheme.typography.titleMedium,
