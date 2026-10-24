@@ -401,6 +401,7 @@
     <string name="l10n_double_tap_to_create_your_wallet_5f1bad91" formatted="false">"Cüzdanınızı oluşturmak için çift dokunun"</string>
     <string name="l10n_double_tap_to_enable_s_for_quick_unlock_29d8bee8" formatted="false">"%1$s ile hızlı kilit açmayı etkinleştirmek için çift dokunun"</string>
     <string name="l10n_double_tap_to_enter_the_recovery_phrase_of_one_of_these_b8f46b93" formatted="false">"Bu cüzdanlardan birinin kurtarma ifadesini girmek için çift dokunun"</string>
+    <string name="l10n_double_tap_to_fund_the_link_with_s_cb9c60f3" formatted="false">"Bağlantıyı %1$s ile fonlamak için çift dokunun"</string>
     <string name="l10n_double_tap_to_fund_the_link_with_s_xmr_70c67733" formatted="false">"Bağlantıyı %1$s XMR ile fonlamak için çift dokunun"</string>
     <string name="l10n_double_tap_to_make_it_small_again_0960f859" formatted="false">"Yeniden küçültmek için çift dokunun."</string>
     <string name="l10n_double_tap_to_pair_a_trezor_hardware_wallet_over_blueto_42439687" formatted="false">"Bluetooth üzerinden bir Trezor donanım cüzdanı eşlemek için çift dokunun"</string>
@@ -418,6 +419,7 @@
     <string name="l10n_double_tap_to_select_6c4b7a21" formatted="false">"Seçmek için çift dokunun"</string>
     <string name="l10n_double_tap_to_select_s_8963947c" formatted="false">"%1$s öğesini seçmek için çift dokunun"</string>
     <string name="l10n_double_tap_to_select_this_address_1cd99192" formatted="false">"Bu adresi seçmek için çift dokunun"</string>
+    <string name="l10n_double_tap_to_send_s_ddb876a8" formatted="false">"%1$s göndermek için çift dokunun"</string>
     <string name="l10n_double_tap_to_send_s_xmr_0c79892b" formatted="false">"%1$s XMR göndermek için çift dokunun"</string>
     <string name="l10n_double_tap_to_send_monero_d67cbfb6" formatted="false">"Monero göndermek için çift dokunun"</string>
     <string name="l10n_double_tap_to_skip_biometric_setup_d4270d92" formatted="false">"Biyometrik kurulumu atlamak için çift dokunun"</string>
@@ -660,6 +662,7 @@
     <string name="l10n_network_fee_90297f42" formatted="false">"Ağ Ücreti"</string>
     <string name="l10n_network_error_check_your_connection_bdfeee9c" formatted="false">"Ağ hatası. Bağlantınızı kontrol edin."</string>
     <string name="l10n_network_fee_82c5067d" formatted="false">"Ağ ücreti"</string>
+    <string name="l10n_network_fee_s_6e109367" formatted="false">"Ağ ücreti: %1$s"</string>
     <string name="l10n_network_fee_s_xmr_2f32e617" formatted="false">"Ağ ücreti: %1$s XMR"</string>
     <string name="l10n_network_fee_loading_2a673f23" formatted="false">"Ağ ücreti: yükleniyor"</string>
     <string name="l10n_never_6300ef80" formatted="false">"Hiçbir Zaman"</string>
@@ -845,6 +848,8 @@
     <string name="l10n_radius_6fe0661c" formatted="false">"Yarıçap"</string>
     <string name="l10n_radius_s_78f7366a" formatted="false">"Yarıçap: %1$s"</string>
     <string name="l10n_rate_monero_one_8d7741ae" formatted="false">"Monero One\'ı Puanla"</string>
+    <string name="l10n_rate_on_google_play_e6f632ae" formatted="false">"Google Play\'de puanla"</string>
+    <string name="l10n_rate_on_the_app_store_13dc8d6e" formatted="false">"App Store\'da puanla"</string>
     <string name="l10n_re_enter_your_new_pin_to_confirm_ae223c83" formatted="false">"Yeni PIN\'i Onaylayın"</string>
     <string name="l10n_reaching_node_9a18d501" formatted="false">"Düğüme ulaşılıyor…"</string>
     <string name="l10n_reading_transactions_from_trezor_13097f0b" formatted="false">"İşlemler Trezor\'dan okunuyor…"</string>
@@ -1035,6 +1040,7 @@
     <string name="l10n_share_the_link_b0c1ec20" formatted="false">"Bağlantıyı paylaş"</string>
     <string name="l10n_share_the_link_again_ca22671a" formatted="false">"Bağlantıyı yeniden paylaş"</string>
     <string name="l10n_share_view_only_wallet_keys_e0bb1306" formatted="false">"Yalnızca görüntüleme cüzdanı anahtarlarını paylaş"</string>
+    <string name="l10n_share_with_friends_86dbbca7" formatted="false">"Arkadaşlarınla paylaş"</string>
     <string name="l10n_show_s_first_cc3cb868" formatted="false">"Önce %1$s Göster"</string>
     <string name="l10n_show_balance_transactions_bf96c0cc" formatted="false">"Bakiye ve İşlemleri Göster"</string>
     <string name="l10n_show_recovery_phrase_3744ad12" formatted="false">"Kurtarma İfadesi"</string>

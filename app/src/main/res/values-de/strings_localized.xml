@@ -401,6 +401,7 @@
     <string name="l10n_double_tap_to_create_your_wallet_5f1bad91" formatted="false">"Doppeltippen, um deine Wallet zu erstellen"</string>
     <string name="l10n_double_tap_to_enable_s_for_quick_unlock_29d8bee8" formatted="false">"Doppeltippen, um %1$s zum schnellen Entsperren zu aktivieren"</string>
     <string name="l10n_double_tap_to_enter_the_recovery_phrase_of_one_of_these_b8f46b93" formatted="false">"Doppeltippen, um die Seed-Phrase einer dieser Wallets einzugeben"</string>
+    <string name="l10n_double_tap_to_fund_the_link_with_s_cb9c60f3" formatted="false">"Doppeltippen, um den Link mit %1$s zu füllen"</string>
     <string name="l10n_double_tap_to_fund_the_link_with_s_xmr_70c67733" formatted="false">"Doppeltippen, um den Link mit %1$s XMR zu füllen"</string>
     <string name="l10n_double_tap_to_make_it_small_again_0960f859" formatted="false">"Doppeltippen, um ihn wieder zu verkleinern."</string>
     <string name="l10n_double_tap_to_pair_a_trezor_hardware_wallet_over_blueto_42439687" formatted="false">"Doppeltippen, um eine Trezor-Hardware-Wallet über Bluetooth zu koppeln"</string>
@@ -418,6 +419,7 @@
     <string name="l10n_double_tap_to_select_6c4b7a21" formatted="false">"Zum Auswählen doppeltippen"</string>
     <string name="l10n_double_tap_to_select_s_8963947c" formatted="false">"Doppeltippen, um %1$s auszuwählen"</string>
     <string name="l10n_double_tap_to_select_this_address_1cd99192" formatted="false">"Doppeltippen, um diese Adresse auszuwählen"</string>
+    <string name="l10n_double_tap_to_send_s_ddb876a8" formatted="false">"Doppeltippen, um %1$s zu senden"</string>
     <string name="l10n_double_tap_to_send_s_xmr_0c79892b" formatted="false">"Doppeltippen, um %1$s XMR zu senden"</string>
     <string name="l10n_double_tap_to_send_monero_d67cbfb6" formatted="false">"Doppeltippen, um Monero zu senden"</string>
     <string name="l10n_double_tap_to_skip_biometric_setup_d4270d92" formatted="false">"Doppeltippen, um die biometrische Einrichtung zu überspringen"</string>
@@ -660,6 +662,7 @@
     <string name="l10n_network_fee_90297f42" formatted="false">"Netzwerkgebühr"</string>
     <string name="l10n_network_error_check_your_connection_bdfeee9c" formatted="false">"Netzwerkfehler. Prüfe deine Verbindung."</string>
     <string name="l10n_network_fee_82c5067d" formatted="false">"Netzwerkgebühr"</string>
+    <string name="l10n_network_fee_s_6e109367" formatted="false">"Netzwerkgebühr: %1$s"</string>
     <string name="l10n_network_fee_s_xmr_2f32e617" formatted="false">"Netzwerkgebühr: %1$s XMR"</string>
     <string name="l10n_network_fee_loading_2a673f23" formatted="false">"Netzwerkgebühr: wird geladen"</string>
     <string name="l10n_never_6300ef80" formatted="false">"Nie"</string>
@@ -845,6 +848,8 @@
     <string name="l10n_radius_6fe0661c" formatted="false">"Radius"</string>
     <string name="l10n_radius_s_78f7366a" formatted="false">"Radius: %1$s"</string>
     <string name="l10n_rate_monero_one_8d7741ae" formatted="false">"Monero One bewerten"</string>
+    <string name="l10n_rate_on_google_play_e6f632ae" formatted="false">"Bei Google Play bewerten"</string>
+    <string name="l10n_rate_on_the_app_store_13dc8d6e" formatted="false">"Im App Store bewerten"</string>
     <string name="l10n_re_enter_your_new_pin_to_confirm_ae223c83" formatted="false">"Neue PIN bestätigen"</string>
     <string name="l10n_reaching_node_9a18d501" formatted="false">"Node wird erreicht …"</string>
     <string name="l10n_reading_transactions_from_trezor_13097f0b" formatted="false">"Transaktionen werden vom Trezor gelesen …"</string>
@@ -1035,6 +1040,7 @@
     <string name="l10n_share_the_link_b0c1ec20" formatted="false">"Link teilen"</string>
     <string name="l10n_share_the_link_again_ca22671a" formatted="false">"Link erneut teilen"</string>
     <string name="l10n_share_view_only_wallet_keys_e0bb1306" formatted="false">"Schlüssel der View-Only-Wallet teilen"</string>
+    <string name="l10n_share_with_friends_86dbbca7" formatted="false">"Mit Freunden teilen"</string>
     <string name="l10n_show_s_first_cc3cb868" formatted="false">"%1$s zuerst anzeigen"</string>
     <string name="l10n_show_balance_transactions_bf96c0cc" formatted="false">"Guthaben &amp; Transaktionen zeigen"</string>
     <string name="l10n_show_recovery_phrase_3744ad12" formatted="false">"Seed-Phrase"</string>

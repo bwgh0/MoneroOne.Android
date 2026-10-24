@@ -2072,5 +2072,22 @@
     "uk": "Очікування синхронізації гаманця",
     "zh-Hans": "正在等待钱包同步",
     "zh-Hant": "正在等待錢包同步"
+  },
+  "Rate on Google Play": {
+    "de": "Bei Google Play bewerten",
+    "es": "Valorar en Google Play",
+    "fr": "Noter sur Google Play",
+    "it": "Valuta su Google Play",
+    "ja": "Google Playで評価",
+    "ko": "Google Play에서 평가하기",
+    "nl": "Beoordeel op Google Play",
+    "pl": "Oceń w Google Play",
+    "pt-BR": "Avaliar no Google Play",
+    "ro": "Evaluează pe Google Play",
+    "ru": "Оценить в Google Play",
+    "tr": "Google Play'de puanla",
+    "uk": "Оцінити в Google Play",
+    "zh-Hans": "在 Google Play 评分",
+    "zh-Hant": "在 Google Play 評分"
   }
 }
