@@ -44,14 +44,14 @@ object WhatsNewNotes {
             version = NotesVersion(1, 1),
             highlights = listOf(
                 WhatsNewHighlight(
-                    WhatsNewGlyph.TRANSFER,
-                    "Transfer between your wallets",
-                    "Move XMR from one of your wallets to another. Tap the wallet name at the top, then Transfer."
-                ),
-                WhatsNewHighlight(
                     WhatsNewGlyph.LINK,
                     "Send XMR as a link",
                     "Whoever opens it claims the funds in Monero One. In Send, choose Link."
+                ),
+                WhatsNewHighlight(
+                    WhatsNewGlyph.TRANSFER,
+                    "Transfer between your wallets",
+                    "Move XMR from one of your wallets to another. Tap the wallet name at the top, then Transfer."
                 ),
                 WhatsNewHighlight(
                     WhatsNewGlyph.CONTACTS,
