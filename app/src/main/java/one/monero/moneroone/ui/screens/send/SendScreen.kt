@@ -127,6 +127,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -678,6 +680,7 @@ fun SendScreen(
                 } else {
                     val currentPrice by walletViewModel.currentPrice.collectAsState()
                     val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+                    val fiatMode by walletViewModel.fiatMode.collectAsState()
                     ReviewPhase(
                         address = address,
                         openAliasSummary = openAliasSummary,
@@ -704,6 +707,7 @@ fun SendScreen(
                         },
                         xmrPrice = currentPrice?.price,
                         currency = selectedCurrency,
+                        fiatMode = fiatMode,
                         sendInProgress = sendInProgress,
                         gate = sendWaitGate,
                         onRetryWait = retryWait,
@@ -1550,6 +1554,8 @@ private fun ReviewPhase(
     buildFee: (Long, Boolean, Long) -> ReviewFeeResult,
     xmrPrice: Double?,
     currency: Currency,
+    /** Fiat Mode: with a plausible price the amounts show fiat on top and the exact XMR under it. */
+    fiatMode: Boolean,
     sendInProgress: Boolean,
     /** The wait for the main wallet: the review builds only once it runs and is synced. */
     gate: SendWaitGate,
@@ -1606,6 +1612,10 @@ private fun ReviewPhase(
     val feeError = reviewFee.error
     val estimatedFee = reviewFee.fee
     val needsSweepAllChoice = amountPrefilledFromQR && !isSweepAll && feeReady && reviewFee.overBalance
+    // An amount in the order Fiat Mode picks (iOS SendReviewStep.lines).
+    fun lines(atomic: Long) = ReviewAmountLines.of(atomic, xmrPrice, currency, fiatMode)
+    // What the built sweep sends: the balance it spends less its fee.
+    val sweepAmount = reviewFee.prepared?.sentAmount ?: (unlockedBalance - estimatedFee).coerceAtLeast(0)
 
     Column(
         modifier = Modifier
@@ -1719,34 +1729,35 @@ private fun ReviewPhase(
                             Text(tr("All Funds"), style = MaterialTheme.typography.headlineMedium)
                             Spacer(modifier = Modifier.height(4.dp))
                             if (feeReady) {
-                                // What the built sweep sends: the balance it spends less its fee.
-                                val sendAmount = reviewFee.prepared?.sentAmount ?: (unlockedBalance - estimatedFee).coerceAtLeast(0)
+                                val sent = lines(sweepAmount)
                                 Text(
-                                    "${formatXmr(sendAmount)} XMR",
+                                    sent.primary,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                xmrPrice?.let { price ->
-                                    val fiat = atomicToXmr(sendAmount) * price
+                                sent.secondary?.let {
                                     Text(
-                                        "≈ ${MoneyFormat.format(fiat, currency, fractionDigits = 2)}",
+                                        it,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             } else {
-                                ValuePlaceholder(width = 132.dp, style = MaterialTheme.typography.bodyMedium)
-                                if (xmrPrice != null) ValuePlaceholder(width = 56.dp, style = MaterialTheme.typography.bodySmall)
+                                ReviewLinesPlaceholder(
+                                    lines = lines(unlockedBalance),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    alignment = Alignment.CenterHorizontally
+                                )
                             }
                         } else {
+                            val sent = lines(parsedAmount)
                             Text(
-                                "${formatXmr(parsedAmount)} XMR",
+                                sent.primary,
                                 style = MaterialTheme.typography.headlineMedium
                             )
-                            xmrPrice?.let { price ->
-                                val fiat = atomicToXmr(parsedAmount) * price
+                            sent.secondary?.let {
                                 Text(
-                                    "≈ ${MoneyFormat.format(fiat, currency, fractionDigits = 2)}",
+                                    it,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1766,18 +1777,18 @@ private fun ReviewPhase(
                         FillIn(
                             ready = feeReady,
                             placeholder = {
-                                Column(horizontalAlignment = Alignment.End) {
-                                    ValuePlaceholder(width = 104.dp, style = MaterialTheme.typography.bodyMedium)
-                                    if (xmrPrice != null) ValuePlaceholder(width = 44.dp, style = MaterialTheme.typography.bodySmall)
-                                }
+                                ReviewLinesPlaceholder(
+                                    lines = lines(ReviewAmountLines.FEE_SAMPLE_ATOMIC),
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                                )
                             }
                         ) {
+                            val feeLines = lines(estimatedFee)
                             Column(horizontalAlignment = Alignment.End) {
-                                Text("${formatXmr(estimatedFee)} XMR", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                xmrPrice?.let { price ->
-                                    val fiat = atomicToXmr(estimatedFee) * price
+                                Text(feeLines.primary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                feeLines.secondary?.let {
                                     Text(
-                                        "≈ ${MoneyFormat.format(fiat, currency, fractionDigits = 2)}",
+                                        it,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1798,24 +1809,23 @@ private fun ReviewPhase(
                             FillIn(
                                 ready = feeReady,
                                 placeholder = {
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        ValuePlaceholder(width = 132.dp, style = MaterialTheme.typography.titleSmall)
-                                        if (xmrPrice != null) ValuePlaceholder(width = 56.dp, style = MaterialTheme.typography.bodySmall)
-                                    }
+                                    ReviewLinesPlaceholder(
+                                        lines = lines(if (parsedAmount > 0) parsedAmount else unlockedBalance),
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                                    )
                                 }
                             ) {
-                                val total = reviewFee.prepared?.total ?: (parsedAmount + estimatedFee)
+                                val totalLines = lines(reviewFee.prepared?.total ?: (parsedAmount + estimatedFee))
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
-                                        "${formatXmr(total)} XMR",
+                                        totalLines.primary,
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MoneroOrange
                                     )
-                                    xmrPrice?.let { price ->
-                                        val fiat = atomicToXmr(total) * price
+                                    totalLines.secondary?.let {
                                         Text(
-                                            "≈ ${MoneyFormat.format(fiat, currency, fractionDigits = 2)}",
+                                            it,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -1912,6 +1922,33 @@ private fun ReviewPhase(
 
         Spacer(modifier = Modifier.height(40.dp))
     }
+}
+
+/**
+ * Gray bars the size of a sample amount's lines while the value loads (iOS ReviewValuePlaceholder: the
+ * sample, redacted), so the bars follow the order Fiat Mode picks.
+ */
+@Composable
+private fun ReviewLinesPlaceholder(
+    lines: ReviewAmountLines,
+    style: TextStyle,
+    alignment: Alignment.Horizontal = Alignment.End
+) {
+    Column(horizontalAlignment = alignment) {
+        SampleBar(lines.primary, style)
+        lines.secondary?.let { SampleBar(it, MaterialTheme.typography.bodySmall) }
+    }
+}
+
+/** One gray bar as wide as [sample] would be in [style]. */
+@Composable
+private fun SampleBar(sample: String, style: TextStyle) {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val width = remember(sample, style, density) {
+        with(density) { measurer.measure(sample, style, maxLines = 1).size.width.toDp() }
+    }
+    ValuePlaceholder(width = width, style = style)
 }
 
 /**
