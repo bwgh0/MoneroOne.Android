@@ -370,8 +370,8 @@ fun WalletManagerRows(
                 renameTarget = null
             },
             onDelete = {
-                // The sheet closes; the confirmation opens as for a swipe.
-                renameTarget = null
+                // The confirmation opens over the sheet, as on iOS: Cancel
+                // returns to Edit Wallet, Delete closes both.
                 deleteCandidate = target
             }
         )
@@ -399,6 +399,7 @@ fun WalletManagerRows(
                             }
                         }
                         deleteCandidate = null
+                        renameTarget = null
                     }
                 ) {
                     Text(tr("Delete"), color = ErrorRed)
@@ -876,7 +877,7 @@ fun EmojiCircle(emoji: String, size: androidx.compose.ui.unit.Dp, color: Color =
 /**
  * Edit Wallet (iOS EditWalletSheet): the icon, the name, Save, and Delete
  * Wallet last, for every wallet (a swipe deletes only inactive ones).
- * [onDelete] closes the sheet and opens the caller's confirmation.
+ * [onDelete] opens the caller's confirmation over the sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
