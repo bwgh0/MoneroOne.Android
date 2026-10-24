@@ -19,11 +19,13 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
@@ -58,7 +60,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -197,7 +198,12 @@ fun RestoreWalletScreen(
                         enabled = !walletState.isInitializing && entry.validPhrase != null,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(text = if (walletState.isInitializing) tr("Restoring...") else tr("Continue"))
+                        if (walletState.isInitializing) {
+                            Text(tr("Restoring..."))
+                        } else {
+                            Text(tr("Continue"))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
@@ -259,8 +265,7 @@ fun RestoreWalletScreen(
 
                 Text(
                     text = tr("Enter your seed phrase"),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium, // iOS .headline
                     modifier = Modifier.semantics { heading() }
                 )
 

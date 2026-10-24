@@ -16,7 +16,6 @@ import android.view.inputmethod.InputMethodSubtype
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -26,12 +25,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -40,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.KeyboardHide
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -75,7 +75,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.PlatformTextInputMethodRequest
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
@@ -93,6 +92,7 @@ import one.monero.moneroone.core.wallet.seed.SeedDates
 import one.monero.moneroone.core.wallet.seed.SeedFormat
 import one.monero.moneroone.core.wallet.seed.SeedPhraseValidator.Status
 import one.monero.moneroone.ui.components.GlassSegmentedPicker
+import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.screens.onboarding.SeedEntryState.Effect
 import one.monero.moneroone.ui.screens.onboarding.SeedEntryState.Focus
@@ -144,32 +144,51 @@ internal fun SeedPhraseEntry(
 }
 
 /**
- * Up to three list words for the focused cell, directly above the keyboard
- * (iOS: the keyboard's suggestion bar). It keeps its height while empty, so
- * the grid above it does not jump while typing.
+ * Up to three list words for the focused cell, directly above the keyboard,
+ * and a trailing button that hides the keyboard (iOS SeedSuggestionBar: the
+ * toolbar's capsule items). The words spread over the bar, one word centered.
+ * It keeps its height while empty, so the grid above it does not jump.
  */
 @Composable
 internal fun SeedSuggestionBar(entry: SeedEntryState, onEffect: (Effect) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier = modifier.fillMaxWidth().height(44.dp)) {
-        for (word in entry.suggestions) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clickable(role = Role.Button) { onEffect(entry.acceptSuggestion(word)) },
-                contentAlignment = Alignment.Center
+    val words = entry.suggestions
+    BoxWithConstraints(modifier = modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        // A long word shortens (ellipsis) before the bar overflows; chips keep 8 apart.
+        val chipMax = if (words.isEmpty()) maxWidth else (maxWidth - SuggestionHeight - 8.dp * words.size) / words.size
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            words.forEachIndexed { i, word ->
+                if (i > 0 || words.size == 1) Spacer(modifier = Modifier.weight(1f))
+                GlassButton(
+                    onClick = { onEffect(entry.acceptSuggestion(word)) },
+                    modifier = Modifier.height(SuggestionHeight).widthIn(max = chipMax)
+                ) {
+                    Text(
+                        text = word,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            GlassButton(
+                onClick = { onEffect(Effect(SeedEntryState.Focus.Hide)) },
+                modifier = Modifier.size(SuggestionHeight)
             ) {
-                Text(
-                    text = word,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                Icon(
+                    Icons.Default.KeyboardHide,
+                    contentDescription = tr("Hide keyboard"),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }
     }
 }
+
+private val SuggestionHeight = 44.dp
 
 @Composable
 private fun SeedEntryControls(format: SeedFormat, onFormat: (SeedFormat) -> Unit, onPaste: () -> Unit) {
