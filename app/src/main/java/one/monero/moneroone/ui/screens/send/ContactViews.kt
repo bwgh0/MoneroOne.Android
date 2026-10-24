@@ -8,7 +8,6 @@ import android.provider.ContactsContract
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,7 +35,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material3.AlertDialog
@@ -47,12 +46,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -87,6 +83,7 @@ import one.monero.moneroone.core.openalias.RecipientInput
 import one.monero.moneroone.ui.components.CapsuleShape
 import one.monero.moneroone.ui.components.CellFill
 import one.monero.moneroone.ui.components.DismissTextButton
+import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroTextField
 import one.monero.moneroone.ui.components.moneroTextFieldColors
@@ -95,7 +92,9 @@ import one.monero.moneroone.ui.theme.MonoCaption
 import one.monero.moneroone.ui.theme.MoneroOrange
 import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.truncateMiddle
+import one.monero.moneroone.ui.screens.wallet.SwipeToDeleteRow
 import one.monero.moneroone.ui.screens.wallet.WalletRowCheck
+import one.monero.moneroone.ui.screens.wallet.rememberRowSwipeState
 import one.monero.moneroone.core.locale.tr
 import timber.log.Timber
 
@@ -230,7 +229,7 @@ internal fun DeleteContactAlert(onDelete: () -> Unit, onDismiss: () -> Unit) {
         title = { Text(tr("Delete Contact?")) },
         text = { Text(tr("Your transactions stay in History.")) },
         confirmButton = { TextButton(onClick = onDelete) { Text(tr("Delete"), color = ErrorRed) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Cancel")) } }
+        dismissButton = { DismissTextButton(onClick = onDismiss) { Text(tr("Cancel")) } }
     )
 }
 
@@ -266,12 +265,23 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.align(Alignment.Center).semantics { heading() }
                 )
-                IconButton(onClick = { editingNew = true }, modifier = Modifier.align(Alignment.CenterEnd)) {
-                    Icon(Icons.Default.Add, contentDescription = tr("New Contact"))
+                // iOS: a glass circle with a plus in the label color; fillElevated, as the sheet is the surface.
+                GlassButton(
+                    onClick = { editingNew = true },
+                    containerColor = MoneroTheme.colors.fillElevated,
+                    // 16 from the edge, over the search field's end (the bar pads 8).
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp).size(44.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = tr("New Contact"),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
             Spacer(Modifier.height(16.dp))
-            MoneroTextField(
+            if (contacts.isNotEmpty()) MoneroTextField(
                 value = query,
                 onValueChange = { query = it },
                 placeholder = { Text(tr("Search"), maxLines = 1) },
@@ -280,7 +290,7 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
                 colors = moneroTextFieldColors(containerColor = CellFill),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
             )
-            Spacer(Modifier.height(16.dp))
+            if (contacts.isNotEmpty()) Spacer(Modifier.height(16.dp))
             when {
                 contacts.isEmpty() -> ContactsEmptyCard()
                 shown.isEmpty() -> ContactsMessage(tr("No Results"), null)
@@ -290,16 +300,19 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(shown, key = { it.id }) { contact ->
-                        SwipeToDeleteContact(onDelete = { deletingId = contact.id }) {
+                        val swipe = rememberRowSwipeState()
+                        val deleteLabel = tr("Delete Contact")
+                        SwipeToDeleteRow(swipe = swipe, deleteLabel = deleteLabel, onDelete = { deletingId = contact.id }) {
                             Box {
                                 val copyLabel = tr(if (contact.isOpenAlias) "Copy OpenAlias" else "Copy Address")
                                 val editLabel = tr("Edit Contact")
-                                val deleteLabel = tr("Delete Contact")
                                 ContactRow(
                                     contact = contact,
                                     checked = contact.id == selectedId,
                                     color = MoneroTheme.colors.fillElevated,
-                                    onClick = { onPick(contact) },
+                                    modifier = Modifier.offset { swipe.offset() },
+                                    // A tap on an open row closes it and never picks.
+                                    onClick = { if (swipe.isOpen) swipe.close() else onPick(contact) },
                                     onLongClick = { menuFor = contact.id },
                                     actions = listOf(
                                         CustomAccessibilityAction(editLabel) { editingId = contact.id; true },
@@ -342,34 +355,6 @@ internal fun ContactsSheet(selectedId: String?, onPick: (Contact) -> Unit, onDis
             onDismiss = { deletingId = null }
         )
     }
-}
-
-/** A swipe left asks to delete; the row springs back while the alert decides. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SwipeToDeleteContact(onDelete: () -> Unit, content: @Composable () -> Unit) {
-    val state = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) onDelete()
-            false
-        }
-    )
-    SwipeToDismissBox(
-        state = state,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
-            val color by animateColorAsState(
-                if (state.targetValue == SwipeToDismissBoxValue.EndToStart) ErrorRed else Color.Transparent,
-                label = "contactSwipe"
-            )
-            Box(
-                Modifier.fillMaxSize().background(color, RoundedCornerShape(20.dp)).padding(end = 20.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = null, tint = Color.White)
-            }
-        }
-    ) { content() }
 }
 
 /** No contacts yet (ios-10): the empty-state card, with the person glyph, on the cell fill. */
@@ -529,19 +514,10 @@ internal fun ContactEditorSheet(contact: Contact?, onDismiss: () -> Unit, prefil
                             destination = it
                             lookup.onInputChanged(it, immediate = false)
                         },
-                        placeholder = { Text(fieldLabel, style = MonoCaption) },
                         textStyle = MonoCaption,
                         // The whole address shows, over several lines (ios-14, ios-15).
                         keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Done),
                         colors = moneroTextFieldColors(containerColor = cardColor),
-                        trailingIcon = if (destination.isNotEmpty()) {
-                            {
-                                OpenAliasClearButton(onClear = {
-                                    destination = ""
-                                    lookup.onInputChanged("", immediate = true)
-                                })
-                            }
-                        } else null,
                         modifier = Modifier.fillMaxWidth().semantics { contentDescription = fieldLabel }
                     )
                     if (destination.isNotEmpty()) {

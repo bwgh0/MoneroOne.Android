@@ -21,11 +21,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -441,18 +443,152 @@ internal fun reorderDropIndex(heights: List<Float>, gap: Float, from: Int, dragO
     return to
 }
 
-private enum class RowSwipe { Closed, Open }
+internal enum class RowSwipe { Closed, Open }
+
+/**
+ * The swipe to the Delete zone (iOS SwipeTrack, allowsFullSwipe false), shared by the wallet rows
+ * and the Contacts sheet. A flick or a pull past 40% of the zone width opens it; a full swipe only
+ * opens it, and a tap on the zone asks to delete. Only offset and alpha animate.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+internal class RowSwipeState(val revealPx: Float, flingPx: Float, private val scope: CoroutineScope) {
+    val anchored = AnchoredDraggableState(
+        initialValue = RowSwipe.Closed,
+        anchors = DraggableAnchors {
+            RowSwipe.Closed at 0f
+            RowSwipe.Open at -revealPx
+        },
+        positionalThreshold = { distance -> distance * 0.4f },
+        velocityThreshold = { flingPx },
+        snapAnimationSpec = Motion.snappy(),
+        decayAnimationSpec = exponentialDecay()
+    )
+    private var job: Job? = null
+
+    /** The zone takes taps once the row is almost open. */
+    val zoneEnabled by derivedStateOf { anchored.offset <= -revealPx * 0.9f }
+
+    /** Open, or on its way: a tap on the row closes it and does nothing else. */
+    val isOpen: Boolean get() = anchored.targetValue != RowSwipe.Closed || anchored.offset < -0.5f
+
+    /** The row's offset; read it in a layout lambda (`Modifier.offset { }`). */
+    fun offset(): IntOffset = IntOffset(anchored.offset.roundToInt(), 0)
+
+    fun animate(block: suspend () -> Unit) {
+        job?.cancel()
+        job = scope.launch { block() }
+    }
+
+    fun close() = animate { anchored.animateTo(RowSwipe.Closed) }
+
+    fun cancel() {
+        job?.cancel()
+    }
+}
+
+@Composable
+internal fun rememberRowSwipeState(): RowSwipeState {
+    val density = LocalDensity.current
+    val revealPx = with(density) { 88.dp.toPx() }
+    val flingPx = with(density) { 125.dp.toPx() }
+    val scope = rememberCoroutineScope()
+    return remember(revealPx, flingPx) { RowSwipeState(revealPx, flingPx, scope) }
+}
+
+/**
+ * A row over its Delete zone. The card follows the finger from the touch slop on. The axis that
+ * moved more by the touch slop decides: a mostly horizontal swipe, diagonal too, is a swipe; a
+ * mostly vertical one scrolls the list. [content] offsets its card by [RowSwipeState.offset] and
+ * closes an open row on a tap. A null [onDelete], or [locked], turns the swipe off and closes the row.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun SwipeToDeleteRow(
+    swipe: RowSwipeState,
+    deleteLabel: String,
+    onDelete: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    locked: Boolean = false,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val swipeEnabled = onDelete != null
+    LaunchedEffect(swipeEnabled, locked) {
+        if ((!swipeEnabled || locked) && swipe.anchored.currentValue != RowSwipe.Closed) swipe.close()
+    }
+    // The leading edge moves toward the start: left in LTR, right in RTL.
+    val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1f else 1f
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(swipe, swipeEnabled, locked, direction) {
+                if (!swipeEnabled || locked) return@pointerInput
+                val slop = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val tracker = VelocityTracker().apply { addPointerInputChange(down) }
+                    var total = Offset.Zero
+                    var dragging = false
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) {
+                            if (dragging) {
+                                val velocity = tracker.calculateVelocity().x * direction
+                                swipe.animate { swipe.anchored.settle(velocity) }
+                            }
+                            break
+                        }
+                        if (!dragging && change.isConsumed) break
+                        tracker.addPointerInputChange(change)
+                        val delta = change.positionChange()
+                        if (dragging) {
+                            change.consume()
+                            swipe.anchored.dispatchRawDelta(delta.x * direction)
+                            continue
+                        }
+                        total += delta
+                        if (abs(total.x) < slop && abs(total.y) < slop) {
+                            // The list scroll or the reorder drag may take it first.
+                            awaitPointerEvent(PointerEventPass.Final)
+                            if (change.isConsumed) break
+                            continue
+                        }
+                        // Past the slop, the axis that moved more wins.
+                        if (abs(total.x) <= abs(total.y)) break
+                        dragging = true
+                        swipe.cancel()
+                        change.consume()
+                        swipe.anchored.dispatchRawDelta((total.x - sign(total.x) * slop) * direction)
+                    }
+                }
+            }
+    ) {
+        if (swipeEnabled) {
+            // The Delete zone behind the row, no layout participation (iOS SwipeTrack): the 52
+            // red disc with the white trash, "Delete" in caption2 under it.
+            WalletDeleteZone(
+                label = deleteLabel,
+                enabled = swipe.zoneEnabled,
+                onClick = {
+                    swipe.close()
+                    onDelete?.invoke()
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .graphicsLayer { alpha = (-swipe.anchored.offset / swipe.revealPx).coerceIn(0f, 1f) }
+            )
+        }
+        content()
+    }
+}
 
 /**
  * One wallet row (iOS WalletRow): emoji, name, orange balance, address under
- * it, Edit Wallet pencil, and a check when it is the active wallet. Swipe-to-delete
- * reveals a trash button in an overlay — only offset/alpha animate, the row
- * never re-lays-out (iOS aa8e835 lesson). The card follows the finger from the
- * touch slop on; a flick or a pull past 40% of the trash width opens it. The
- * axis that moved more by the touch slop decides: a mostly horizontal swipe,
- * diagonal too, is a swipe; a mostly vertical one scrolls the list.
+ * it, Edit Wallet pencil, and a check when it is the active wallet. A swipe
+ * reveals the Delete zone ([SwipeToDeleteRow]); the row never re-lays-out
+ * (iOS aa8e835 lesson).
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WalletRow(
     wallet: WalletInfo,
@@ -469,99 +605,14 @@ private fun WalletRow(
     onMoveDown: (() -> Unit)?,
     onDeleteRequest: (() -> Unit)?
 ) {
-    val density = LocalDensity.current
-    val revealPx = with(density) { 88.dp.toPx() }
-    val flingPx = with(density) { 125.dp.toPx() }
-    val scope = rememberCoroutineScope()
-    val swipe = remember(revealPx, flingPx) {
-        AnchoredDraggableState(
-            initialValue = RowSwipe.Closed,
-            anchors = DraggableAnchors {
-                RowSwipe.Closed at 0f
-                RowSwipe.Open at -revealPx
-            },
-            positionalThreshold = { distance -> distance * 0.4f },
-            velocityThreshold = { flingPx },
-            snapAnimationSpec = Motion.snappy(),
-            decayAnimationSpec = exponentialDecay()
-        )
-    }
-    val swipeEnabled = onDeleteRequest != null
-    val trashEnabled by remember(swipe, revealPx) { derivedStateOf { swipe.offset <= -revealPx * 0.9f } }
-    var swipeJob by remember { mutableStateOf<Job?>(null) }
-    fun animateSwipe(block: suspend () -> Unit) {
-        swipeJob?.cancel()
-        swipeJob = scope.launch { block() }
-    }
-    // A lifted row, or one that can no longer be deleted, closes its trash.
-    LaunchedEffect(swipeEnabled, isLifted) {
-        if ((!swipeEnabled || isLifted) && swipe.currentValue != RowSwipe.Closed) animateSwipe { swipe.animateTo(RowSwipe.Closed) }
-    }
-    // The leading edge moves toward the start: left in LTR, right in RTL.
-    val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1f else 1f
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .pointerInput(swipeEnabled, isLifted, direction) {
-                if (!swipeEnabled || isLifted) return@pointerInput
-                val slop = viewConfiguration.touchSlop
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val tracker = VelocityTracker().apply { addPointerInputChange(down) }
-                    var total = Offset.Zero
-                    var dragging = false
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) {
-                            if (dragging) {
-                                val velocity = tracker.calculateVelocity().x * direction
-                                animateSwipe { swipe.settle(velocity) }
-                            }
-                            break
-                        }
-                        if (!dragging && change.isConsumed) break
-                        tracker.addPointerInputChange(change)
-                        val delta = change.positionChange()
-                        if (dragging) {
-                            change.consume()
-                            swipe.dispatchRawDelta(delta.x * direction)
-                            continue
-                        }
-                        total += delta
-                        if (abs(total.x) < slop && abs(total.y) < slop) {
-                            // The list scroll or the reorder drag may take it first.
-                            awaitPointerEvent(PointerEventPass.Final)
-                            if (change.isConsumed) break
-                            continue
-                        }
-                        // Past the slop, the axis that moved more wins.
-                        if (abs(total.x) <= abs(total.y)) break
-                        dragging = true
-                        swipeJob?.cancel()
-                        change.consume()
-                        swipe.dispatchRawDelta((total.x - sign(total.x) * slop) * direction)
-                    }
-                }
-            }
+    val swipe = rememberRowSwipeState()
+    SwipeToDeleteRow(
+        swipe = swipe,
+        deleteLabel = tr("Delete wallet"),
+        onDelete = onDeleteRequest,
+        modifier = modifier,
+        locked = isLifted
     ) {
-        if (swipeEnabled) {
-            // The Delete zone behind the row, no layout participation (iOS SwipeTrack): the 52
-            // red disc with the white trash, "Delete" in caption2 under it.
-            WalletDeleteZone(
-                label = tr("Delete wallet"),
-                enabled = trashEnabled,
-                onClick = {
-                    animateSwipe { swipe.animateTo(RowSwipe.Closed) }
-                    onDeleteRequest?.invoke()
-                },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .graphicsLayer { alpha = (-swipe.offset / revealPx).coerceIn(0f, 1f) }
-            )
-        }
-
         WalletRowCard(
             emoji = wallet.emoji,
             name = wallet.name,
@@ -570,7 +621,7 @@ private fun WalletRow(
             isActive = isActive,
             modifier = Modifier
                 .fillMaxWidth()
-                .offset { IntOffset(swipe.offset.roundToInt(), 0) }
+                .offset { swipe.offset() }
                 .clearAndSetSemantics {
                     contentDescription = "${wallet.name}, $balanceText"
                     selected = isActive
@@ -584,8 +635,8 @@ private fun WalletRow(
                 },
             onClick = {
                 // A tap on an open row closes it and never switches.
-                if (swipe.targetValue != RowSwipe.Closed || swipe.offset < -0.5f) {
-                    animateSwipe { swipe.animateTo(RowSwipe.Closed) }
+                if (swipe.isOpen) {
+                    swipe.close()
                 } else {
                     onClick()
                 }
@@ -613,7 +664,7 @@ private fun WalletRow(
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .offset { IntOffset(swipe.offset.roundToInt(), 0) }
+                    .offset { swipe.offset() }
                     .fillMaxHeight()
                     .width(16.dp + HandleSlot)
                     // Hidden from TalkBack, as on iOS: the row has Move up / Move down, so each
@@ -809,7 +860,7 @@ internal fun FilledCircleGlyph(
 /** The swipe's Delete zone (iOS SwipeTrack): a 52 red disc with the white trash, "Delete" in caption2
  * under it, 6 apart, 12 from the edge. TalkBack hears [label] as one button. */
 @Composable
-private fun WalletDeleteZone(label: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun WalletDeleteZone(label: String, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),

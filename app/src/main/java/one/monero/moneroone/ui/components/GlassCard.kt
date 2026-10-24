@@ -192,6 +192,8 @@ fun GlassButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: Shape = CapsuleShape,
+    /** The fill: the surface on a page, fillElevated on a sheet that is the surface. */
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     content: @Composable BoxScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -205,7 +207,7 @@ fun GlassButton(
             }
             .cardShadow(shape)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(containerColor)
             .clickable(
                 enabled = enabled,
                 interactionSource = interactionSource,
