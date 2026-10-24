@@ -69,6 +69,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -177,6 +178,7 @@ import one.monero.moneroone.ui.components.FieldShape
 import one.monero.moneroone.ui.components.GlassButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroTextField
+import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.components.OnNavEntryEnd
 import one.monero.moneroone.ui.components.PrimaryButton
 import one.monero.moneroone.ui.components.ShrinkToFitText
@@ -463,7 +465,7 @@ fun SendScreen(
                     Text(
                         text = when (phase) {
                             SendPhase.ADDRESS -> tr("Send XMR")
-                            SendPhase.AMOUNT -> if (linkMode) tr("Send with a link") else toWalletShown?.let { tr("Send to %s", it.name) }
+                            SendPhase.AMOUNT -> if (linkMode) tr("Send with a Link") else toWalletShown?.let { tr("Send to %s", it.name) }
                                 ?: sendContact?.let { tr("Send to %s", it.name) }
                                 ?: openAliasSummary?.let { openAliasAmountTitle(it) }
                                 ?: if (address.length > 20) tr("Send to %s", truncateMiddle(address)) else tr("Amount")
@@ -1201,18 +1203,20 @@ private fun AmountPhase(
             SendPrefillSource.LINK -> tr("Amount pre-filled from payment link")
             null -> null
         }
+        // The amount sits at the iOS height (SendAmountStep: a 12 spacer and the
+        // stack's 16 above, the amount's 8 padding); the free space goes under the note row.
+        Spacer(modifier = Modifier.height(28.dp))
         if (amountPrefilledFromQR && prefillNote != null) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Default.Warning, contentDescription = null, tint = WarningYellow, modifier = Modifier.size(14.dp))
                 Text(prefillNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Spacer(modifier = Modifier.height(16.dp))
         }
-
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Large amount display
         if (isFiatMode) {
@@ -1264,7 +1268,7 @@ private fun AmountPhase(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(4.dp)) // iOS: the amount and its swap chip stack 4 apart
 
         // Fiat toggle capsule
         if (xmrPrice != null) {
@@ -1291,8 +1295,8 @@ private fun AmountPhase(
                     text = if (isFiatMode) {
                         "≈ ${amount.ifEmpty { "0" }} XMR"
                     } else {
-                        val fiatVal = (amount.toDoubleOrNull() ?: 0.0) * xmrPrice
-                        "≈ ${currencySymbol}${"%.2f".format(fiatVal)}"
+                        val xmrVal = amount.toDoubleOrNull() ?: 0.0
+                        if (xmrVal > 0) "≈ ${currencySymbol}${"%.2f".format(xmrVal * xmrPrice)}" else "≈ ${currencySymbol}0"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1346,7 +1350,10 @@ private fun AmountPhase(
             }
         }
 
-        // Add memo
+        // Add memo. iOS draws the row .secondary inside a Button: the brand tint at the
+        // secondary level (about half), with a chevron that turns over when it opens.
+        val memoTint = MoneroOrange.copy(alpha = 0.5f)
+        val memoChevron by animateFloatAsState(if (showMemo) 180f else 0f, Motion.disclose(), label = "memoChevron")
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1355,11 +1362,16 @@ private fun AmountPhase(
                 .clickable { showMemo = !showMemo }
                 .padding(vertical = 8.dp)
         ) {
-            Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Description, contentDescription = null, tint = memoTint, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text(memoToggleText(showMemo, linkMode), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(memoToggleText(showMemo, linkMode), style = MaterialTheme.typography.bodyMedium, color = memoTint)
             Spacer(modifier = Modifier.weight(1f))
-            Text(if (showMemo) "▲" else "▼", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = memoTint,
+                modifier = Modifier.size(18.dp).rotate(memoChevron)
+            )
         }
         AnimatedVisibility(visible = showMemo) {
             MoneroTextField(
