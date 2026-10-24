@@ -1251,9 +1251,14 @@ private fun AmountPhase(
     }
 
     fun syncXmrFromFiat() {
-        val price = xmrPrice ?: return
-        if (price <= 0) return
+        // This division decides how much XMR leaves the wallet, so the price has to be sane: with no
+        // plausible price the amount clears (iOS SendAmountStep.syncXMRFromFiat). The swap to XMR and Paste use it.
+        val price = xmrPrice?.takeIf { SendAmountStart.isPlausiblePrice(it) }
         val fiatVal = fiatString.toDoubleOrNull() ?: 0.0
+        if (price == null || fiatVal <= 0) {
+            onAmountChange("")
+            return
+        }
         val xmr = fiatVal / price
         onAmountChange(if (xmr > 0) "%.12f".format(java.util.Locale.US, xmr).trimEnd('0').trimEnd('.') else "")
     }
@@ -1328,13 +1333,7 @@ private fun AmountPhase(
                         .alignByBaseline()
                 )
             }
-            // XMR conversion below
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "≈ ${amount.ifEmpty { "0" }} XMR",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // The XMR shows once, in the swap chip under the amount, as on iOS.
         } else {
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center) {
                 // Shrinks like iOS (minimumScaleFactor 0.4) instead of clipping.
