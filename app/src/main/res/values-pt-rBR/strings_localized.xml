@@ -420,7 +420,6 @@
     <string name="l10n_double_tap_to_select_this_address_1cd99192" formatted="false">"Toque duas vezes para selecionar este endereço"</string>
     <string name="l10n_double_tap_to_send_s_xmr_0c79892b" formatted="false">"Toque duas vezes para enviar %1$s XMR"</string>
     <string name="l10n_double_tap_to_send_monero_d67cbfb6" formatted="false">"Toque duas vezes para enviar Monero"</string>
-    <string name="l10n_double_tap_to_send_to_this_wallet_9c41ec7a" formatted="false">"Toque duas vezes para enviar para esta carteira"</string>
     <string name="l10n_double_tap_to_skip_biometric_setup_d4270d92" formatted="false">"Toque duas vezes para pular a configuração biométrica"</string>
     <string name="l10n_double_tap_to_switch_to_this_wallet_d0b0a219" formatted="false">"Toque duas vezes para mudar para esta carteira"</string>
     <string name="l10n_double_tap_to_unlock_with_your_pin_5ab80f93" formatted="false">"Toque duas vezes para desbloquear com seu PIN"</string>
@@ -477,6 +476,7 @@
     <string name="l10n_error_s_a6aee4e1" formatted="false">"Erro: %1$s"</string>
     <string name="l10n_establishing_connection_over_bluetooth_6d370004" formatted="false">"Estabelecendo conexão via Bluetooth."</string>
     <string name="l10n_euro_8bd0b436" formatted="false">"Euro"</string>
+    <string name="l10n_everyday_spending_dfa526fc" formatted="false">"Gastos do dia a dia"</string>
     <string name="l10n_expanded_e72d5d8d" formatted="false">"Expandido"</string>
     <string name="l10n_expired_424a2551" formatted="false">"Expirado"</string>
     <string name="l10n_expires_f6725f3a" formatted="false">"Expira"</string>
@@ -607,6 +607,7 @@
     <string name="l10n_locked_a424e33d" formatted="false">"Bloqueada"</string>
     <string name="l10n_locked_s_10_confirmations_1ebca220" formatted="false">"Bloqueado (%s/10 confirmações)"</string>
     <string name="l10n_locked_until_recent_transactions_confirm_9ea62908" formatted="false">"Bloqueado até as transações recentes serem confirmadas"</string>
+    <string name="l10n_long_term_savings_wallet_07532baa" formatted="false">"Carteira de poupança de longo prazo"</string>
     <string name="l10n_look_up_the_name_again_43d80731" formatted="false">"Buscar o nome novamente"</string>
     <string name="l10n_looking_up_s_580f0cb6" formatted="false">"Buscando %1$s…"</string>
     <string name="l10n_main_address_4b09bf43" formatted="false">"Endereço Principal"</string>
@@ -640,14 +641,14 @@
     <string name="l10n_move_up_c66feb5e" formatted="false">"Mover para cima"</string>
     <string name="l10n_moved_down_69318bee" formatted="false">"Movido para baixo"</string>
     <string name="l10n_moved_up_dbbbde2a" formatted="false">"Movido para cima"</string>
-    <string name="l10n_moves_xmr_to_another_of_your_wallets_55cc6306" formatted="false">"Move XMR para outra das suas carteiras"</string>
+    <string name="l10n_moves_xmr_to_another_of_your_wallets_or_back_to_this_on_cbcbb2a8" formatted="false">"Move XMR para outra das suas carteiras ou de volta para esta"</string>
     <string name="l10n_moves_between_transactions_426445ed" formatted="false">"Navega entre as transações"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_s_e697ef03" formatted="false">"Move o dinheiro deste link de volta para %1$s"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_your_wallet_fb8d98af" formatted="false">"Move o dinheiro deste link de volta para sua carteira"</string>
     <string name="l10n_moves_the_money_in_this_link_to_s_d78b8a89" formatted="false">"Move o dinheiro deste link para %1$s"</string>
     <string name="l10n_name_dcd1d522" formatted="false">"Nome"</string>
     <string name="l10n_name_not_signed_a4712126" formatted="false">"Nome não assinado"</string>
-    <string name="l10n_name_your_wallet_31b56e34" formatted="false">"Nome da Carteira"</string>
+    <string name="l10n_name_your_wallet_31b56e34" formatted="false">"Nome da carteira"</string>
     <string name="l10n_name_this_link_4aa3d2cb" formatted="false">"Dê um nome a este link"</string>
     <string name="l10n_name_address_or_openalias_d13028c0" formatted="false">"Nome, endereço ou OpenAlias"</string>
     <string name="l10n_name_number_or_address_04f4c03c" formatted="false">"Nome, número ou endereço"</string>
@@ -1006,6 +1007,8 @@
     <string name="l10n_send_with_a_link_5d2460f7" formatted="false">"Enviar com um link"</string>
     <string name="l10n_sender_address_hidden_by_monero_privacy_db9424c6" formatted="false">"Endereço do remetente oculto pela privacidade do Monero"</string>
     <string name="l10n_sending_transaction_bd723587" formatted="false">"Enviando Transação…"</string>
+    <string name="l10n_sends_xmr_back_to_itself_75e614e8" formatted="false">"Envia XMR de volta para ela mesma"</string>
+    <string name="l10n_sends_xmr_back_to_this_wallet_as_a_new_payment_you_can__3ff6764b" formatted="false">"Envia XMR de volta para esta carteira como um novo pagamento. Você pode gastá-lo de novo em cerca de 20 minutos."</string>
     <string name="l10n_sends_the_money_as_a_link_anyone_can_claim_b6e2cb74" formatted="false">"Envia o dinheiro como um link que qualquer pessoa pode resgatar"</string>
     <string name="l10n_sent_c16bc82b" formatted="false">"Enviado"</string>
     <string name="l10n_sent_s_xmr_53edc03c" formatted="false">"Enviado: %1$s XMR"</string>
@@ -1129,6 +1132,7 @@
     <string name="l10n_the_wallet_couldn_t_load_its_keys_so_no_receive_address_97a33f75" formatted="false">"A carteira não conseguiu carregar as chaves, então nenhum endereço de recebimento pode ser exibido. Não envie fundos para nenhum endereço deste app até que isso seja resolvido. Force o encerramento do app e abra-o novamente; se o problema continuar, restaure a carteira com a semente."</string>
     <string name="l10n_the_wallet_stays_unlocked_until_the_app_is_force_closed_eb3ed2b1" formatted="false">"A carteira permanece desbloqueada até o fechamento forçado do app"</string>
     <string name="l10n_this_polyseed_uses_a_passphrase_monero_one_does_not_sup_2d07f5e0" formatted="false">"Este Polyseed usa uma frase secreta. O Monero One ainda não oferece suporte a frases secretas do Polyseed."</string>
+    <string name="l10n_this_wallet_a5d7a28b" formatted="false">"Esta carteira"</string>
     <string name="l10n_this_device_does_not_support_biometric_authentication_y_60fadc72" formatted="false">"Este dispositivo não oferece autenticação biométrica. Você pode ativá-la depois nos ajustes se configurar a biometria no dispositivo."</string>
     <string name="l10n_this_helps_speed_up_transaction_scanning_by_skipping_bl_ff8147d6" formatted="false">"Isso acelera a varredura de transações ao pular os blocos anteriores à existência da sua carteira."</string>
     <string name="l10n_this_iphone_was_set_up_from_a_device_backup_wallet_keys_86cd3cbf" formatted="false">"Este iPhone foi configurado a partir de um backup do dispositivo. As chaves das carteiras ficam no iPhone antigo, então o Monero One precisa restaurá-las aqui."</string>
@@ -1289,7 +1293,6 @@
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"Carteira %1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"Data de Criação da Carteira"</string>
     <string name="l10n_wallet_birthday_optional_ee94ef7e" formatted="false">"Data de Criação da Carteira"</string>
-    <string name="l10n_wallet_name_ad7c43f4" formatted="false">"Nome da Carteira"</string>
     <string name="l10n_wallet_sync_0c6bef86" formatted="false">"Sincronização da carteira"</string>
     <string name="l10n_wallet_created_around_s_0b6f8d00" formatted="false">"Carteira criada por volta de %s"</string>
     <string name="l10n_wallet_error_occurred_98faccd3" formatted="false">"Ocorreu um erro na carteira."</string>
@@ -1336,6 +1339,7 @@
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_4ad7ab94" formatted="false">"Você só poderá restaurá-las com as frases-semente ou chaves delas."</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_49fc3c79" formatted="false">"Você só poderá restaurá-las com as frases-semente ou chaves delas.\nLinks de pagamento não resgatados serão perdidos."</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_9d64a0a8" formatted="false">"Você só poderá restaurá-las com as frases-semente delas."</string>
+    <string name="l10n_you_can_spend_it_again_in_about_20_minutes_c85ca6f5" formatted="false">"Você pode gastá-lo de novo em cerca de 20 minutos."</string>
     <string name="l10n_you_re_offline_some_features_may_be_unavailable_29abd526" formatted="false">"Sem conexão com a internet"</string>
     <string name="l10n_your_pin_is_required_to_access_your_recovery_phrase_636df823" formatted="false">"Seu PIN é necessário para acessar a frase de recuperação"</string>
     <string name="l10n_your_payment_link_d7e13524" formatted="false">"Seu link de pagamento"</string>

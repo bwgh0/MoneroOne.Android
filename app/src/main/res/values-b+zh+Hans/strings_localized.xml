@@ -420,7 +420,6 @@
     <string name="l10n_double_tap_to_select_this_address_1cd99192" formatted="false">"连按两次以选择此地址"</string>
     <string name="l10n_double_tap_to_send_s_xmr_0c79892b" formatted="false">"连按两次以发送 %1$s XMR"</string>
     <string name="l10n_double_tap_to_send_monero_d67cbfb6" formatted="false">"连按两次以发送 Monero"</string>
-    <string name="l10n_double_tap_to_send_to_this_wallet_9c41ec7a" formatted="false">"连按两次以发送到此钱包"</string>
     <string name="l10n_double_tap_to_skip_biometric_setup_d4270d92" formatted="false">"连按两次以跳过生物识别设置"</string>
     <string name="l10n_double_tap_to_switch_to_this_wallet_d0b0a219" formatted="false">"连按两次以切换到此钱包"</string>
     <string name="l10n_double_tap_to_unlock_with_your_pin_5ab80f93" formatted="false">"连按两次以使用 PIN 码解锁"</string>
@@ -477,6 +476,7 @@
     <string name="l10n_error_s_a6aee4e1" formatted="false">"错误：%1$s"</string>
     <string name="l10n_establishing_connection_over_bluetooth_6d370004" formatted="false">"正在通过蓝牙建立连接。"</string>
     <string name="l10n_euro_8bd0b436" formatted="false">"欧元"</string>
+    <string name="l10n_everyday_spending_dfa526fc" formatted="false">"日常开销"</string>
     <string name="l10n_expanded_e72d5d8d" formatted="false">"已展开"</string>
     <string name="l10n_expired_424a2551" formatted="false">"已过期"</string>
     <string name="l10n_expires_f6725f3a" formatted="false">"到期时间"</string>
@@ -607,6 +607,7 @@
     <string name="l10n_locked_a424e33d" formatted="false">"锁定中"</string>
     <string name="l10n_locked_s_10_confirmations_1ebca220" formatted="false">"已锁定（%s/10 次确认）"</string>
     <string name="l10n_locked_until_recent_transactions_confirm_9ea62908" formatted="false">"锁定中，待最近的交易确认后解锁"</string>
+    <string name="l10n_long_term_savings_wallet_07532baa" formatted="false">"长期储蓄钱包"</string>
     <string name="l10n_look_up_the_name_again_43d80731" formatted="false">"重新查询此名称"</string>
     <string name="l10n_looking_up_s_580f0cb6" formatted="false">"正在查询 %1$s…"</string>
     <string name="l10n_main_address_4b09bf43" formatted="false">"主地址"</string>
@@ -640,7 +641,7 @@
     <string name="l10n_move_up_c66feb5e" formatted="false">"上移"</string>
     <string name="l10n_moved_down_69318bee" formatted="false">"已下移"</string>
     <string name="l10n_moved_up_dbbbde2a" formatted="false">"已上移"</string>
-    <string name="l10n_moves_xmr_to_another_of_your_wallets_55cc6306" formatted="false">"将 XMR 转移到你的另一个钱包"</string>
+    <string name="l10n_moves_xmr_to_another_of_your_wallets_or_back_to_this_on_cbcbb2a8" formatted="false">"将 XMR 转移到你的另一个钱包，或转回此钱包"</string>
     <string name="l10n_moves_between_transactions_426445ed" formatted="false">"在交易之间移动"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_s_e697ef03" formatted="false">"将此链接中的款项转回 %1$s"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_your_wallet_fb8d98af" formatted="false">"将此链接中的款项转回你的钱包"</string>
@@ -1006,6 +1007,8 @@
     <string name="l10n_send_with_a_link_5d2460f7" formatted="false">"通过链接发送"</string>
     <string name="l10n_sender_address_hidden_by_monero_privacy_db9424c6" formatted="false">"发送方地址受 Monero 隐私保护而隐藏"</string>
     <string name="l10n_sending_transaction_bd723587" formatted="false">"正在发送交易…"</string>
+    <string name="l10n_sends_xmr_back_to_itself_75e614e8" formatted="false">"将 XMR 发回给自己"</string>
+    <string name="l10n_sends_xmr_back_to_this_wallet_as_a_new_payment_you_can__3ff6764b" formatted="false">"将 XMR 作为一笔新付款发回此钱包。大约 20 分钟后即可再次使用。"</string>
     <string name="l10n_sends_the_money_as_a_link_anyone_can_claim_b6e2cb74" formatted="false">"以任何人都能领取的链接发送款项"</string>
     <string name="l10n_sent_c16bc82b" formatted="false">"已发送"</string>
     <string name="l10n_sent_s_xmr_53edc03c" formatted="false">"已发送 %1$s XMR"</string>
@@ -1129,6 +1132,7 @@
     <string name="l10n_the_wallet_couldn_t_load_its_keys_so_no_receive_address_97a33f75" formatted="false">"钱包无法载入其密钥，因此无法显示收款地址。在问题解决之前，请勿向此 App 显示的任何地址发送资金。请强制退出并重新打开 App；如果问题仍然存在，请用助记词恢复钱包。"</string>
     <string name="l10n_the_wallet_stays_unlocked_until_the_app_is_force_closed_eb3ed2b1" formatted="false">"钱包将保持解锁状态，直到应用被强制关闭"</string>
     <string name="l10n_this_polyseed_uses_a_passphrase_monero_one_does_not_sup_2d07f5e0" formatted="false">"此 Polyseed 使用了密码短语。Monero One 暂不支持 Polyseed 密码短语。"</string>
+    <string name="l10n_this_wallet_a5d7a28b" formatted="false">"此钱包"</string>
     <string name="l10n_this_device_does_not_support_biometric_authentication_y_60fadc72" formatted="false">"此设备不支持生物识别验证。在设备上设置生物识别后，可稍后在设置中启用。"</string>
     <string name="l10n_this_helps_speed_up_transaction_scanning_by_skipping_bl_ff8147d6" formatted="false">"这会跳过钱包创建之前的区块，从而加快交易扫描。"</string>
     <string name="l10n_this_iphone_was_set_up_from_a_device_backup_wallet_keys_86cd3cbf" formatted="false">"此 iPhone 是通过设备备份设置的。钱包密钥仍在旧 iPhone 上，所以 Monero One 需要在此恢复它们。"</string>
@@ -1289,7 +1293,6 @@
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"钱包 %1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"钱包生日"</string>
     <string name="l10n_wallet_birthday_optional_ee94ef7e" formatted="false">"钱包生日"</string>
-    <string name="l10n_wallet_name_ad7c43f4" formatted="false">"钱包名称"</string>
     <string name="l10n_wallet_sync_0c6bef86" formatted="false">"钱包同步"</string>
     <string name="l10n_wallet_created_around_s_0b6f8d00" formatted="false">"钱包创建于 %s 前后"</string>
     <string name="l10n_wallet_error_occurred_98faccd3" formatted="false">"钱包出错。"</string>
@@ -1336,6 +1339,7 @@
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_4ad7ab94" formatted="false">"只能用它们的助记词或密钥恢复。"</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_49fc3c79" formatted="false">"只能通过助记词或密钥恢复。\n尚未领取的付款链接将会丢失。"</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_9d64a0a8" formatted="false">"只能用它们的助记词恢复。"</string>
+    <string name="l10n_you_can_spend_it_again_in_about_20_minutes_c85ca6f5" formatted="false">"大约 20 分钟后即可再次使用。"</string>
     <string name="l10n_you_re_offline_some_features_may_be_unavailable_29abd526" formatted="false">"没有互联网连接"</string>
     <string name="l10n_your_pin_is_required_to_access_your_recovery_phrase_636df823" formatted="false">"需要输入 PIN 才能查看恢复短语"</string>
     <string name="l10n_your_payment_link_d7e13524" formatted="false">"你的付款链接"</string>

@@ -420,7 +420,6 @@
     <string name="l10n_double_tap_to_select_this_address_1cd99192" formatted="false">"ダブルタップしてこのアドレスを選択します"</string>
     <string name="l10n_double_tap_to_send_s_xmr_0c79892b" formatted="false">"ダブルタップして%1$s XMRを送金します"</string>
     <string name="l10n_double_tap_to_send_monero_d67cbfb6" formatted="false">"ダブルタップしてMoneroを送金します"</string>
-    <string name="l10n_double_tap_to_send_to_this_wallet_9c41ec7a" formatted="false">"ダブルタップしてこのウォレットに送金します"</string>
     <string name="l10n_double_tap_to_skip_biometric_setup_d4270d92" formatted="false">"ダブルタップして生体認証の設定をスキップします"</string>
     <string name="l10n_double_tap_to_switch_to_this_wallet_d0b0a219" formatted="false">"ダブルタップしてこのウォレットに切り替えます"</string>
     <string name="l10n_double_tap_to_unlock_with_your_pin_5ab80f93" formatted="false">"ダブルタップしてPINでロックを解除します"</string>
@@ -477,6 +476,7 @@
     <string name="l10n_error_s_a6aee4e1" formatted="false">"エラー：%1$s"</string>
     <string name="l10n_establishing_connection_over_bluetooth_6d370004" formatted="false">"Bluetoothで接続しています。"</string>
     <string name="l10n_euro_8bd0b436" formatted="false">"ユーロ"</string>
+    <string name="l10n_everyday_spending_dfa526fc" formatted="false">"日々の支出"</string>
     <string name="l10n_expanded_e72d5d8d" formatted="false">"展開"</string>
     <string name="l10n_expired_424a2551" formatted="false">"期限切れ"</string>
     <string name="l10n_expires_f6725f3a" formatted="false">"有効期限"</string>
@@ -607,6 +607,7 @@
     <string name="l10n_locked_a424e33d" formatted="false">"ロック中"</string>
     <string name="l10n_locked_s_10_confirmations_1ebca220" formatted="false">"ロック中（承認 %s/10）"</string>
     <string name="l10n_locked_until_recent_transactions_confirm_9ea62908" formatted="false">"最近のトランザクションが承認されるまでロック中"</string>
+    <string name="l10n_long_term_savings_wallet_07532baa" formatted="false">"長期貯蓄ウォレット"</string>
     <string name="l10n_look_up_the_name_again_43d80731" formatted="false">"名前をもう一度検索します"</string>
     <string name="l10n_looking_up_s_580f0cb6" formatted="false">"%1$s を検索中…"</string>
     <string name="l10n_main_address_4b09bf43" formatted="false">"メインアドレス"</string>
@@ -640,7 +641,7 @@
     <string name="l10n_move_up_c66feb5e" formatted="false">"上に移動"</string>
     <string name="l10n_moved_down_69318bee" formatted="false">"下に移動しました"</string>
     <string name="l10n_moved_up_dbbbde2a" formatted="false">"上に移動しました"</string>
-    <string name="l10n_moves_xmr_to_another_of_your_wallets_55cc6306" formatted="false">"XMRを別のウォレットに移動します"</string>
+    <string name="l10n_moves_xmr_to_another_of_your_wallets_or_back_to_this_on_cbcbb2a8" formatted="false">"XMRを別のウォレットに移動するか、このウォレットに戻します"</string>
     <string name="l10n_moves_between_transactions_426445ed" formatted="false">"トランザクション間を移動します"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_s_e697ef03" formatted="false">"このリンクのお金を%1$sに戻します"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_your_wallet_fb8d98af" formatted="false">"このリンクのお金をあなたのウォレットに戻します"</string>
@@ -1006,6 +1007,8 @@
     <string name="l10n_send_with_a_link_5d2460f7" formatted="false">"リンクで送金"</string>
     <string name="l10n_sender_address_hidden_by_monero_privacy_db9424c6" formatted="false">"送金元アドレスはMoneroのプライバシー保護により非表示です"</string>
     <string name="l10n_sending_transaction_bd723587" formatted="false">"送金中…"</string>
+    <string name="l10n_sends_xmr_back_to_itself_75e614e8" formatted="false">"XMRを自分自身に送り返します"</string>
+    <string name="l10n_sends_xmr_back_to_this_wallet_as_a_new_payment_you_can__3ff6764b" formatted="false">"XMRを新しい支払いとしてこのウォレットに送り返します。約20分後に再び使えるようになります。"</string>
     <string name="l10n_sends_the_money_as_a_link_anyone_can_claim_b6e2cb74" formatted="false">"誰でも受け取れるリンクとしてお金を送ります"</string>
     <string name="l10n_sent_c16bc82b" formatted="false">"送金済み"</string>
     <string name="l10n_sent_s_xmr_53edc03c" formatted="false">"送金済み %1$s XMR"</string>
@@ -1129,6 +1132,7 @@
     <string name="l10n_the_wallet_couldn_t_load_its_keys_so_no_receive_address_97a33f75" formatted="false">"ウォレットのキーを読み込めなかったため、受取アドレスを表示できません。この問題が解決するまで、このAppに表示されるどのアドレスにも資金を送らないでください。Appを強制終了して開き直してください。問題が続く場合は、シードからウォレットを復元してください。"</string>
     <string name="l10n_the_wallet_stays_unlocked_until_the_app_is_force_closed_eb3ed2b1" formatted="false">"アプリを強制終了するまでウォレットはロック解除されたままです"</string>
     <string name="l10n_this_polyseed_uses_a_passphrase_monero_one_does_not_sup_2d07f5e0" formatted="false">"この Polyseed はパスフレーズを使用しています。Monero One は Polyseed のパスフレーズにまだ対応していません。"</string>
+    <string name="l10n_this_wallet_a5d7a28b" formatted="false">"このウォレット"</string>
     <string name="l10n_this_device_does_not_support_biometric_authentication_y_60fadc72" formatted="false">"この端末では生体認証を利用できません。端末で生体認証を設定すれば、後で設定画面から有効にできます。"</string>
     <string name="l10n_this_helps_speed_up_transaction_scanning_by_skipping_bl_ff8147d6" formatted="false">"ウォレットが存在する前のブロックを省略することで、トランザクションのスキャンを高速化できます。"</string>
     <string name="l10n_this_iphone_was_set_up_from_a_device_backup_wallet_keys_86cd3cbf" formatted="false">"このiPhoneはデバイスのバックアップから設定されました。ウォレットのキーは以前のiPhoneに残っているため、Monero Oneでここに復元する必要があります。"</string>
@@ -1289,7 +1293,6 @@
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"ウォレット%1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"ウォレット作成日"</string>
     <string name="l10n_wallet_birthday_optional_ee94ef7e" formatted="false">"ウォレット作成日"</string>
-    <string name="l10n_wallet_name_ad7c43f4" formatted="false">"ウォレット名"</string>
     <string name="l10n_wallet_sync_0c6bef86" formatted="false">"ウォレットの同期"</string>
     <string name="l10n_wallet_created_around_s_0b6f8d00" formatted="false">"ウォレット作成日：%s頃"</string>
     <string name="l10n_wallet_error_occurred_98faccd3" formatted="false">"ウォレットでエラーが発生しました。"</string>
@@ -1336,6 +1339,7 @@
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_4ad7ab94" formatted="false">"復元するには、各ウォレットのシードフレーズまたはキーが必要です。"</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_49fc3c79" formatted="false">"復元できるのは、シードフレーズまたはキーがある場合のみです。\n未受取の支払いリンクは失われます。"</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_9d64a0a8" formatted="false">"復元するには、各ウォレットのシードフレーズが必要です。"</string>
+    <string name="l10n_you_can_spend_it_again_in_about_20_minutes_c85ca6f5" formatted="false">"約20分後に再び使えるようになります。"</string>
     <string name="l10n_you_re_offline_some_features_may_be_unavailable_29abd526" formatted="false">"インターネットに接続されていません"</string>
     <string name="l10n_your_pin_is_required_to_access_your_recovery_phrase_636df823" formatted="false">"リカバリーフレーズの表示にはPINが必要です"</string>
     <string name="l10n_your_payment_link_d7e13524" formatted="false">"あなたの支払いリンク"</string>

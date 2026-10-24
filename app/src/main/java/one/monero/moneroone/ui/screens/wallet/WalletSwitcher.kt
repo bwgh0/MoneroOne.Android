@@ -903,7 +903,7 @@ internal fun WalletDeleteZone(label: String, enabled: Boolean, onClick: () -> Un
  */
 @Composable
 private fun WalletActionsRow(showTransfer: Boolean, onTransfer: () -> Unit, onAddWallet: () -> Unit) {
-    val hint = tr("Moves XMR to another of your wallets")
+    val hint = tr("Moves XMR to another of your wallets, or back to this one")
     val transfer = @Composable { modifier: Modifier ->
         WalletActionCard(
             icon = Icons.Default.SwapHoriz,

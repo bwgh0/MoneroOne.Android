@@ -420,7 +420,6 @@
     <string name="l10n_double_tap_to_select_this_address_1cd99192" formatted="false">"Bu adresi seçmek için çift dokunun"</string>
     <string name="l10n_double_tap_to_send_s_xmr_0c79892b" formatted="false">"%1$s XMR göndermek için çift dokunun"</string>
     <string name="l10n_double_tap_to_send_monero_d67cbfb6" formatted="false">"Monero göndermek için çift dokunun"</string>
-    <string name="l10n_double_tap_to_send_to_this_wallet_9c41ec7a" formatted="false">"Bu cüzdana göndermek için çift dokunun"</string>
     <string name="l10n_double_tap_to_skip_biometric_setup_d4270d92" formatted="false">"Biyometrik kurulumu atlamak için çift dokunun"</string>
     <string name="l10n_double_tap_to_switch_to_this_wallet_d0b0a219" formatted="false">"Bu cüzdana geçmek için çift dokunun"</string>
     <string name="l10n_double_tap_to_unlock_with_your_pin_5ab80f93" formatted="false">"PIN\'inizle kilidi açmak için çift dokunun"</string>
@@ -477,6 +476,7 @@
     <string name="l10n_error_s_a6aee4e1" formatted="false">"Hata: %1$s"</string>
     <string name="l10n_establishing_connection_over_bluetooth_6d370004" formatted="false">"Bluetooth üzerinden bağlantı kuruluyor."</string>
     <string name="l10n_euro_8bd0b436" formatted="false">"Euro"</string>
+    <string name="l10n_everyday_spending_dfa526fc" formatted="false">"Günlük Harcamalar"</string>
     <string name="l10n_expanded_e72d5d8d" formatted="false">"Genişletilmiş"</string>
     <string name="l10n_expired_424a2551" formatted="false">"Süresi doldu"</string>
     <string name="l10n_expires_f6725f3a" formatted="false">"Bitiş"</string>
@@ -607,6 +607,7 @@
     <string name="l10n_locked_a424e33d" formatted="false">"Kilitli"</string>
     <string name="l10n_locked_s_10_confirmations_1ebca220" formatted="false">"Kilitli (%s/10 onay)"</string>
     <string name="l10n_locked_until_recent_transactions_confirm_9ea62908" formatted="false">"Son işlemler onaylanana kadar kilitli"</string>
+    <string name="l10n_long_term_savings_wallet_07532baa" formatted="false">"Uzun Vadeli Birikim Cüzdanı"</string>
     <string name="l10n_look_up_the_name_again_43d80731" formatted="false">"Adı yeniden ara"</string>
     <string name="l10n_looking_up_s_580f0cb6" formatted="false">"%1$s aranıyor…"</string>
     <string name="l10n_main_address_4b09bf43" formatted="false">"Ana Adres"</string>
@@ -640,14 +641,14 @@
     <string name="l10n_move_up_c66feb5e" formatted="false">"Yukarı taşı"</string>
     <string name="l10n_moved_down_69318bee" formatted="false">"Aşağı taşındı"</string>
     <string name="l10n_moved_up_dbbbde2a" formatted="false">"Yukarı taşındı"</string>
-    <string name="l10n_moves_xmr_to_another_of_your_wallets_55cc6306" formatted="false">"XMR\'yi başka bir cüzdanınıza taşır"</string>
+    <string name="l10n_moves_xmr_to_another_of_your_wallets_or_back_to_this_on_cbcbb2a8" formatted="false">"XMR\'yi başka bir cüzdanınıza ya da yeniden bu cüzdana taşır"</string>
     <string name="l10n_moves_between_transactions_426445ed" formatted="false">"İşlemler arasında geçiş yapar"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_s_e697ef03" formatted="false">"Bu bağlantıdaki parayı şuraya geri taşır: %1$s"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_your_wallet_fb8d98af" formatted="false">"Bu bağlantıdaki parayı cüzdanınıza geri taşır"</string>
     <string name="l10n_moves_the_money_in_this_link_to_s_d78b8a89" formatted="false">"Bu bağlantıdaki parayı şuraya taşır: %1$s"</string>
     <string name="l10n_name_dcd1d522" formatted="false">"Ad"</string>
     <string name="l10n_name_not_signed_a4712126" formatted="false">"Ad imzalı değil"</string>
-    <string name="l10n_name_your_wallet_31b56e34" formatted="false">"Cüzdan Adı"</string>
+    <string name="l10n_name_your_wallet_31b56e34" formatted="false">"Cüzdan adı"</string>
     <string name="l10n_name_this_link_4aa3d2cb" formatted="false">"Bu bağlantıyı adlandırın"</string>
     <string name="l10n_name_address_or_openalias_d13028c0" formatted="false">"Ad, adres veya OpenAlias"</string>
     <string name="l10n_name_number_or_address_04f4c03c" formatted="false">"Ad, numara veya adres"</string>
@@ -1006,6 +1007,8 @@
     <string name="l10n_send_with_a_link_5d2460f7" formatted="false">"Bağlantıyla gönder"</string>
     <string name="l10n_sender_address_hidden_by_monero_privacy_db9424c6" formatted="false">"Gönderen adres Monero gizliliğiyle gizlenir"</string>
     <string name="l10n_sending_transaction_bd723587" formatted="false">"İşlem Gönderiliyor…"</string>
+    <string name="l10n_sends_xmr_back_to_itself_75e614e8" formatted="false">"XMR\'yi kendisine geri gönderir"</string>
+    <string name="l10n_sends_xmr_back_to_this_wallet_as_a_new_payment_you_can__3ff6764b" formatted="false">"XMR\'yi yeni bir ödeme olarak bu cüzdana geri gönderir. Yaklaşık 20 dakika sonra tekrar harcayabilirsiniz."</string>
     <string name="l10n_sends_the_money_as_a_link_anyone_can_claim_b6e2cb74" formatted="false">"Parayı herkesin teslim alabileceği bir bağlantı olarak gönderir"</string>
     <string name="l10n_sent_c16bc82b" formatted="false">"Gönderildi"</string>
     <string name="l10n_sent_s_xmr_53edc03c" formatted="false">"%1$s XMR gönderildi"</string>
@@ -1129,6 +1132,7 @@
     <string name="l10n_the_wallet_couldn_t_load_its_keys_so_no_receive_address_97a33f75" formatted="false">"Cüzdan anahtarlarını yükleyemediği için alma adresi gösterilemiyor. Sorun çözülene kadar bu uygulamadaki hiçbir adrese fon göndermeyin. Uygulamayı zorla kapatıp yeniden açın; sorun sürerse cüzdanı kurtarma ifadesinden geri yükleyin."</string>
     <string name="l10n_the_wallet_stays_unlocked_until_the_app_is_force_closed_eb3ed2b1" formatted="false">"Uygulama zorla kapatılana kadar cüzdanın kilidi açık kalır"</string>
     <string name="l10n_this_polyseed_uses_a_passphrase_monero_one_does_not_sup_2d07f5e0" formatted="false">"Bu Polyseed bir parola ifadesi kullanıyor. Monero One henüz Polyseed parola ifadelerini desteklemiyor."</string>
+    <string name="l10n_this_wallet_a5d7a28b" formatted="false">"Bu cüzdan"</string>
     <string name="l10n_this_device_does_not_support_biometric_authentication_y_60fadc72" formatted="false">"Bu cihaz biyometrik kimlik doğrulamayı desteklemiyor. Cihazınızda biyometri ayarlarsanız daha sonra Ayarlar’dan etkinleştirebilirsiniz."</string>
     <string name="l10n_this_helps_speed_up_transaction_scanning_by_skipping_bl_ff8147d6" formatted="false">"Bu ayar, cüzdanınız oluşturulmadan önceki blokları atlayarak işlem taramasını hızlandırır."</string>
     <string name="l10n_this_iphone_was_set_up_from_a_device_backup_wallet_keys_86cd3cbf" formatted="false">"Bu iPhone bir aygıt yedeğinden kuruldu. Cüzdan anahtarları eski iPhone\'da kaldı, bu yüzden Monero One bunları burada geri yüklemelidir."</string>
@@ -1289,7 +1293,6 @@
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"Cüzdan %1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"Cüzdan Doğum Tarihi"</string>
     <string name="l10n_wallet_birthday_optional_ee94ef7e" formatted="false">"Cüzdan Doğum Tarihi"</string>
-    <string name="l10n_wallet_name_ad7c43f4" formatted="false">"Cüzdan Adı"</string>
     <string name="l10n_wallet_sync_0c6bef86" formatted="false">"Cüzdan eşzamanlama"</string>
     <string name="l10n_wallet_created_around_s_0b6f8d00" formatted="false">"Cüzdan yaklaşık %s tarihinde oluşturuldu"</string>
     <string name="l10n_wallet_error_occurred_98faccd3" formatted="false">"Cüzdan hatası oluştu."</string>
@@ -1336,6 +1339,7 @@
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_4ad7ab94" formatted="false">"Bunları yalnızca kurtarma ifadeleri veya anahtarlarıyla geri yükleyebilirsiniz."</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_49fc3c79" formatted="false">"Bunları yalnızca kurtarma ifadeleri veya anahtarlarıyla geri yükleyebilirsiniz.\nTeslim alınmamış ödeme bağlantıları kaybolur."</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_9d64a0a8" formatted="false">"Bunları yalnızca kurtarma ifadeleriyle geri yükleyebilirsiniz."</string>
+    <string name="l10n_you_can_spend_it_again_in_about_20_minutes_c85ca6f5" formatted="false">"Yaklaşık 20 dakika sonra tekrar harcayabilirsiniz."</string>
     <string name="l10n_you_re_offline_some_features_may_be_unavailable_29abd526" formatted="false">"İnternet bağlantısı yok"</string>
     <string name="l10n_your_pin_is_required_to_access_your_recovery_phrase_636df823" formatted="false">"Kurtarma ifadenize erişmek için PIN’iniz gerekir"</string>
     <string name="l10n_your_payment_link_d7e13524" formatted="false">"Ödeme bağlantınız"</string>

@@ -420,7 +420,6 @@
     <string name="l10n_double_tap_to_select_this_address_1cd99192" formatted="false">"Двічі торкніться, щоб вибрати цю адресу"</string>
     <string name="l10n_double_tap_to_send_s_xmr_0c79892b" formatted="false">"Двічі торкніться, щоб надіслати %1$s XMR"</string>
     <string name="l10n_double_tap_to_send_monero_d67cbfb6" formatted="false">"Двічі торкніться, щоб надіслати Monero"</string>
-    <string name="l10n_double_tap_to_send_to_this_wallet_9c41ec7a" formatted="false">"Двічі торкніться, щоб надіслати на цей гаманець"</string>
     <string name="l10n_double_tap_to_skip_biometric_setup_d4270d92" formatted="false">"Двічі торкніться, щоб пропустити налаштування біометрії"</string>
     <string name="l10n_double_tap_to_switch_to_this_wallet_d0b0a219" formatted="false">"Двічі торкніться, щоб перемкнутися на цей гаманець"</string>
     <string name="l10n_double_tap_to_unlock_with_your_pin_5ab80f93" formatted="false">"Двічі торкніться, щоб розблокувати за допомогою PIN-коду"</string>
@@ -477,6 +476,7 @@
     <string name="l10n_error_s_a6aee4e1" formatted="false">"Помилка: %1$s"</string>
     <string name="l10n_establishing_connection_over_bluetooth_6d370004" formatted="false">"Встановлення з’єднання через Bluetooth."</string>
     <string name="l10n_euro_8bd0b436" formatted="false">"Євро"</string>
+    <string name="l10n_everyday_spending_dfa526fc" formatted="false">"Щоденні витрати"</string>
     <string name="l10n_expanded_e72d5d8d" formatted="false">"Розгорнуто"</string>
     <string name="l10n_expired_424a2551" formatted="false">"Термін минув"</string>
     <string name="l10n_expires_f6725f3a" formatted="false">"Спливає"</string>
@@ -607,6 +607,7 @@
     <string name="l10n_locked_a424e33d" formatted="false">"Заблоковано"</string>
     <string name="l10n_locked_s_10_confirmations_1ebca220" formatted="false">"Заблоковано (%s/10 підтверджень)"</string>
     <string name="l10n_locked_until_recent_transactions_confirm_9ea62908" formatted="false">"Заблоковано, доки нові транзакції не буде підтверджено"</string>
+    <string name="l10n_long_term_savings_wallet_07532baa" formatted="false">"Гаманець довгострокових заощаджень"</string>
     <string name="l10n_look_up_the_name_again_43d80731" formatted="false">"Повторити пошук імені"</string>
     <string name="l10n_looking_up_s_580f0cb6" formatted="false">"Пошук %1$s…"</string>
     <string name="l10n_main_address_4b09bf43" formatted="false">"Основна адреса"</string>
@@ -640,7 +641,7 @@
     <string name="l10n_move_up_c66feb5e" formatted="false">"Перемістити вгору"</string>
     <string name="l10n_moved_down_69318bee" formatted="false">"Переміщено вниз"</string>
     <string name="l10n_moved_up_dbbbde2a" formatted="false">"Переміщено вгору"</string>
-    <string name="l10n_moves_xmr_to_another_of_your_wallets_55cc6306" formatted="false">"Переказує XMR на інший ваш гаманець"</string>
+    <string name="l10n_moves_xmr_to_another_of_your_wallets_or_back_to_this_on_cbcbb2a8" formatted="false">"Переказує XMR на інший ваш гаманець або назад на цей"</string>
     <string name="l10n_moves_between_transactions_426445ed" formatted="false">"Переходить між транзакціями"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_s_e697ef03" formatted="false">"Повертає гроші з цього посилання до %1$s"</string>
     <string name="l10n_moves_the_money_in_this_link_back_to_your_wallet_fb8d98af" formatted="false">"Повертає гроші з цього посилання до вашого гаманця"</string>
@@ -1006,6 +1007,8 @@
     <string name="l10n_send_with_a_link_5d2460f7" formatted="false">"Надіслати за посиланням"</string>
     <string name="l10n_sender_address_hidden_by_monero_privacy_db9424c6" formatted="false">"Адресу відправника приховано завдяки приватності Monero"</string>
     <string name="l10n_sending_transaction_bd723587" formatted="false">"Надсилання транзакції…"</string>
+    <string name="l10n_sends_xmr_back_to_itself_75e614e8" formatted="false">"Надсилає XMR назад на себе"</string>
+    <string name="l10n_sends_xmr_back_to_this_wallet_as_a_new_payment_you_can__3ff6764b" formatted="false">"Надсилає XMR назад на цей гаманець як новий платіж. Їх можна буде знову витратити приблизно через 20 хвилин."</string>
     <string name="l10n_sends_the_money_as_a_link_anyone_can_claim_b6e2cb74" formatted="false">"Надсилає гроші у вигляді посилання, яке може забрати будь-хто"</string>
     <string name="l10n_sent_c16bc82b" formatted="false">"Надіслано"</string>
     <string name="l10n_sent_s_xmr_53edc03c" formatted="false">"Надіслано %1$s XMR"</string>
@@ -1129,6 +1132,7 @@
     <string name="l10n_the_wallet_couldn_t_load_its_keys_so_no_receive_address_97a33f75" formatted="false">"Гаманцю не вдалося завантажити ключі, тому адресу для отримання показати неможливо. Не надсилайте кошти на жодну адресу з цієї програми, доки проблему не буде усунено. Примусово закрийте й знову відкрийте програму; якщо проблема не зникне, відновіть гаманець з мнемонічної фрази."</string>
     <string name="l10n_the_wallet_stays_unlocked_until_the_app_is_force_closed_eb3ed2b1" formatted="false">"Гаманець залишається розблокованим до примусового закриття застосунку"</string>
     <string name="l10n_this_polyseed_uses_a_passphrase_monero_one_does_not_sup_2d07f5e0" formatted="false">"Цей Polyseed використовує парольну фразу. Monero One поки не підтримує парольні фрази Polyseed."</string>
+    <string name="l10n_this_wallet_a5d7a28b" formatted="false">"Цей гаманець"</string>
     <string name="l10n_this_device_does_not_support_biometric_authentication_y_60fadc72" formatted="false">"Пристрій не підтримує біометричну автентифікацію. Її можна ввімкнути пізніше в налаштуваннях, якщо налаштувати біометрію на пристрої."</string>
     <string name="l10n_this_helps_speed_up_transaction_scanning_by_skipping_bl_ff8147d6" formatted="false">"Це пришвидшує сканування транзакцій, бо пропускаються блоки, створені до появи гаманця."</string>
     <string name="l10n_this_iphone_was_set_up_from_a_device_backup_wallet_keys_86cd3cbf" formatted="false">"Цей iPhone налаштовано з резервної копії пристрою. Ключі гаманців залишилися на старому iPhone, тому Monero One має відновити їх тут."</string>
@@ -1289,7 +1293,6 @@
     <string name="l10n_wallet_s_ca6410b6" formatted="false">"Гаманець %1$s"</string>
     <string name="l10n_wallet_birthday_1b0a056d" formatted="false">"Дата створення гаманця"</string>
     <string name="l10n_wallet_birthday_optional_ee94ef7e" formatted="false">"Дата створення гаманця"</string>
-    <string name="l10n_wallet_name_ad7c43f4" formatted="false">"Назва гаманця"</string>
     <string name="l10n_wallet_sync_0c6bef86" formatted="false">"Синхронізація гаманця"</string>
     <string name="l10n_wallet_created_around_s_0b6f8d00" formatted="false">"Дата створення гаманця: приблизно %s"</string>
     <string name="l10n_wallet_error_occurred_98faccd3" formatted="false">"Сталася помилка гаманця."</string>
@@ -1336,6 +1339,7 @@
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_4ad7ab94" formatted="false">"Відновити їх можна лише за допомогою мнемонічних фраз або ключів."</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_or_ke_49fc3c79" formatted="false">"Відновити їх можна лише за мнемонічними фразами або ключами.\nНезабрані платіжні посилання буде втрачено."</string>
     <string name="l10n_you_can_restore_them_only_with_their_seed_phrases_9d64a0a8" formatted="false">"Відновити їх можна лише за допомогою мнемонічних фраз."</string>
+    <string name="l10n_you_can_spend_it_again_in_about_20_minutes_c85ca6f5" formatted="false">"Їх можна буде знову витратити приблизно через 20 хвилин."</string>
     <string name="l10n_you_re_offline_some_features_may_be_unavailable_29abd526" formatted="false">"Немає з’єднання з інтернетом"</string>
     <string name="l10n_your_pin_is_required_to_access_your_recovery_phrase_636df823" formatted="false">"Для доступу до фрази відновлення потрібен PIN"</string>
     <string name="l10n_your_payment_link_d7e13524" formatted="false">"Ваше платіжне посилання"</string>
