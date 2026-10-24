@@ -11,6 +11,7 @@ import one.monero.moneroone.ui.screens.send.ValuePlaceholder
 import one.monero.moneroone.ui.screens.send.SendWaitGate
 import one.monero.moneroone.ui.screens.send.SendStatusSlot
 import one.monero.moneroone.ui.screens.send.FillIn
+import one.monero.moneroone.core.wallet.ReviewFee
 import one.monero.moneroone.core.wallet.SendWait
 import androidx.compose.runtime.rememberUpdatedState
 import android.content.Context
@@ -316,8 +317,9 @@ fun PaymentLinkReview(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // wallet2: "not enough money" / "not enough unlocked money" once the real inputs are counted.
-                if (e.message?.contains("not enough", ignoreCase = true) == true) {
+                // wallet2: "not enough money" / "not enough unlocked money" once the real inputs are counted. The
+                // same check as the Send Review: "Not enough rct outputs" (too few decoys) is an error, not a shortfall.
+                if (ReviewFee.isNotEnoughMoney(e.message)) {
                     networkFee = estimate
                     tooMuch = true
                     return null

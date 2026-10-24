@@ -139,6 +139,21 @@ class ReviewFeeTest {
     }
 
     @Test
+    fun `a decoy shortage is not over balance on the Send with a Link Review`() {
+        // The link Review's funding build uses this check: too few decoys (a fresh test chain) shows as an error,
+        // not as the over-balance estimates.
+        assertFalse(ReviewFee.isNotEnoughMoney("Create Transaction failed: Not enough rct outputs"))
+        assertFalse(ReviewFee.isNotEnoughMoney("Not enough rct outputs"))
+        assertTrue(
+            ReviewFee.isNotEnoughMoney(
+                "Create Transaction failed: not enough money to transfer, available only 1.000020000000, " +
+                    "sent amount 2.000000000000"
+            )
+        )
+        assertTrue(ReviewFee.isNotEnoughMoney("Create Transaction failed: not enough unlocked money"))
+    }
+
+    @Test
     fun `the review state is ready only with a fee and no error`() {
         assertFalse(ReviewFeeState().ready)
         assertFalse(ReviewFeeState(loading = true).ready)
