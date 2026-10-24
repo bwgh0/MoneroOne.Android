@@ -71,9 +71,10 @@ import kotlin.math.sqrt
  * `.monospacedDigit()`, on the balance card and the Price tab.
  *
  * The look copies iOS as its frames show. Every character from the first
- * change to the last rolls down, whether the value rises or falls and
- * whatever each digit does: the new character comes in from above and the
- * old one leaves downward, and an unchanged '.' between them rolls in place.
+ * change to the last rolls up, whether the value rises or falls and
+ * whatever each digit does, as iOS `.numericText()` (countsDown false): the
+ * new character comes in from below and the old one leaves upward, and an
+ * unchanged '.' between them rolls in place.
  * The old character blurs, fades and shrinks as it leaves; the new one comes
  * in blurred, faint and small, lands on a spring with a small overshoot and
  * sharpens. Each character travels and blurs by its own height, so the '.'
@@ -90,8 +91,8 @@ import kotlin.math.sqrt
  * When the text grows or shrinks ("0.2500 XMR" to "250.2500 XMR"), the
  * characters the old and new text share at the start and at the end keep
  * their places, as on iOS: only the places between them roll, a new place
- * rolls in from nothing, and the shared end slides to its new x on the roll
- * spring.
+ * rolls in from nothing, and the shared end slides to its new x once, on
+ * an ease-in-out over the call site's duration, as the iOS layout change does.
  *
  * Each place draws on two layers whatever it shows: one for the characters
  * rolling out, under one blur, and one for the character in place or rolling
@@ -244,6 +245,9 @@ private class RollLine {
     /** True from a rolled change until the layout that follows it: the places whose x changes slide there. */
     private var slides = false
 
+    /** How long the latest rolled change takes to slide, in ms: the call site's duration, as on iOS. */
+    private var slideMs = 0f
+
     /**
      * Rolls each place whose character differs from the one shown. The
      * characters the old and new text share at the start and at the end keep
@@ -278,6 +282,7 @@ private class RollLine {
         }
         slots.removeAll { it.isEmpty }
         slides = rolls
+        slideMs = durationMillis.toFloat()
         relayout.intValue++
         redraw.intValue++
         if (rolls) wake.trySend(Unit)
@@ -307,6 +312,11 @@ private class RollLine {
      * Lays the places out on one baseline, each at the x of the characters
      * before it. A place that goes away keeps its last x while its character
      * rolls out. Both layers of a place cover it with room to spare.
+     *
+     * A place that slides is placed where it shows on this frame, not moved by
+     * its layer: a layer's block can run before this layout and keep the old
+     * offset, which showed the shared end at its new x for a frame, then back
+     * where it was, then sliding there again.
      */
     fun measure(scope: MeasureScope, measurables: List<Measurable>): MeasureResult = with(scope) {
         relayout.intValue
@@ -316,7 +326,7 @@ private class RollLine {
         var width = 0
         for (slot in slots) {
             val latest = slot.latest ?: continue
-            slot.moveTo(width, slides, now)
+            slot.moveTo(width, if (slides) slideMs else 0f)
             width += shapes.layout(latest).size.width
         }
         slides = false
@@ -324,9 +334,11 @@ private class RollLine {
         val placeables = measurables.map { it.measure(room) }
         val baseline = shapes.ascent
         layout(width, shapes.height, mapOf(FirstBaseline to baseline, LastBaseline to baseline)) {
+            // Each frame places the places again, so a slide moves on.
+            redraw.intValue
             placeables.forEachIndexed { i, placeable ->
                 val slot = measurables[i].layoutId as RollSlot
-                placeable.place(slot.x - padX, -padY)
+                placeable.place(slot.shownX(now) - padX, -padY)
             }
         }
     }
@@ -336,7 +348,6 @@ private class RollLine {
         .layoutId(slot)
         .graphicsLayer {
             redraw.intValue
-            translationX = slot.slide(now)
             renderEffect = slot.shownGlyph?.let { blur(sigma(it, it.opacity(now))) }
         }
         .drawBehind {
@@ -353,7 +364,6 @@ private class RollLine {
         .layoutId(slot)
         .graphicsLayer {
             redraw.intValue
-            translationX = slot.slide(now)
             var weight = 0f
             var sum = 0f
             for (glyph in slot.leavingGlyphs) {
@@ -417,56 +427,23 @@ private class RollSlot {
         private set
     private var placed = false
 
-    /** While it slides to [x]: its offset from [x] (px) and velocity when the slide began, on the roll spring. */
-    private var sliding = false
-    private var slideFrom = 0f
-    private var slideVelocity = 0f
-    private var slideSince = UNSCHEDULED
-    private var slidePace = 1f
+    /** While it slides to [x]: where it shows, from [x]. */
+    private val slide = RollSlide()
 
     /**
-     * Puts the place at [newX]. With [slides] (a rolled change), a place
-     * already shown moves there from where it shows now, as the shared end of
-     * a text that grows or shrinks does on iOS; else it is there at once.
+     * Puts the place at [newX]. With [slideMs] over 0 (a rolled change), a
+     * place already shown moves there from where it shows now, as the shared
+     * end of a text that grows or shrinks does on iOS; else it is there at once.
      */
-    fun moveTo(newX: Int, slides: Boolean, now: Long) {
+    fun moveTo(newX: Int, slideMs: Float) {
         if (placed && newX == x) return
-        if (placed && slides) {
-            val shownAt = x + slide(now)
-            slideVelocity = if (sliding && slideSince != UNSCHEDULED) springVelocity(slideFrom, slideVelocity, 0f, slideAge(now)) else 0f
-            slideFrom = shownAt - newX
-            slideSince = UNSCHEDULED
-            sliding = true
-        } else {
-            sliding = false
-        }
+        if (placed && slideMs > 0f) slide.add((newX - x).toFloat(), slideMs) else slide.stop()
         x = newX
         placed = true
     }
 
-    /** Its offset from [x] on this frame, in px: 0 unless it slides. */
-    fun slide(now: Long): Float = when {
-        !sliding -> 0f
-        slideSince == UNSCHEDULED -> slideFrom
-        else -> spring(slideFrom, slideVelocity, 0f, slideAge(now))
-    }
-
-    private fun slideAge(now: Long): Float = ((now - slideSince).coerceAtLeast(0L) / 1000f) / slidePace
-
-    /** Starts a slide on its first frame, and ends it once it has settled. */
-    private fun tickSlide(time: Long, pace: Float) {
-        if (!sliding) return
-        if (slideSince == UNSCHEDULED) {
-            slideSince = time
-            slidePace = pace
-            return
-        }
-        val t = slideAge(time)
-        if (t * 1000f >= FADE_MS &&
-            abs(spring(slideFrom, slideVelocity, 0f, t)) < SLIDE_SETTLED_PX &&
-            abs(springVelocity(slideFrom, slideVelocity, 0f, t)) < SLIDE_SETTLED_PX * 10f
-        ) sliding = false
-    }
+    /** Its x on this frame, in px: [x], or on its way there while it slides. */
+    fun shownX(now: Long): Int = (x + slide.offset(now)).roundToInt()
 
     /** The character in its place or rolling into it; null while the place goes away. */
     private var incoming: RollGlyph? = null
@@ -545,10 +522,10 @@ private class RollSlot {
     fun tick(time: Long, pace: Float): Boolean {
         if (pace <= 0f) {
             if (waiting) rest(next) else rest(incoming)
-            sliding = false
+            slide.stop()
             return false
         }
-        tickSlide(time, pace)
+        val sliding = slide.tick(time, pace)
         if (waiting) {
             if (nextAt == UNSCHEDULED) nextAt = time + (nextDelay * pace).toLong()
             if (time >= nextAt && (lastBegin == UNSCHEDULED || time - lastBegin >= MIN_ROLL_MS * pace)) begin(time, pace)
@@ -571,6 +548,50 @@ private class RollSlot {
         next = null
         waiting = false
         lastBegin = time
+    }
+}
+
+/**
+ * How a place slides to its new x, as on iOS, where the layout change takes
+ * the call site's ease-in-out: each move eases in and out over its duration,
+ * once, without overshoot. A move that comes while one is under way adds to
+ * it, as SwiftUI adds animations, so the place goes on from where it shows.
+ */
+internal class RollSlide {
+    private class Move(val by: Float, val ms: Float) {
+        var since = UNSCHEDULED
+        var pace = 1f
+    }
+
+    private val moves = ArrayList<Move>(2)
+
+    /** Starts a move of [by] px over [ms] ms. Until its first frame the place shows where it was. */
+    fun add(by: Float, ms: Float) {
+        if (by != 0f) moves += Move(by, ms)
+    }
+
+    fun stop() = moves.clear()
+
+    /** The place's offset from its x at [now], in px: 0 once every move is done. */
+    fun offset(now: Long): Float {
+        var offset = 0f
+        for (move in moves) {
+            val done = if (move.since == UNSCHEDULED) 0f else ((now - move.since) / move.pace / move.ms).coerceIn(0f, 1f)
+            offset -= move.by * (1f - Motion.EaseInOut.transform(done))
+        }
+        return offset
+    }
+
+    /** Starts each new move on this frame and drops those done; returns true while one is under way. */
+    fun tick(time: Long, pace: Float): Boolean {
+        for (move in moves) {
+            if (move.since == UNSCHEDULED) {
+                move.since = time
+                move.pace = pace
+            }
+        }
+        moves.removeAll { time - it.since >= it.ms * it.pace }
+        return moves.isNotEmpty()
     }
 }
 
@@ -663,9 +684,10 @@ private class RollGlyph(val char: Char) {
 }
 
 /**
- * How the roll looks. [IosExact] is the one the app uses: iOS 1.0.9 as its
- * frames show, where every character from the first change to the last rolls
- * down, whatever the digits do, and shrinks to 0.38 of its size as it fades.
+ * How the roll looks. [IosExact] is the one the app uses: iOS as its frames
+ * show, where every character from the first change to the last rolls up
+ * (`.numericText()`, countsDown false), whatever the digits do, and shrinks
+ * to 0.38 of its size as it fades.
  * [PerDigit] rolls each changed digit on its own, up when it gets bigger and
  * down when it gets smaller, with a mild scale.
  */
@@ -680,7 +702,7 @@ private enum class RollLook(
 
     /** True when the place rolls up: the old character leaves upward and the new one comes in from below. */
     fun up(old: Char?, new: Char?, rose: Boolean?): Boolean = when (this) {
-        IosExact -> false
+        IosExact -> true
         PerDigit -> if (old != null && new != null && old.isDigit() && new.isDigit()) new > old else rose == true
     }
 }
@@ -825,9 +847,6 @@ private const val PAD_Y_SHARE = 1.2f
 
 /** An entering character has landed once it is this close to its place, as a share of its ink height. */
 private const val SETTLED_SHARE = 0.003f
-
-/** A slide has settled when it is this close to its x (px) and slower than ten times that per second. */
-private const val SLIDE_SETTLED_PX = 0.5f
 
 /**
  * The ink of each character for one typeface and size: its top and bottom in

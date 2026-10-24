@@ -18,10 +18,63 @@ class RollingTextTest {
     }
 
     @Test
-    fun withoutADirectionTheAppLookStays() {
-        // The balance card and the chart: every place rolls down, whatever the value does.
-        assertFalse(rollsUp(countsDown = null, old = '1', new = '2', rose = true))
-        assertFalse(rollsUp(countsDown = null, old = '2', new = '1', rose = false))
+    fun withoutADirectionEveryChangeRollsUpAsOnIos() {
+        // The balance card, "As of" and the chart: iOS .numericText() is countsDown false,
+        // so the new digit comes in from below whether the value rises or falls.
+        assertTrue(rollsUp(countsDown = null, old = '1', new = '2', rose = true))
+        assertTrue(rollsUp(countsDown = null, old = '2', new = '1', rose = false))
+        assertTrue(rollsUp(countsDown = null, old = null, new = '2', rose = true))
+        assertTrue(rollsUp(countsDown = null, old = '2', new = null, rose = false))
+    }
+
+    @Test
+    fun aSlideShowsTheOldPlaceUntilItsFirstFrameThenMovesOnlyOneWay() {
+        // "0.2500 XMR" to "250.2500 XMR": the shared end moves 34 px right over 200 ms.
+        val slide = RollSlide()
+        slide.add(by = 34f, ms = 200f)
+        // The layout that places it at its new x, before any frame: it still shows at the old x.
+        assertEquals(-34f, slide.offset(now = 5_000L), 0f)
+        var last = -34f
+        var time = 10_000L
+        while (slide.tick(time, pace = 1f)) {
+            val offset = slide.offset(time)
+            assertTrue("moved back at ${time - 10_000} ms: $last to $offset", offset >= last)
+            assertTrue(offset <= 0f)
+            last = offset
+            time += 16
+        }
+        assertEquals(0f, slide.offset(time), 0f)
+        assertTrue("took ${time - 10_000} ms", time - 10_000L in 200L..216L)
+    }
+
+    @Test
+    fun aMoveDuringASlideGoesOnFromWhereItShows() {
+        val slide = RollSlide()
+        slide.add(by = 34f, ms = 200f)
+        slide.tick(0L, pace = 1f)
+        slide.tick(100L, pace = 1f)
+        val before = 34f + slide.offset(100L)
+        // The text grows again: the place's x moves 17 px further.
+        slide.add(by = 17f, ms = 200f)
+        assertEquals(before, 51f + slide.offset(100L), 0.001f)
+        var last = before
+        var time = 116L
+        while (slide.tick(time, pace = 1f)) {
+            val shown = 51f + slide.offset(time)
+            assertTrue("moved back at $time ms", shown >= last)
+            last = shown
+            time += 16
+        }
+        assertEquals(51f, 51f + slide.offset(time), 0f)
+    }
+
+    @Test
+    fun aSlideStopsAtOnce() {
+        val slide = RollSlide()
+        slide.add(by = 34f, ms = 200f)
+        slide.stop()
+        assertEquals(0f, slide.offset(0L), 0f)
+        assertFalse(slide.tick(0L, pace = 1f))
     }
 
     @Test
