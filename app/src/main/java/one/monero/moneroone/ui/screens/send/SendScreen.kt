@@ -360,6 +360,8 @@ fun SendScreen(
     // The amount as typed in fiat, kept while the amount step is gone (back to the recipient,
     // on to Review), so the amount comes back in fiat (iOS SendFlowView.typedFiat).
     var typedFiat by rememberSaveable(stateSaver = TypedFiat.Saver) { mutableStateOf<TypedFiat?>(null) }
+    // Counts the `monero:` links that filled in an amount; the amount step shows a new one in XMR.
+    var linkFills by rememberSaveable { mutableIntStateOf(0) }
 
     // Fee state, built on the REVIEW phase: the review builds and signs the transfer, shows its real fee, and
     // Send broadcasts that same transfer (reviewFee.prepared).
@@ -451,6 +453,12 @@ fun SendScreen(
             amount = link.amount?.trim()?.takeIf { walletViewModel.parseXmr(it) > 0 } ?: ""
             amountPrefilledFromQR = amount.isNotEmpty()
             amountSource = SendPrefillSource.LINK
+            // A link's amount shows in XMR, as it came; the fiat typed before is dropped, so a
+            // later return does not bring it back (iOS SendFlowView.apply).
+            if (!SendAmountStart.linkKeepsFiat(amount)) {
+                typedFiat = null
+                linkFills++
+            }
             isSweepAll = false
             reviewFee = ReviewFeeState()
             when (phase) {
@@ -626,6 +634,7 @@ fun SendScreen(
                         fiatMode = fiatMode,
                         typedFiat = typedFiat,
                         onTypedFiat = { typedFiat = it },
+                        linkFill = linkFills,
                         memo = if (linkMode) linkNote else memo,
                         onMemoChange = { if (linkMode) linkNote = it.take(LinkNames.NOTE_LIMIT) else memo = it },
                         onContinue = { goForward(SendPhase.REVIEW) },
@@ -1222,6 +1231,8 @@ private fun AmountPhase(
     typedFiat: TypedFiat?,
     /** The step goes away: the fiat text and its XMR, or null when it shows XMR. */
     onTypedFiat: (TypedFiat?) -> Unit,
+    /** Goes up when a `monero:` link fills in an amount; the step then shows it in XMR. */
+    linkFill: Int,
     memo: String,
     onMemoChange: (String) -> Unit,
     onContinue: () -> Unit,
@@ -1271,6 +1282,15 @@ private fun AmountPhase(
 
     // The fiat that came back keeps its text; its XMR follows the current price (iOS onChange(of: fiatString)).
     LaunchedEffect(Unit) { if (restoredFiat != null && isFiatMode) syncXmrFromFiat() }
+    // A `monero:` link filled in an amount while the step shows: the link's amount shows in XMR,
+    // as it came, not the old fiat (iOS SendAmountStep.onChange(of: paymentRequest)).
+    var seenLinkFill by rememberSaveable { mutableIntStateOf(linkFill) }
+    LaunchedEffect(linkFill) {
+        if (linkFill != seenLinkFill) {
+            seenLinkFill = linkFill
+            isFiatMode = false
+        }
+    }
     // The step goes away: the flow keeps the fiat text and its XMR (iOS SendAmountStep.onDisappear).
     val leaving by rememberUpdatedState(if (isFiatMode) TypedFiat(fiatString, amount) else null)
     val keepTypedFiat by rememberUpdatedState(onTypedFiat)

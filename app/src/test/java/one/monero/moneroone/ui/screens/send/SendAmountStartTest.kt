@@ -53,6 +53,24 @@ class SendAmountStartTest {
         assertNull(SendAmountStart.restoredFiat(typed, amount = "0.302260911618", price = Double.NaN))
     }
 
+    @Test fun aLinkWithAnAmountShowsItInXmr() {
+        // iOS SendAmountStep.linkKeepsFiat: the link's amount, as it came, not the old fiat.
+        assertFalse(SendAmountStart.linkKeepsFiat(linkAmount = "0.25"))
+    }
+
+    @Test fun aLinkWithNoAmountKeepsTheUnitAndTheTypedFiat() {
+        assertTrue(SendAmountStart.linkKeepsFiat(linkAmount = ""))
+    }
+
+    @Test fun aLinkOnTheRecipientStepOrReviewDoesNotBringTheOldFiatBack() {
+        // The link's amount equals the XMR of the typed fiat: with the typed fiat dropped, the
+        // step that comes next starts in XMR with the link's amount.
+        val linkAmount = typed.xmr
+        val kept = if (SendAmountStart.linkKeepsFiat(linkAmount)) typed else null
+        assertNull(SendAmountStart.restoredFiat(kept, amount = linkAmount, price = price))
+        assertFalse(SendAmountStart.startsInFiat(fiatMode = true, price = price, amount = linkAmount))
+    }
+
     @Test fun aSwappedFiatAmountShowsAsTyped() {
         // iOS formatFiatNumber: two decimals at most, no trailing zeros, no thousands separator.
         assertEquals("1223.56", SendAmountStart.fiatInput(1223.564))

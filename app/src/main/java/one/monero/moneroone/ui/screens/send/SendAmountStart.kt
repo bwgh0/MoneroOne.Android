@@ -40,6 +40,15 @@ internal object SendAmountStart {
         typed?.fiat?.takeIf { amount.isNotEmpty() && typed.xmr == amount && isPlausiblePrice(price) }
 
     /**
+     * A `monero:` link filled the flow (iOS SendAmountStep.linkKeepsFiat), with [linkAmount] the
+     * amount it filled in ("" for none). A link with an amount shows that amount in XMR, as it
+     * came (like any filled-in amount), and the fiat the user typed before is dropped, so a later
+     * return does not bring it back. A link with no amount leaves the unit and the typed fiat as
+     * they are.
+     */
+    fun linkKeepsFiat(linkAmount: String): Boolean = linkAmount.isEmpty()
+
+    /**
      * A fiat amount as the amount step shows it when it swaps from XMR (iOS formatFiatNumber): two
      * decimals at most, no trailing zeros, no thousands separator, as the user would type it.
      */
