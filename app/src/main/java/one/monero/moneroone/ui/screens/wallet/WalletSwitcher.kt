@@ -78,6 +78,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -902,21 +903,30 @@ fun EditWalletSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        val canSave = name.trim().isNotEmpty()
+        // Cancel, the title and Save in one bar, as in the New Contact sheet and on iOS.
+        Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+            DismissTextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) { Text(tr("Cancel")) }
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                modifier = Modifier.align(Alignment.Center).semantics { heading() }
             )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
+            TextButton(
+                onClick = { onSave(name.trim(), emoji) },
+                enabled = canSave,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                Text(tr("Save"), color = if (canSave) MoneroOrange else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(top = 8.dp, bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Box(
                 modifier = Modifier
                     .size(72.dp)
@@ -928,10 +938,10 @@ fun EditWalletSheet(
             ) {
                 Text(text = emoji, fontSize = 36.sp)
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = tr("Tap to change"),
-                style = MaterialTheme.typography.labelSmall,
+                text = tr("Tap to change icon"),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
@@ -946,7 +956,7 @@ fun EditWalletSheet(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             MoneroTextField(
                 value = name,
@@ -957,18 +967,7 @@ fun EditWalletSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            PrimaryButton(
-                onClick = { onSave(name.trim(), emoji) },
-                enabled = name.trim().isNotEmpty(),
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(tr("Save"))
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(48.dp))
 
             TextButton(
                 onClick = onDelete,
