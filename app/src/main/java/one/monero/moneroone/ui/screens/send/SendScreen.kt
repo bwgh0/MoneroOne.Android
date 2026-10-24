@@ -617,7 +617,11 @@ fun SendScreen(
                     val fiatMode by walletViewModel.fiatMode.collectAsState()
                     AmountPhase(
                         amount = amount,
-                        onAmountChange = { amount = it; isSweepAll = false; amountPrefilledFromQR = false },
+                        onAmountChange = {
+                            amountPrefilledFromQR = SendAmountStart.prefillNoteShows(amountPrefilledFromQR, before = amount, after = it)
+                            amount = it
+                            isSweepAll = false
+                        },
                         isSweepAll = isSweepAll,
                         onMaxTap = {
                             amount = walletViewModel.formatXmr(walletState.balance.unlocked)
@@ -1397,8 +1401,9 @@ private fun AmountPhase(
                     .background(MoneroOrange.copy(alpha = 0.15f))
                     .clickable {
                         if (isFiatMode) {
-                            // Switching back to XMR mode — sync XMR from fiat
-                            syncXmrFromFiat()
+                            // Switching back to XMR mode: the amount stays as it is (each fiat
+                            // edit already set it), so a link's amount stays exact and keeps its
+                            // note (iOS SendAmountStep.toggleFiatMode).
                             isFiatMode = false
                         } else {
                             // Switching to fiat mode — sync fiat from XMR

@@ -78,6 +78,24 @@ class SendAmountStartTest {
         assertFalse(SendAmountStart.startsInFiat(fiatMode = false, price = price, amount = ""))
     }
 
+    @Test fun theFirstEditThatChangesTheAmountHidesThePrefillNote() {
+        // A key, delete or Paste with a new amount.
+        assertFalse(SendAmountStart.prefillNoteShows(shown = true, before = "0.25", after = "0.255"))
+        assertFalse(SendAmountStart.prefillNoteShows(shown = true, before = "0.25", after = "0.2"))
+        assertFalse(SendAmountStart.prefillNoteShows(shown = true, before = "0.25", after = "1.5"))
+    }
+
+    @Test fun anEditThatChangesNothingKeepsThePrefillNote() {
+        // A key with the decimals full, or a Paste of the same amount.
+        assertTrue(SendAmountStart.prefillNoteShows(shown = true, before = "0.25", after = "0.25"))
+    }
+
+    @Test fun aHiddenPrefillNoteStaysHidden() {
+        // Typing the link's amount again does not bring the note back; only a new link does.
+        assertFalse(SendAmountStart.prefillNoteShows(shown = false, before = "0.2", after = "0.25"))
+        assertFalse(SendAmountStart.prefillNoteShows(shown = false, before = "0.25", after = "0.25"))
+    }
+
     @Test fun aSwappedFiatAmountShowsAsTyped() {
         // iOS formatFiatNumber: two decimals at most, no trailing zeros, no thousands separator.
         assertEquals("1223.56", SendAmountStart.fiatInput(1223.564))

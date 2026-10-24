@@ -49,6 +49,16 @@ internal object SendAmountStart {
     fun linkKeepsFiat(linkAmount: String): Boolean = linkAmount.isEmpty()
 
     /**
+     * Whether the note "Amount pre-filled from payment link" (or "from QR code", the same note)
+     * still shows after an edit on the amount step took the amount from [before] to [after]. It
+     * shows only while the amount is still the one filled in: the first edit that changes it (a
+     * key, delete, Paste) hides it; a key that changes nothing (the decimals are full) keeps it.
+     * A unit swap is no edit: the amount stays as it is. Max always hides it, and a new link with
+     * an amount shows it again.
+     */
+    fun prefillNoteShows(shown: Boolean, before: String, after: String): Boolean = shown && before == after
+
+    /**
      * A fiat amount as the amount step shows it when it swaps from XMR (iOS formatFiatNumber): two
      * decimals at most, no trailing zeros, no thousands separator, as the user would type it.
      */
