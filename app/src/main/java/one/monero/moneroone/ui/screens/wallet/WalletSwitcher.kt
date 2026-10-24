@@ -899,28 +899,33 @@ internal fun WalletDeleteZone(label: String, enabled: Boolean, onClick: () -> Un
 /**
  * The switcher's last row: Transfer and Add Wallet side by side, 12 apart, as every button pair
  * (iOS WalletManagerRows). With one wallet there is nothing to transfer to, and Add Wallet fills the row.
+ * At the largest text sizes the two stack, 12 apart, so neither label is cut (iOS accessibility sizes).
  */
 @Composable
 private fun WalletActionsRow(showTransfer: Boolean, onTransfer: () -> Unit, onAddWallet: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        if (showTransfer) {
-            val hint = tr("Moves XMR to another of your wallets")
-            WalletActionCard(
-                icon = Icons.Default.SwapHoriz,
-                label = tr("Transfer"),
-                onClick = onTransfer,
-                // TalkBack reads the visible "Transfer"; the action label explains it.
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics { onClick(label = hint) { onTransfer(); true } }
-            )
-        }
+    val hint = tr("Moves XMR to another of your wallets")
+    val transfer = @Composable { modifier: Modifier ->
         WalletActionCard(
-            icon = Icons.Default.Add,
-            label = tr("Add Wallet"),
-            onClick = onAddWallet,
-            modifier = Modifier.weight(1f)
+            icon = Icons.Default.SwapHoriz,
+            label = tr("Transfer"),
+            onClick = onTransfer,
+            // TalkBack reads the visible "Transfer"; the action label explains it.
+            modifier = modifier.semantics { onClick(label = hint) { onTransfer(); true } }
         )
+    }
+    val addWallet = @Composable { modifier: Modifier ->
+        WalletActionCard(icon = Icons.Default.Add, label = tr("Add Wallet"), onClick = onAddWallet, modifier = modifier)
+    }
+    if (LocalDensity.current.fontScale >= 1.5f) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            if (showTransfer) transfer(Modifier.fillMaxWidth())
+            addWallet(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            if (showTransfer) transfer(Modifier.weight(1f))
+            addWallet(Modifier.weight(1f))
+        }
     }
 }
 
