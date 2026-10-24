@@ -2382,6 +2382,15 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     fun hasSeedMismatch(walletId: String): Boolean = seedVerificationFor(walletId) == SeedVerification.MISMATCH
 
+    /**
+     * The wallet's keys are not on this phone (iOS needsRestore): it has no seed in secure storage,
+     * so no PIN can open it. Transfer shows such a wallet under To, disabled, with "Needs restore".
+     */
+    fun needsRestore(walletId: String): Boolean {
+        val wallet = _wallets.value.firstOrNull { it.id == walletId } ?: return false
+        return !wallet.isViewOnly && !secrets.hasSeed(wallet.id)
+    }
+
     fun seedMatchesWalletFile(walletId: String): Boolean = seedVerificationFor(walletId) == SeedVerification.VERIFIED
 
     /** Check the local file directly: backing up does not require a working node connection. */
