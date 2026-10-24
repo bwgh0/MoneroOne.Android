@@ -111,14 +111,25 @@ import one.monero.moneroone.ui.components.Motion
 import one.monero.moneroone.ui.components.rememberReduceMotion
 import kotlin.math.roundToLong
 import one.monero.moneroone.ui.screens.wallet.WhatsNewLinkLoop.Step as LoopStep
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.key
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.CoroutineScope
+import one.monero.moneroone.ui.components.RollingText
+import one.monero.moneroone.ui.screens.send.formatFiatAmount
+import java.math.BigDecimal
+import java.math.RoundingMode
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /*
  * The pictures of the What's New cards (iOS WhatsNewScenes.swift). Each one is laid out at its
  * native width at the default text size, then scaled to fit the card, so it looks the same on
- * every phone and at every font scale. The link plays the send's loop (iOS WhatsNewLinkLoop); the
- * Transfer loop comes later.
+ * every phone and at every font scale. The link plays the send's loop (iOS WhatsNewLinkLoop) and
+ * the Transfer picture its own (iOS WhatsNewTransferLoop).
  */
 
 /** A picture's native width in dp (iOS WhatsNewScenePicture.nativeWidth). */
@@ -129,21 +140,24 @@ private fun WhatsNewGlyph.nativeWidth(): Dp = when (this) {
     WhatsNewGlyph.AT, WhatsNewGlyph.KEY -> 300.dp
 }
 
-/** The picture of one feature, centered in the space it gets, scaled to fit it. [animated]: the link plays its loop. */
+/** The picture of one feature, centered in the space it gets, scaled to fit it. [animated]: the link and Transfer play their loops. */
 @Composable
 internal fun WhatsNewScenePicture(glyph: WhatsNewGlyph, modifier: Modifier = Modifier, animated: Boolean = false) {
     if (glyph == WhatsNewGlyph.LINK) {
         LinkScene(animated, modifier)
         return
     }
+    if (glyph == WhatsNewGlyph.TRANSFER) {
+        TransferScene(animated, modifier)
+        return
+    }
     Box(modifier, contentAlignment = Alignment.Center) {
         ScaledPicture(nativeWidth = glyph.nativeWidth()) {
             when (glyph) {
-                WhatsNewGlyph.TRANSFER -> TransferStill()
                 WhatsNewGlyph.CONTACTS -> ContactsStill()
                 WhatsNewGlyph.AT -> NameStill()
                 WhatsNewGlyph.KEY -> SeedStill()
-                WhatsNewGlyph.LINK -> Unit
+                WhatsNewGlyph.LINK, WhatsNewGlyph.TRANSFER -> Unit
             }
         }
     }
@@ -195,42 +209,308 @@ private fun Modifier.scenePart(shape: Shape): Modifier = this
 
 private fun sampleAddress(head: String, tail: String) = head + "1".repeat(79) + tail
 
-private fun xmr(value: Double, digits: Int): String {
-    val format = NumberFormat.getNumberInstance(Locale.getDefault())
-    format.minimumFractionDigits = digits
-    format.maximumFractionDigits = digits
-    return format.format(value) + " XMR"
+// MARK: Transfer
+
+/**
+ * The pictures' amounts in Fiat Mode with a usable price (iOS PriceService.showFiatFirst and
+ * formatFiatValue): the live price and the selected currency's symbol. Null shows XMR.
+ */
+@Immutable
+data class WhatsNewFiat(val price: Double, val symbol: String) {
+    companion object {
+        /** The fiat for the pictures, or null (XMR) outside Fiat Mode or without a usable price. */
+        fun of(fiatMode: Boolean, price: Double?, symbol: String): WhatsNewFiat? =
+            if (fiatMode && price != null && price.isFinite() && price > 0.0) WhatsNewFiat(price, symbol) else null
+    }
 }
 
-// MARK: Transfer (the received step of the iOS loop)
+/** The fiat the sheet gives its pictures; null shows XMR. */
+internal val LocalWhatsNewFiat = compositionLocalOf<WhatsNewFiat?> { null }
 
+/**
+ * iOS WhatsNewTransferLoop: Transfer is pressed, the amount shows between the wallets, the From
+ * balance rolls down, the To balance rolls up, a rest on the result, then a fade, so the balances
+ * go back unseen.
+ */
+internal object WhatsNewTransferLoop {
+    enum class Step {
+        /** The picture as it stands: nothing has moved. It fades back in. */
+        START,
+        /** Transfer is pressed. */
+        PRESS,
+        /** Transfer is let go and the amount shows between the wallets. */
+        AMOUNT,
+        /** The amount leaves the From wallet: its balance rolls down. */
+        SENT,
+        /** The amount reaches the To wallet: its balance rolls up. */
+        RECEIVED,
+        /** The picture fades out, so the balances go back unseen. */
+        FADE,
+    }
+
+    val FROM_BALANCE = BigDecimal("1284.503917")
+    val TO_BALANCE = BigDecimal("0.25")
+    val AMOUNT = BigDecimal("250")
+
+    /** The frame that stands still with animations off: the result, the last frame before the fade. */
+    val stillStep = Step.RECEIVED
+
+    /** The Transfer button's press (motion.press, larger than 0.98 so it reads at the picture's scale). */
+    const val PRESS_SCALE = 0.96f
+
+    /** The amount's size while it is hidden. */
+    const val AMOUNT_HIDDEN_SCALE = 0.8f
+
+    /** The settle spring (response 0.4, damping 0.8): the amount comes in, the button comes back. */
+    const val SETTLE_STIFFNESS = 246.7f
+
+    fun fromBalance(step: Step): BigDecimal = when (step) {
+        Step.START, Step.PRESS, Step.AMOUNT -> FROM_BALANCE
+        Step.SENT, Step.RECEIVED, Step.FADE -> FROM_BALANCE - AMOUNT
+    }
+
+    fun toBalance(step: Step): BigDecimal = when (step) {
+        Step.START, Step.PRESS, Step.AMOUNT, Step.SENT -> TO_BALANCE
+        Step.RECEIVED, Step.FADE -> TO_BALANCE + AMOUNT
+    }
+
+    fun showsAmount(step: Step): Boolean = step == Step.AMOUNT || step == Step.SENT || step == Step.RECEIVED
+
+    fun buttonScale(step: Step): Float = if (step == Step.PRESS) PRESS_SCALE else 1f
+
+    fun pictureOpacity(step: Step): Float = if (step == Step.FADE) 0f else 1f
+
+    /**
+     * The wait before the move to [step]: the rest on the start frame before the press, the time
+     * to read the amount, the gap between the two rolls, and the rest on the result before the fade.
+     */
+    fun delay(step: Step): Double = when (step) {
+        Step.START, Step.AMOUNT -> 0.0
+        Step.PRESS -> 1.4
+        Step.SENT -> 0.6
+        Step.RECEIVED -> 0.3
+        Step.FADE -> 2.0
+    }
+
+    /** The length of the move to [step]: the fades (crossFade), the press, the settle spring, the roll (rollDigits). */
+    fun duration(step: Step): Double = when (step) {
+        Step.START, Step.FADE -> 0.35
+        Step.PRESS -> 0.1
+        Step.AMOUNT -> 0.4
+        Step.SENT, Step.RECEIVED -> 0.2
+    }
+
+    /** When the move to [step] begins, from the start of a cycle. */
+    fun begin(step: Step): Double {
+        var time = 0.0
+        for (earlier in Step.entries) {
+            time += delay(earlier)
+            if (earlier == step) break
+            time += duration(earlier)
+        }
+        return time
+    }
+
+    /** One cycle, rests included. */
+    val cycleDuration: Double get() = Step.entries.sumOf { delay(it) + duration(it) }
+
+    /** The step shown [elapsed] seconds after the loop began. A time on a step's begin shows that step. */
+    fun step(elapsed: Double): Step {
+        val time = (maxOf(0.0, elapsed) + 1e-6) % cycleDuration
+        return Step.entries.last { begin(it) <= time }
+    }
+
+    /**
+     * An amount as the picture shows it: in fiat with [fiat], as the Activity rows and the wallet
+     * switcher; else in XMR with 4 to 12 decimals (iOS XMRFormatter).
+     */
+    fun amountText(xmr: BigDecimal, fiat: WhatsNewFiat?): String {
+        if (fiat != null) return formatFiatAmount(xmr.toDouble() * fiat.price, fiat.symbol)
+        val format = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
+            minimumFractionDigits = 4
+            maximumFractionDigits = 12
+            roundingMode = RoundingMode.DOWN
+        }
+        return format.format(xmr) + " XMR"
+    }
+}
+
+private typealias TransferStep = WhatsNewTransferLoop.Step
+
+/** The Transfer loop's moving parts, driven at each step's begin (iOS TransferSceneLoop). */
+@Stable
+private class TransferLoopMotion {
+    /** The step whose balances show; a balance rolls when it changes. */
+    var step by mutableStateOf(TransferStep.START)
+        private set
+
+    /** Each swap back to the start draws the balances anew, without a roll (iOS `.identity`). */
+    var resets by mutableIntStateOf(0)
+        private set
+
+    val opacity = Animatable(1f)
+    val buttonScale = Animatable(1f)
+    val amountScale = Animatable(WhatsNewTransferLoop.AMOUNT_HIDDEN_SCALE)
+    val amountAlpha = Animatable(0f)
+
+    /** Off screen: the first frame, at once. The loop starts again from there, without a jump. */
+    suspend fun reset() {
+        toStart()
+        opacity.snapTo(1f)
+    }
+
+    /** The loop, cycle after cycle, until it is cancelled. */
+    suspend fun run() = coroutineScope {
+        val cycleMs = (WhatsNewTransferLoop.cycleDuration * 1000).roundToLong()
+        while (isActive) {
+            val cycle = launch { playCycle() }
+            delay(cycleMs)
+            cycle.cancelAndJoin()
+        }
+    }
+
+    private suspend fun toStart() {
+        if (step != TransferStep.START) {
+            step = TransferStep.START
+            resets++
+        }
+        buttonScale.snapTo(1f)
+        amountScale.snapTo(WhatsNewTransferLoop.AMOUNT_HIDDEN_SCALE)
+        amountAlpha.snapTo(0f)
+    }
+
+    private suspend fun playCycle() = coroutineScope {
+        // Back to the start while the picture is clear (after the fade), or at once the first time.
+        if (opacity.value < 1f) opacity.snapTo(0f)
+        toStart()
+        fun at(move: TransferStep, block: suspend CoroutineScope.() -> Unit) = launch {
+            val ms = (WhatsNewTransferLoop.begin(move) * 1000).roundToLong()
+            if (ms > 0) delay(ms)
+            coroutineScope { block() }
+        }
+        fun ms(move: TransferStep) = (WhatsNewTransferLoop.duration(move) * 1000).roundToInt()
+        val fade = tween<Float>(ms(TransferStep.FADE), easing = Motion.EaseInOut)
+        val settle = spring<Float>(dampingRatio = 0.8f, stiffness = WhatsNewTransferLoop.SETTLE_STIFFNESS)
+        at(TransferStep.START) { opacity.animateTo(1f, tween(ms(TransferStep.START), easing = Motion.EaseInOut)) }
+        at(TransferStep.PRESS) {
+            step = TransferStep.PRESS
+            buttonScale.animateTo(WhatsNewTransferLoop.PRESS_SCALE, tween(ms(TransferStep.PRESS), easing = Motion.EaseInOut))
+        }
+        at(TransferStep.AMOUNT) {
+            step = TransferStep.AMOUNT
+            launch { buttonScale.animateTo(1f, settle) }
+            launch { amountScale.animateTo(1f, settle) }
+            amountAlpha.animateTo(1f, settle)
+        }
+        at(TransferStep.SENT) { step = TransferStep.SENT }
+        at(TransferStep.RECEIVED) { step = TransferStep.RECEIVED }
+        at(TransferStep.FADE) {
+            step = TransferStep.FADE
+            launch { amountScale.animateTo(WhatsNewTransferLoop.AMOUNT_HIDDEN_SCALE, fade) }
+            launch { amountAlpha.animateTo(0f, fade) }
+            opacity.animateTo(0f, fade)
+        }
+    }
+}
+
+/**
+ * iOS TransferScene: two wallet switcher rows (the current one with its brand ring) and the
+ * Transfer button. When [animated], it plays the Transfer loop while it is on screen and the app
+ * is in front; with animations off (or the blurred copy behind) it shows the loop's result, still.
+ */
 @Composable
-private fun TransferStill() {
+private fun TransferScene(animated: Boolean, modifier: Modifier) {
+    val playing = animated && !rememberReduceMotion()
+    val loop = remember(playing) { if (playing) TransferLoopMotion() else null }
+    var onScreen by remember { mutableStateOf(false) }
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    if (loop != null) {
+        val running = onScreen && lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+        LaunchedEffect(loop, running) {
+            if (running) loop.run() else loop.reset()
+        }
+    }
+    val visibility = if (loop != null) {
+        Modifier.onGloballyPositioned {
+            val bounds = it.boundsInWindow()
+            onScreen = bounds.width > 0f && bounds.height > 0f
+        }
+    } else {
+        Modifier
+    }
+    Box(modifier.then(visibility), contentAlignment = Alignment.Center) {
+        ScaledPicture(nativeWidth = WhatsNewGlyph.TRANSFER.nativeWidth()) {
+            if (loop == null) {
+                TransferFrame(WhatsNewTransferLoop.stillStep, resets = 0, { 1f }, { 1f }, { 1f }, { 1f })
+            } else {
+                TransferFrame(
+                    loop.step,
+                    loop.resets,
+                    opacity = { loop.opacity.value },
+                    buttonScale = { loop.buttonScale.value },
+                    amountScale = { loop.amountScale.value },
+                    amountAlpha = { loop.amountAlpha.value }
+                )
+            }
+        }
+    }
+}
+
+/** One frame of the Transfer picture; the moving values are read at draw time. */
+@Composable
+private fun TransferFrame(
+    step: TransferStep,
+    resets: Int,
+    opacity: () -> Float,
+    buttonScale: () -> Float,
+    amountScale: () -> Float,
+    amountAlpha: () -> Float
+) {
     val brand = MoneroTheme.colors.brand
+    val fiat = LocalWhatsNewFiat.current
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                alpha = opacity().coerceIn(0f, 1f)
+                // Each part fades on its own, so the shadows past the picture's bounds stay whole.
+                compositingStrategy = CompositingStrategy.ModulateAlpha
+            },
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(contentAlignment = Alignment.Center) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // The From balance falls (it rolls up, iOS numericText(value:)); the To balance rises.
                 SceneWalletRow(
                     emoji = "💰",
                     name = tr("Everyday Spending"),
                     address = sampleAddress("4AdUndXH", "5ZDxJ8Bq"),
-                    balance = xmr(1034.503917, 6),
-                    isActive = true
+                    balanceText = WhatsNewTransferLoop.amountText(WhatsNewTransferLoop.fromBalance(step), fiat),
+                    isActive = true,
+                    resets = resets,
+                    countsDown = true
                 )
                 SceneWalletRow(
                     emoji = "🏔️",
                     name = tr("Long-Term Savings Wallet"),
                     address = sampleAddress("86yLe8Lm", "QHv5ezC1"),
-                    balance = xmr(250.25, 4),
-                    isActive = false
+                    balanceText = WhatsNewTransferLoop.amountText(WhatsNewTransferLoop.toBalance(step), fiat),
+                    isActive = false,
+                    resets = resets,
+                    countsDown = false
                 )
             }
+            // Across the gap between From and To.
             Row(
                 modifier = Modifier
+                    .graphicsLayer {
+                        val scale = amountScale()
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = amountAlpha().coerceIn(0f, 1f)
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    }
                     .raisedShadow(CapsuleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainer, CapsuleShape)
                     .background(brand.copy(alpha = 0.15f), CapsuleShape)
@@ -240,7 +520,7 @@ private fun TransferStill() {
             ) {
                 Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = brand, modifier = Modifier.size(16.dp))
                 Text(
-                    text = xmr(250.0, 4),
+                    text = WhatsNewTransferLoop.amountText(WhatsNewTransferLoop.AMOUNT, fiat),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = brand,
@@ -250,6 +530,11 @@ private fun TransferStill() {
         }
         Row(
             modifier = Modifier
+                .graphicsLayer {
+                    val scale = buttonScale()
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .width(179.dp)
                 .scenePart(CapsuleShape)
                 .padding(vertical = 14.dp),
@@ -268,13 +553,22 @@ private fun TransferStill() {
 }
 
 @Composable
-private fun SceneWalletRow(emoji: String, name: String, address: String, balance: String, isActive: Boolean) {
+private fun SceneWalletRow(
+    emoji: String,
+    name: String,
+    address: String,
+    balanceText: String,
+    isActive: Boolean,
+    resets: Int = 0,
+    countsDown: Boolean = false
+) {
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val brand = MoneroTheme.colors.brand
     WalletRowCard(
         emoji = emoji,
         name = name,
         address = address,
-        balanceText = balance,
+        balanceText = balanceText,
         isActive = isActive,
         modifier = if (isActive) Modifier else Modifier.border(0.5.dp, MoneroTheme.colors.separator, CapsuleShape),
         leading = {
@@ -287,6 +581,18 @@ private fun SceneWalletRow(emoji: String, name: String, address: String, balance
             }
             Spacer(Modifier.width(12.dp))
             WalletRowCheck(isActive)
+        },
+        balance = {
+            // The balance rolls when it changes; back at the start it is drawn anew, without a roll.
+            key(resets) {
+                RollingText(
+                    text = balanceText,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                    color = brand,
+                    minScale = 0.6f,
+                    countsDown = countsDown
+                )
+            }
         }
     )
 }

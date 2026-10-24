@@ -698,7 +698,8 @@ fun WalletScreen(
             onDismiss = {
                 whatsNewSheet = false
                 whatsNewBanner = false
-            }
+            },
+            fiat = WhatsNewFiat.of(fiatMode, currentPrice?.price, selectedCurrency.symbol)
         )
     }
 }

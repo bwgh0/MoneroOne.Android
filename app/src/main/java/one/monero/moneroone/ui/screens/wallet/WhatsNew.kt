@@ -54,6 +54,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -145,7 +146,16 @@ fun WhatsNewBanner(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WhatsNewSheet(entry: WhatsNewEntry, onDismiss: () -> Unit) {
+fun WhatsNewSheet(entry: WhatsNewEntry, onDismiss: () -> Unit, fiat: WhatsNewFiat? = null) {
+    // The pictures' amounts follow Fiat Mode, as every amount in the app.
+    CompositionLocalProvider(LocalWhatsNewFiat provides fiat) {
+        WhatsNewSheetContent(entry, onDismiss)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WhatsNewSheetContent(entry: WhatsNewEntry, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current

@@ -85,6 +85,7 @@ import one.monero.moneroone.paymentlinks.PaymentLinkStore
 import one.monero.moneroone.ui.components.DismissTextButton
 import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.components.MoneroSwitch
+import one.monero.moneroone.ui.screens.wallet.WhatsNewFiat
 import one.monero.moneroone.ui.screens.wallet.WhatsNewSheet
 import one.monero.moneroone.ui.theme.ErrorRed
 import one.monero.moneroone.ui.theme.MoneroOrange
@@ -373,7 +374,12 @@ fun SettingsScreen(
         // A payment link that arrives closes the notes, as on iOS (closesForPaymentLink).
         val claimPending = PaymentLinkStore.get(context).pendingOpen.collectAsState().value != null
         LaunchedEffect(claimPending) { if (claimPending) showWhatsNew = false }
-        WhatsNewSheet(entry = whatsNewEntry, onDismiss = { showWhatsNew = false })
+        val currentPrice by walletViewModel.currentPrice.collectAsState()
+        WhatsNewSheet(
+            entry = whatsNewEntry,
+            onDismiss = { showWhatsNew = false },
+            fiat = WhatsNewFiat.of(fiatMode, currentPrice?.price, selectedCurrency.symbol)
+        )
     }
 
     // Remove-all confirmation dialog (iOS copy). The body leaves out iOS's

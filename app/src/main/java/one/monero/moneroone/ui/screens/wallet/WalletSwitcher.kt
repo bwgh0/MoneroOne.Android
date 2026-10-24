@@ -737,7 +737,9 @@ fun WalletRowCard(
     note: String? = null,
     /** Before the emoji: the switcher's room for its drag handle. */
     leading: @Composable RowScope.() -> Unit = {},
-    trailing: @Composable RowScope.() -> Unit = {}
+    trailing: @Composable RowScope.() -> Unit = {},
+    /** In place of [balanceText]'s text: a balance drawn by the caller, such as one that rolls. */
+    balance: (@Composable () -> Unit)? = null
 ) {
     GlassCard(
         modifier = modifier.then(
@@ -771,7 +773,10 @@ fun WalletRowCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.alpha(contentAlpha)
                 )
-                balanceText?.let {
+                if (balance != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Box(modifier = Modifier.alpha(contentAlpha)) { balance() }
+                } else balanceText?.let {
                     Spacer(modifier = Modifier.height(2.dp))
                     // A balance never loses digits: it shrinks, then wraps.
                     ShrinkToFitText(

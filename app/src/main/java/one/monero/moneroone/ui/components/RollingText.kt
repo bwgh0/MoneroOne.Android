@@ -108,7 +108,12 @@ fun RollingText(
      * each character rolls on the measured iOS spring whatever the duration.
      */
     durationMillis: Int = Motion.DIGIT_MS,
-    minScale: Float = 1f
+    minScale: Float = 1f,
+    /**
+     * iOS `.numericText(countsDown: true)`, or `.numericText(value:)` for a value that falls: the
+     * changed characters roll up (the new one comes in from below) in place of down.
+     */
+    countsDown: Boolean = false
 ) {
     val glyphStyle = style.copy(
         fontSize = if (fontSize.isSpecified) fontSize else style.fontSize,
@@ -116,7 +121,7 @@ fun RollingText(
         fontFeatureSettings = TabularFigures
     )
     if (minScale >= 1f) {
-        RollingLine(text, glyphStyle, color, durationMillis, modifier)
+        RollingLine(text, glyphStyle, color, durationMillis, countsDown, modifier)
         return
     }
     BoxWithConstraints(modifier) {
@@ -129,14 +134,14 @@ fun RollingText(
             if (maxWidth == Constraints.Infinity || drawn <= maxWidth) 1f else (maxWidth.toFloat() / drawn).coerceAtLeast(minScale)
         }
         val fitted = if (scale < 1f) glyphStyle.copy(fontSize = glyphStyle.fontSize * scale) else glyphStyle
-        RollingLine(text, fitted, color, durationMillis, Modifier)
+        RollingLine(text, fitted, color, durationMillis, countsDown, Modifier)
     }
 }
 
 @Composable
-private fun RollingLine(text: String, style: TextStyle, color: Color, durationMillis: Int, modifier: Modifier) {
+private fun RollingLine(text: String, style: TextStyle, color: Color, durationMillis: Int, countsDown: Boolean, modifier: Modifier) {
     val line = remember { RollLine() }
-    line.show(text, durationMillis)
+    line.show(text, durationMillis, countsDown)
     LaunchedEffect(line) { line.run() }
 
     val em = with(LocalDensity.current) { (if (style.fontSize.isSpecified) style.fontSize else 16.sp).toPx() }
@@ -228,7 +233,7 @@ private class RollLine {
     }
 
     /** Rolls each place whose character differs from the one shown. */
-    fun show(text: String, durationMillis: Int) {
+    fun show(text: String, durationMillis: Int, countsDown: Boolean = false) {
         val old = shown
         if (old == text) return
         shown = text
@@ -251,7 +256,7 @@ private class RollLine {
             // rolls in place once; while it rolls, a new value leaves it alone.
             if (have == want && !(rolls && LOOK.rollsWholeSpan && want != null && i <= last && slot.isResting)) continue
             val glyph = want?.let { RollGlyph(it) }
-            if (rolls) slot.change(glyph, LOOK.up(have, want, rose), (i - first) * step) else slot.rest(glyph)
+            if (rolls) slot.change(glyph, countsDown || LOOK.up(have, want, rose), (i - first) * step) else slot.rest(glyph)
         }
         while (slots.isNotEmpty() && slots.last().isEmpty) slots.removeAt(slots.lastIndex)
         relayout.intValue++
