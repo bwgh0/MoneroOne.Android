@@ -78,14 +78,47 @@ import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.ui.theme.SuccessGreen
 import java.text.NumberFormat
 import java.util.Locale
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import one.monero.moneroone.paymentlinks.ENVELOPE_ARRIVE
+import one.monero.moneroone.paymentlinks.PACE
+import one.monero.moneroone.paymentlinks.SWEEP_MS
+import one.monero.moneroone.paymentlinks.TOOL_AWAY_X
+import one.monero.moneroone.paymentlinks.TOOL_AWAY_Y
+import one.monero.moneroone.paymentlinks.TOOL_HOVER
+import one.monero.moneroone.paymentlinks.TOOL_LIFT
+import one.monero.moneroone.paymentlinks.TOOL_SINK
+import one.monero.moneroone.paymentlinks.TOOL_TILT
+import one.monero.moneroone.paymentlinks.WAX_DROP_SCALE
+import one.monero.moneroone.paymentlinks.pacedSettle
+import one.monero.moneroone.paymentlinks.pacedStepBack
+import one.monero.moneroone.paymentlinks.pacedTween
+import one.monero.moneroone.ui.components.Motion
+import one.monero.moneroone.ui.components.rememberReduceMotion
+import kotlin.math.roundToLong
+import one.monero.moneroone.ui.screens.wallet.WhatsNewLinkLoop.Step as LoopStep
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /*
  * The pictures of the What's New cards (iOS WhatsNewScenes.swift). Each one is laid out at its
  * native width at the default text size, then scaled to fit the card, so it looks the same on
- * every phone and at every font scale. Phase A: still pictures only (the iOS link and Transfer
- * loops come later).
+ * every phone and at every font scale. The link plays the send's loop (iOS WhatsNewLinkLoop); the
+ * Transfer loop comes later.
  */
 
 /** A picture's native width in dp (iOS WhatsNewScenePicture.nativeWidth). */
@@ -96,11 +129,11 @@ private fun WhatsNewGlyph.nativeWidth(): Dp = when (this) {
     WhatsNewGlyph.AT, WhatsNewGlyph.KEY -> 300.dp
 }
 
-/** The picture of one feature, centered in the space it gets, scaled to fit it. */
+/** The picture of one feature, centered in the space it gets, scaled to fit it. [animated]: the link plays its loop. */
 @Composable
-internal fun WhatsNewScenePicture(glyph: WhatsNewGlyph, modifier: Modifier = Modifier) {
+internal fun WhatsNewScenePicture(glyph: WhatsNewGlyph, modifier: Modifier = Modifier, animated: Boolean = false) {
     if (glyph == WhatsNewGlyph.LINK) {
-        LinkStill(modifier)
+        LinkScene(animated, modifier)
         return
     }
     Box(modifier, contentAlignment = Alignment.Center) {
@@ -424,44 +457,295 @@ private fun seedSceneWords(locale: Locale): List<String> {
     }
 }
 
-// MARK: Send with a link (the sealed envelope)
+// MARK: Send with a link (the send's packing, in a loop)
 
 /** iOS LinkScene: the envelope 178 wide, with 140 envelope units of room above and below. */
-private const val LINK_W = 178f
-private const val LINK_HEADROOM = 140f
-private const val LINK_H = LINK_W * (EnvelopeGeometry.H + 2 * LINK_HEADROOM) / EnvelopeGeometry.W
-private const val LINK_FILL = 178f / 186f
+internal const val LINK_W = 178f
+internal const val LINK_HEADROOM = 140f
+internal const val LINK_H = LINK_W * (EnvelopeGeometry.H + 2 * LINK_HEADROOM) / EnvelopeGeometry.W
+internal const val LINK_FILL = 178f / 186f
 
-/** The end of the send's packing: the flap shut, the seal pressed, the foil amount shown. */
-private val sealedPose = PackingPose(
-    envelopeY = 0f,
-    envelopeAlpha = 1f,
-    noteLayerY = 0f,
-    noteY = 0f,
-    noteShape = 1f,
-    noteAlpha = 0f,
-    noteTint = 0f,
-    flapDegrees = 0f,
-    sealAlpha = 1f,
-    sealScale = 1f,
-    sealMark = 1f,
-    sealDome = 0f,
-    toolAlpha = 0f,
-    toolX = 0f,
-    toolY = 0f,
-    toolTilt = 0f,
-    toolHeight = 1f,
-    sweep = -1f,
-    foilReveal = 1.35f,
-)
+/** The link picture's scale (dp per dp of its native size) in a box of [boxW] x [boxH] dp. */
+internal fun linkPictureScale(boxW: Float, boxH: Float): Float = min(boxW * LINK_FILL / LINK_W, boxH / LINK_H)
 
+/**
+ * iOS WhatsNewLinkLoop: the send's packing on the card, in a loop. The note alone, the open
+ * envelope comes up around it, the note slides in, the flap folds down, the wax drops, the stamp
+ * presses the seal on and goes, one light sweep shows the foil; a rest, a fade, and everything
+ * goes back unseen. The hero's beats (LinkPacking, its times at pace 1, times its pace), springs
+ * and curves. No check, no haptics, no sounds. Times in seconds.
+ */
+internal object WhatsNewLinkLoop {
+    enum class Step {
+        /** The note alone, risen where the send's check turns into it. It fades back in. */
+        START,
+        /** The open envelope comes up around the note. */
+        ARRIVE,
+        /** The note slides into the envelope. */
+        NOTE_IN,
+        /** The flap folds down; the envelope lifts to the middle. */
+        CLOSE,
+        /** The flap passes 90 degrees: its outside shows (drawn from the flap's angle). */
+        FLAP_OVER,
+        /** A plain drop of wax. */
+        DROP,
+        /** The stamp comes in from the upper right and hovers over the wax. */
+        HOVER,
+        /** It presses in. */
+        PRESS,
+        /** It meets the wax: the wax spreads. */
+        CONTACT,
+        /** It lifts. */
+        LIFT,
+        /** The ring and the mark show in the wax. */
+        MARK,
+        /** It goes up and to the right, and fades. */
+        AWAY,
+        /** One light sweep: the foil shows where it has passed. */
+        SWEEP,
+        /** The picture fades out, so everything goes back unseen. */
+        FADE,
+    }
+
+    /** The frame that stands still when animations are off: the sealed envelope with its foil. */
+    val stillStep = Step.SWEEP
+
+    /** The fade out and back in (crossFade). */
+    const val FADE_S = 0.35
+    /** The rest on the note before the envelope comes up. */
+    const val REST_ON_NOTE_S = 0.6
+    /** The hero's light sweep. Its time is not paced. */
+    const val SWEEP_S = SWEEP_MS / 1000.0
+    /** The rest on the sealed envelope before the fade. */
+    const val REST_ON_RESULT_S = 2.0
+    /** The hero's wax starts at this scale. */
+    const val DROP_START_SCALE = 0.3f
+
+    /** The time from the begin of the step before to the begin of [step]. */
+    fun wait(step: Step): Double {
+        val pace = PACE.toDouble()
+        return when (step) {
+            Step.START -> 0.0
+            Step.ARRIVE -> FADE_S + REST_ON_NOTE_S
+            Step.NOTE_IN -> 0.3 * pace
+            Step.CLOSE -> 0.35 * pace
+            Step.FLAP_OVER -> 0.12 * pace
+            Step.DROP -> 0.23 * pace
+            Step.HOVER -> 0.15 * pace
+            Step.PRESS -> 0.4 * pace
+            Step.CONTACT -> 0.09 * pace
+            Step.LIFT -> 0.16 * pace
+            Step.MARK -> 0.03 * pace
+            Step.AWAY -> 0.07 * pace
+            Step.SWEEP -> 0.1 * pace
+            Step.FADE -> SWEEP_S + REST_ON_RESULT_S
+        }
+    }
+
+    /** When [step] begins, from the start of a cycle. */
+    fun begin(step: Step): Double {
+        var time = 0.0
+        for (earlier in Step.entries) {
+            time += wait(earlier)
+            if (earlier == step) break
+        }
+        return time
+    }
+
+    /** One cycle, rests included: it ends when the fade has finished. */
+    val cycleDuration: Double get() = begin(Step.FADE) + FADE_S
+
+    /** The step shown [elapsed] seconds after the loop began. A time on a step's begin shows that step. */
+    fun step(elapsed: Double): Step {
+        val time = (maxOf(0.0, elapsed) + 1e-6) % cycleDuration
+        return Step.entries.last { begin(it) <= time }
+    }
+
+    /** The picture's opacity once the moves up to [step] have finished. */
+    fun opacity(step: Step): Float = if (step == Step.FADE) 0f else 1f
+
+    /** The hero's pose once the moves up to [step] have finished: each step sets what the hero sets at that beat. */
+    fun pose(step: Step): PackingPose {
+        var pose = PackingPose(
+            envelopeY = EnvelopeGeometry.DROP + ENVELOPE_ARRIVE,
+            envelopeAlpha = 0f,
+            noteLayerY = EnvelopeGeometry.DROP,
+            noteY = -EnvelopeGeometry.CARD_RISE,
+            noteShape = 1f,
+            noteAlpha = 1f,
+            noteTint = 0f,
+            flapDegrees = 180f,
+            sealAlpha = 0f,
+            sealScale = DROP_START_SCALE,
+            sealMark = 0f,
+            sealDome = 1f,
+            toolAlpha = 0f,
+            toolX = TOOL_AWAY_X,
+            toolY = TOOL_AWAY_Y,
+            toolTilt = TOOL_TILT,
+            toolHeight = 1f,
+            sweep = -1f,
+            foilReveal = -0.35f,
+        )
+        for (move in Step.entries) {
+            pose = when (move) {
+                Step.START, Step.FLAP_OVER, Step.FADE -> pose
+                Step.ARRIVE -> pose.copy(envelopeAlpha = 1f, envelopeY = EnvelopeGeometry.DROP)
+                Step.NOTE_IN -> pose.copy(noteY = 0f)
+                Step.CLOSE -> pose.copy(flapDegrees = 0f, envelopeY = 0f, noteLayerY = 0f)
+                Step.DROP -> pose.copy(sealAlpha = 1f, sealScale = WAX_DROP_SCALE)
+                Step.HOVER -> pose.copy(toolAlpha = 1f, toolX = 0f, toolY = TOOL_HOVER, toolTilt = 0f)
+                Step.PRESS -> pose.copy(toolY = TOOL_SINK, toolHeight = 0f)
+                Step.CONTACT -> pose.copy(sealScale = 1f, sealDome = 0f)
+                Step.LIFT -> pose.copy(toolY = TOOL_SINK - TOOL_LIFT, toolHeight = 1f)
+                Step.MARK -> pose.copy(sealMark = 1f)
+                Step.AWAY -> pose.copy(toolAlpha = 0f, toolX = TOOL_AWAY_X, toolY = TOOL_AWAY_Y, toolTilt = TOOL_TILT)
+                Step.SWEEP -> pose.copy(foilReveal = 1.35f, sweep = -1f)
+            }
+            if (move == step) break
+        }
+        return pose
+    }
+}
+
+/** The loop's moving parts, driven at each step's begin as the hero's `play()` drives them. */
+@Stable
+private class LinkLoopMotion {
+    private val start = WhatsNewLinkLoop.pose(WhatsNewLinkLoop.Step.START)
+
+    val opacity = Animatable(1f)
+    private val envelopeY = Animatable(start.envelopeY)
+    private val envelopeAlpha = Animatable(start.envelopeAlpha)
+    private val noteLayerY = Animatable(start.noteLayerY)
+    private val noteY = Animatable(start.noteY)
+    private val flap = Animatable(start.flapDegrees)
+    private val sealAlpha = Animatable(start.sealAlpha)
+    private val sealScale = Animatable(start.sealScale)
+    private val sealMark = Animatable(start.sealMark)
+    private val sealDome = Animatable(start.sealDome)
+    private val toolAlpha = Animatable(start.toolAlpha)
+    private val toolX = Animatable(start.toolX)
+    private val toolY = Animatable(start.toolY)
+    private val toolTilt = Animatable(start.toolTilt)
+    private val toolHeight = Animatable(start.toolHeight)
+    private val sweep = Animatable(start.sweep)
+    private val foilReveal = Animatable(start.foilReveal)
+
+    /** Off screen: the first frame, at once. The loop starts again from there. */
+    suspend fun reset() {
+        toStart()
+        opacity.snapTo(1f)
+    }
+
+    /** The loop, cycle after cycle, until it is cancelled. */
+    suspend fun run() = coroutineScope {
+        val cycleMs = (WhatsNewLinkLoop.cycleDuration * 1000).roundToLong()
+        while (isActive) {
+            val cycle = launch { playCycle() }
+            delay(cycleMs)
+            cycle.cancelAndJoin()
+        }
+    }
+
+    private suspend fun toStart() {
+        envelopeY.snapTo(start.envelopeY); envelopeAlpha.snapTo(start.envelopeAlpha)
+        noteLayerY.snapTo(start.noteLayerY); noteY.snapTo(start.noteY); flap.snapTo(start.flapDegrees)
+        sealAlpha.snapTo(start.sealAlpha); sealScale.snapTo(start.sealScale)
+        sealMark.snapTo(start.sealMark); sealDome.snapTo(start.sealDome)
+        toolAlpha.snapTo(start.toolAlpha); toolX.snapTo(start.toolX); toolY.snapTo(start.toolY)
+        toolTilt.snapTo(start.toolTilt); toolHeight.snapTo(start.toolHeight)
+        sweep.snapTo(start.sweep); foilReveal.snapTo(start.foilReveal)
+    }
+
+    private suspend fun playCycle() = coroutineScope {
+        // Back to the start while the picture is clear (after the fade), or at once the first time.
+        if (opacity.value < 1f) opacity.snapTo(0f)
+        toStart()
+        fun at(step: WhatsNewLinkLoop.Step, block: suspend () -> Unit) = launch {
+            val ms = (WhatsNewLinkLoop.begin(step) * 1000).roundToLong()
+            if (ms > 0) delay(ms)
+            block()
+        }
+        val fade = tween<Float>((WhatsNewLinkLoop.FADE_S * 1000).roundToInt(), easing = Motion.EaseInOut)
+        at(LoopStep.START) { opacity.animateTo(1f, fade) }
+        at(LoopStep.ARRIVE) { envelopeAlpha.animateTo(1f, pacedTween(300, Motion.EaseOut)) }
+        at(LoopStep.ARRIVE) { envelopeY.animateTo(EnvelopeGeometry.DROP, pacedSettle()) }
+        at(LoopStep.NOTE_IN) { noteY.animateTo(0f, pacedSettle()) }
+        at(LoopStep.CLOSE) { flap.animateTo(0f, pacedStepBack()) }
+        at(LoopStep.CLOSE) { envelopeY.animateTo(0f, pacedStepBack()) }
+        at(LoopStep.CLOSE) { noteLayerY.animateTo(0f, pacedStepBack()) }
+        at(LoopStep.DROP) { sealAlpha.animateTo(1f, pacedTween(90, LinearEasing)) }
+        at(LoopStep.DROP) { sealScale.animateTo(WAX_DROP_SCALE, pacedSettle()) }
+        at(LoopStep.HOVER) { toolAlpha.animateTo(1f, pacedTween(150, LinearEasing)) }
+        at(LoopStep.HOVER) { toolX.animateTo(0f, pacedStepBack()) }
+        at(LoopStep.HOVER) { toolY.animateTo(TOOL_HOVER, pacedStepBack()) }
+        at(LoopStep.HOVER) { toolTilt.animateTo(0f, pacedStepBack()) }
+        at(LoopStep.PRESS) { toolY.animateTo(TOOL_SINK, pacedTween(100, Motion.EaseIn)) }
+        at(LoopStep.PRESS) { toolHeight.animateTo(0f, pacedTween(100, Motion.EaseIn)) }
+        at(LoopStep.CONTACT) { sealScale.animateTo(1f, pacedTween(160, Motion.EaseOut)) }
+        at(LoopStep.CONTACT) { sealDome.animateTo(0f, pacedTween(160, Motion.EaseOut)) }
+        at(LoopStep.LIFT) { toolY.animateTo(TOOL_SINK - TOOL_LIFT, pacedTween(100, Motion.EaseIn)) }
+        at(LoopStep.LIFT) { toolHeight.animateTo(1f, pacedTween(100, Motion.EaseIn)) }
+        at(LoopStep.MARK) { sealMark.animateTo(1f, pacedTween(120, Motion.EaseOut)) }
+        at(LoopStep.AWAY) { toolX.animateTo(TOOL_AWAY_X, pacedStepBack()) }
+        at(LoopStep.AWAY) { toolY.animateTo(TOOL_AWAY_Y, pacedStepBack()) }
+        at(LoopStep.AWAY) { toolTilt.animateTo(TOOL_TILT, pacedStepBack()) }
+        at(LoopStep.AWAY) { toolAlpha.animateTo(0f, pacedTween(250, Motion.EaseIn)) }
+        at(LoopStep.SWEEP) { foilReveal.animateTo(1.35f, tween(SWEEP_MS, easing = Motion.EaseInOut)) }
+        at(LoopStep.SWEEP) {
+            sweep.snapTo(-0.35f)
+            sweep.animateTo(1.35f, tween(SWEEP_MS, easing = Motion.EaseInOut))
+            sweep.snapTo(-1f)
+        }
+        at(LoopStep.FADE) { opacity.animateTo(0f, fade) }
+    }
+
+    fun pose() = start.copy(
+        envelopeY = envelopeY.value,
+        envelopeAlpha = envelopeAlpha.value.coerceIn(0f, 1f),
+        noteLayerY = noteLayerY.value,
+        noteY = noteY.value,
+        flapDegrees = flap.value,
+        sealAlpha = sealAlpha.value.coerceIn(0f, 1f),
+        sealScale = sealScale.value,
+        sealMark = sealMark.value.coerceIn(0f, 1f),
+        sealDome = sealDome.value.coerceIn(0f, 1f),
+        toolAlpha = toolAlpha.value.coerceIn(0f, 1f),
+        toolX = toolX.value,
+        toolY = toolY.value,
+        toolTilt = toolTilt.value,
+        toolHeight = toolHeight.value,
+        sweep = sweep.value,
+        foilReveal = foilReveal.value,
+    )
+}
+
+/**
+ * iOS LinkScene: the envelope of the Link ready step with "0.5000 XMR" in foil, 178 wide, with
+ * room above and below for the note, the open envelope and the stamp. When [animated], it plays
+ * the send's loop while it is on screen and the app is in front; with animations off (or the
+ * blurred copy behind) it shows the sealed envelope, still. The picture draws past its own bounds
+ * (the card's edge cuts only the stamp and the rising envelope).
+ */
 @Composable
-private fun LinkStill(modifier: Modifier) {
+private fun LinkScene(animated: Boolean, modifier: Modifier) {
     val context = LocalContext.current
-    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+    val playing = animated && !rememberReduceMotion()
+    val loop = remember(playing) { if (playing) LinkLoopMotion() else null }
+    var onScreen by remember { mutableStateOf(false) }
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val visibility = if (loop != null) {
+        Modifier.onGloballyPositioned {
+            val bounds = it.boundsInWindow()
+            onScreen = bounds.width > 0f && bounds.height > 0f
+        }
+    } else {
+        Modifier
+    }
+    BoxWithConstraints(modifier.then(visibility), contentAlignment = Alignment.Center) {
         val boxW = maxWidth.value
         val boxH = if (constraints.hasBoundedHeight) maxHeight.value else Float.POSITIVE_INFINITY
-        val k = min(boxW * LINK_FILL / LINK_W, boxH / LINK_H)
+        val k = linkPictureScale(boxW, boxH)
         var widthPx by remember { mutableIntStateOf(0) }
         // Envelope units to pixels: the art renders at this scale, as the send hero's does.
         val unit = widthPx / EnvelopeGeometry.W
@@ -471,6 +755,20 @@ private fun LinkStill(modifier: Modifier) {
         val foil by produceState<Bitmap?>(null, widthPx) {
             if (widthPx > 0) value = withContext(Dispatchers.Default) { EnvelopeArt.renderFoil(context, unit, "0.5000", "XMR") }
         }
+        val label = tr("Payment Link").uppercase(Locale.getDefault())
+        val note by produceState<Bitmap?>(null, widthPx, playing, label) {
+            if (widthPx > 0 && playing) {
+                value = withContext(Dispatchers.Default) { EnvelopeArt.renderCard(context, unit, "0.5000", "XMR", label) }
+            }
+        }
+        if (loop != null) {
+            val running = onScreen && lifecycleState.isAtLeast(Lifecycle.State.STARTED) &&
+                art != null && foil != null && note != null
+            LaunchedEffect(loop, running) {
+                if (running) loop.run() else loop.reset()
+            }
+        }
+        val still = remember { WhatsNewLinkLoop.pose(WhatsNewLinkLoop.stillStep) }
         val tint = SuccessGreen.toArgb()
         Canvas(
             Modifier
@@ -479,16 +777,28 @@ private fun LinkStill(modifier: Modifier) {
                 .clearAndSetSemantics {}
         ) {
             val drawn = art ?: return@Canvas
+            val opacity = loop?.opacity?.value ?: 1f
+            if (opacity <= 0f) return@Canvas
+            val pose = loop?.pose() ?: still
             val e = size.width / EnvelopeGeometry.W
             // Frame units to pixels: the envelope sits in the hero frame at ENV_SCALE.
             val frame = e / EnvelopeGeometry.ENV_SCALE
             drawIntoCanvas { canvas ->
                 val native = canvas.nativeCanvas
-                native.save()
+                // One layer for the fade, wider than the picture's bounds: the note, the open flap and
+                // the stamp draw past them.
+                val count = if (opacity < 1f) {
+                    native.saveLayerAlpha(
+                        -size.width, -size.height, 2 * size.width, 2 * size.height,
+                        (opacity * 255).roundToInt()
+                    )
+                } else {
+                    native.save()
+                }
                 native.translate(-EnvelopeGeometry.ENV_LEFT * frame, LINK_HEADROOM * e - EnvelopeGeometry.ENV_TOP * frame)
                 native.scale(frame, frame)
-                drawn.drawPacking(native, sealedPose, null, foil, tint)
-                native.restore()
+                drawn.drawPacking(native, pose, if (loop != null) note else null, foil, tint)
+                native.restoreToCount(count)
             }
         }
     }

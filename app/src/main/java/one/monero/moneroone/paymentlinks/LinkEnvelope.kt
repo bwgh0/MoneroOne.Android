@@ -86,7 +86,7 @@ private const val FLAP_AT_MS = 140L
 private const val RISE_AT_MS = 400L
 private const val LAND_AT_MS = 680L
 private const val SWEEP_AT_MS = 880L
-private const val SWEEP_MS = 1200
+internal const val SWEEP_MS = 1200
 /** Reduce Motion: one cross-fade, half out and half in, with the success haptic in its middle. */
 private const val HALF_FADE_MS = Motion.CROSS_FADE_MS / 2
 
@@ -364,15 +364,15 @@ internal fun LinkEnvelopeHero(
  * Every beat and motion of the packing takes this many times its time (the PACK_ times are at pace
  * 1), all but the light sweep (iOS PaymentLinkSendHero.pace).
  */
-private const val PACE = 1.3f
+internal const val PACE = 1.3f
 private fun paced(ms: Long): Long = (ms * PACE).roundToLong()
-private fun pacedTween(ms: Int, easing: Easing) = tween<Float>((ms * PACE).roundToInt(), easing = easing)
+internal fun pacedTween(ms: Int, easing: Easing) = tween<Float>((ms * PACE).roundToInt(), easing = easing)
 
 /** tokens.json motion.springs settle, SwiftUI .spring(response: 0.4, dampingFraction: 0.8), at [PACE]. */
-private fun <T> pacedSettle() = spring<T>(dampingRatio = 0.8f, stiffness = 246.7f / (PACE * PACE))
+internal fun <T> pacedSettle() = spring<T>(dampingRatio = 0.8f, stiffness = 246.7f / (PACE * PACE))
 
 /** tokens.json motion.springs stepBack, SwiftUI .spring(response: 0.5, dampingFraction: 0.8), at [PACE]. */
-private fun <T> pacedStepBack() = spring<T>(dampingRatio = 0.8f, stiffness = 157.9f / (PACE * PACE))
+internal fun <T> pacedStepBack() = spring<T>(dampingRatio = 0.8f, stiffness = 157.9f / (PACE * PACE))
 
 // The send side's moment (send-stamp spec, 2026-10-23), in ms from the result.
 /** The check springs in with today's ring, the success haptic and the chime at 0; confetti at 200. */
@@ -406,21 +406,21 @@ private const val PACK_SWEEP_AT_MS = 3100L
 private const val PACK_DONE_AFTER_MS = 100L
 
 /** The wax as a plain drop, before the stamp spreads it. */
-private const val WAX_DROP_SCALE = 0.86f
+internal const val WAX_DROP_SCALE = 0.86f
 // The stamp, from its contact with the seal's middle (envelope units): where it comes in and goes,
 // its tilt there, its hover, how far it sinks into the wax and how far it lifts.
-private const val TOOL_AWAY_X = 60f
-private const val TOOL_AWAY_Y = -260f
-private const val TOOL_TILT = 10f
-private const val TOOL_HOVER = -24f
-private const val TOOL_SINK = 5f
-private const val TOOL_LIFT = 30f
+internal const val TOOL_AWAY_X = 60f
+internal const val TOOL_AWAY_Y = -260f
+internal const val TOOL_TILT = 10f
+internal const val TOOL_HOVER = -24f
+internal const val TOOL_SINK = 5f
+internal const val TOOL_LIFT = 30f
 
 // Where the note and the envelope start, in the claim mockup's units (send.js G).
 /** The note as the check's disc: 406.8 envelope units under its risen place (CARD_RISE above the pocket). */
 private const val NOTE_FROM_Y = 406.8f - EnvelopeGeometry.CARD_RISE
 /** The open envelope comes up from 148 object units below its open place. */
-private const val ENVELOPE_ARRIVE = 148f
+internal const val ENVELOPE_ARRIVE = 148f
 
 /** How far the check rises as it turns into the note, in dp of the 338 dp hero. */
 internal const val CHECK_RISE_DP = 110f

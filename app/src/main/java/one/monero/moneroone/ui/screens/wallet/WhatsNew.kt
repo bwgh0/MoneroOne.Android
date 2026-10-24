@@ -375,7 +375,8 @@ private fun FeatureCard(glyph: WhatsNewGlyph) {
             glyph = glyph,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(16.dp),
+            animated = true
         )
     }
 }
