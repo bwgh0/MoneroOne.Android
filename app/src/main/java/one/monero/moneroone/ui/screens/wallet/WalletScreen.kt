@@ -996,7 +996,7 @@ internal fun BalanceCard(
                     modifier = Modifier
                         .graphicsLayer { alpha = if (isPast) 0f else 1f }
                         .clearAndSetSemantics {
-                            if (!isPast) contentDescription = tr("Available balance: %s. Some funds locked until recent transactions confirm.", amounts)
+                            if (!isPast) contentDescription = tr("Available balance: %s. Locked transactions need 10 confirmations.", amounts)
                         }
                 ) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1029,7 +1029,7 @@ internal fun BalanceCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = tr("Locked until recent transactions confirm"),
+                            text = tr("Locked transactions need 10 confirmations"),
                             style = MaterialTheme.typography.labelSmall,
                             color = MoneroOrange
                         )

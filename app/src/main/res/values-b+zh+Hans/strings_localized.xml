@@ -160,6 +160,7 @@
     <string name="l10n_auto_select_6cc55210" formatted="false">"自动选择"</string>
     <string name="l10n_auto_lock_034e3946" formatted="false">"自动锁定"</string>
     <string name="l10n_available_after_10_confirmations_22005707" formatted="false">"10 次确认后可用"</string>
+    <string name="l10n_available_balance_s_locked_transactions_need_10_confirm_21a22d00" formatted="false">"可用余额：%s。锁定中的交易需要 10 次确认。"</string>
     <string name="l10n_available_balance_s_some_funds_locked_until_recent_tran_33a13557" formatted="false">"可用余额：%1$s。部分资金已锁定，待最近的交易确认后解锁。"</string>
     <string name="l10n_available_72074a8a" formatted="false">"可用："</string>
     <string name="l10n_available_s_xmr_fe6c540f" formatted="false">"可用：%1$s XMR"</string>
@@ -608,6 +609,7 @@
     <string name="l10n_lock_after_3c95f2e7" formatted="false">"多久后锁定"</string>
     <string name="l10n_locked_a424e33d" formatted="false">"锁定中"</string>
     <string name="l10n_locked_s_10_confirmations_1ebca220" formatted="false">"已锁定（%s/10 次确认）"</string>
+    <string name="l10n_locked_transactions_need_10_confirmations_15e55545" formatted="false">"锁定中的交易需要 10 次确认"</string>
     <string name="l10n_locked_until_recent_transactions_confirm_9ea62908" formatted="false">"锁定中，待最近的交易确认后解锁"</string>
     <string name="l10n_long_term_savings_wallet_07532baa" formatted="false">"长期储蓄钱包"</string>
     <string name="l10n_look_up_the_name_again_43d80731" formatted="false">"重新查询此名称"</string>
