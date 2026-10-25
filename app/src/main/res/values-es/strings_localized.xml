@@ -160,6 +160,7 @@
     <string name="l10n_auto_select_6cc55210" formatted="false">"Selección automática"</string>
     <string name="l10n_auto_lock_034e3946" formatted="false">"Bloqueo automático"</string>
     <string name="l10n_available_after_10_confirmations_22005707" formatted="false">"Disponible tras 10 confirmaciones"</string>
+    <string name="l10n_available_balance_s_locked_transactions_need_10_confirm_21a22d00" formatted="false">"Saldo disponible: %s. Las transacciones bloqueadas necesitan 10 confirmaciones."</string>
     <string name="l10n_available_balance_s_some_funds_locked_until_recent_tran_33a13557" formatted="false">"Saldo disponible: %1$s. Parte de los fondos está bloqueada hasta que se confirmen las transacciones recientes."</string>
     <string name="l10n_available_72074a8a" formatted="false">"Disponible:"</string>
     <string name="l10n_available_s_xmr_fe6c540f" formatted="false">"Disponible: %1$s XMR"</string>
@@ -608,6 +609,7 @@
     <string name="l10n_lock_after_3c95f2e7" formatted="false">"Bloquear después de"</string>
     <string name="l10n_locked_a424e33d" formatted="false">"Bloqueada"</string>
     <string name="l10n_locked_s_10_confirmations_1ebca220" formatted="false">"Bloqueado (%s/10 confirmaciones)"</string>
+    <string name="l10n_locked_transactions_need_10_confirmations_15e55545" formatted="false">"Las transacciones bloqueadas necesitan 10 confirmaciones"</string>
     <string name="l10n_locked_until_recent_transactions_confirm_9ea62908" formatted="false">"Bloqueado hasta que se confirmen las transacciones recientes"</string>
     <string name="l10n_long_term_savings_wallet_07532baa" formatted="false">"Cartera de ahorro a largo plazo"</string>
     <string name="l10n_look_up_the_name_again_43d80731" formatted="false">"Buscar el nombre de nuevo"</string>

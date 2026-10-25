@@ -160,6 +160,7 @@
     <string name="l10n_auto_select_6cc55210" formatted="false">"Otomatik Seç"</string>
     <string name="l10n_auto_lock_034e3946" formatted="false">"Otomatik Kilit"</string>
     <string name="l10n_available_after_10_confirmations_22005707" formatted="false">"10 onaydan sonra kullanılabilir"</string>
+    <string name="l10n_available_balance_s_locked_transactions_need_10_confirm_21a22d00" formatted="false">"Kullanılabilir bakiye: %s. Kilitli işlemler 10 onay gerektirir."</string>
     <string name="l10n_available_balance_s_some_funds_locked_until_recent_tran_33a13557" formatted="false">"Kullanılabilir bakiye: %1$s. Son işlemler onaylanana kadar bazı fonlar kilitli."</string>
     <string name="l10n_available_72074a8a" formatted="false">"Kullanılabilir:"</string>
     <string name="l10n_available_s_xmr_fe6c540f" formatted="false">"Kullanılabilir: %1$s XMR"</string>
@@ -608,6 +609,7 @@
     <string name="l10n_lock_after_3c95f2e7" formatted="false">"Kilitleme Süresi"</string>
     <string name="l10n_locked_a424e33d" formatted="false">"Kilitli"</string>
     <string name="l10n_locked_s_10_confirmations_1ebca220" formatted="false">"Kilitli (%s/10 onay)"</string>
+    <string name="l10n_locked_transactions_need_10_confirmations_15e55545" formatted="false">"Kilitli işlemler 10 onay gerektirir"</string>
     <string name="l10n_locked_until_recent_transactions_confirm_9ea62908" formatted="false">"Son işlemler onaylanana kadar kilitli"</string>
     <string name="l10n_long_term_savings_wallet_07532baa" formatted="false">"Uzun Vadeli Birikim Cüzdanı"</string>
     <string name="l10n_look_up_the_name_again_43d80731" formatted="false">"Adı yeniden ara"</string>
