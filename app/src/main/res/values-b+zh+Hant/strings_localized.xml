@@ -1331,7 +1331,7 @@
     <string name="l10n_widget_7dd7a28c" formatted="false">"小工具"</string>
     <string name="l10n_will_scan_from_the_beginning_29785ed9" formatted="false">"將從頭開始掃描"</string>
     <string name="l10n_will_scan_from_the_beginning_slower_ce4e8589" formatted="false">"將從頭開始掃描（較慢）"</string>
-    <string name="l10n_with_tor_on_all_app_traffic_goes_through_your_tor_proxy_f7b2ba86" formatted="false">"開啟 Tor 後，App 的所有流量都會經過你的 Tor 代理伺服器。"</string>
+    <string name="l10n_with_tor_on_wallet_sync_prices_and_name_lookups_go_thro_c465a65c" formatted="false">"開啟 Tor 後，錢包同步、價格和名稱查詢都會經過你的 Tor 代理伺服器。"</string>
     <string name="l10n_word_s_98e9bd6f" formatted="false">"第 %s 個單字"</string>
     <string name="l10n_word_s_s_119250bc" formatted="false">"第 %1$s 個單字：%2$s"</string>
     <string name="l10n_working_b93900bd" formatted="false">"正在載入⋯"</string>

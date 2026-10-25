@@ -1331,7 +1331,7 @@
     <string name="l10n_widget_7dd7a28c" formatted="false">"위젯"</string>
     <string name="l10n_will_scan_from_the_beginning_29785ed9" formatted="false">"처음부터 스캔합니다"</string>
     <string name="l10n_will_scan_from_the_beginning_slower_ce4e8589" formatted="false">"처음부터 스캔합니다(더 느림)"</string>
-    <string name="l10n_with_tor_on_all_app_traffic_goes_through_your_tor_proxy_f7b2ba86" formatted="false">"Tor를 켜면 앱의 모든 트래픽이 Tor 프록시를 거칩니다."</string>
+    <string name="l10n_with_tor_on_wallet_sync_prices_and_name_lookups_go_thro_c465a65c" formatted="false">"Tor를 켜면 지갑 동기화, 가격, 이름 조회가 Tor 프록시를 거칩니다."</string>
     <string name="l10n_word_s_98e9bd6f" formatted="false">"단어 %s"</string>
     <string name="l10n_word_s_s_119250bc" formatted="false">"단어 %1$s: %2$s"</string>
     <string name="l10n_working_b93900bd" formatted="false">"불러오는 중..."</string>

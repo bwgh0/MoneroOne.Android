@@ -76,7 +76,7 @@ object WhatsNewNotes {
                 "Rounded QR codes.",
                 "New wallets are created faster.",
                 "Fixes for custom node logins.",
-                "With Tor on, all app traffic goes through your Tor proxy.",
+                "With Tor on, wallet sync, prices and name lookups go through your Tor proxy.",
                 "Fixed a crash when you create a wallet or set a wallet birthday with some phone languages.",
                 "General stability improvements and bug fixes."
             )

@@ -1334,7 +1334,7 @@ internal val localizedStrings: Map<String, Int> = mapOf(
     "Widget" to R.string.l10n_widget_7dd7a28c,
     "Will scan from the beginning" to R.string.l10n_will_scan_from_the_beginning_29785ed9,
     "Will scan from the beginning (slower)" to R.string.l10n_will_scan_from_the_beginning_slower_ce4e8589,
-    "With Tor on, all app traffic goes through your Tor proxy." to R.string.l10n_with_tor_on_all_app_traffic_goes_through_your_tor_proxy_f7b2ba86,
+    "With Tor on, wallet sync, prices and name lookups go through your Tor proxy." to R.string.l10n_with_tor_on_wallet_sync_prices_and_name_lookups_go_thro_c465a65c,
     "Word %s" to R.string.l10n_word_s_98e9bd6f,
     "Word %s: %s" to R.string.l10n_word_s_s_119250bc,
     "Working..." to R.string.l10n_working_b93900bd,
