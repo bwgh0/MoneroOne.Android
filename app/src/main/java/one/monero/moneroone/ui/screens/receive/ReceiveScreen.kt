@@ -98,6 +98,7 @@ import one.monero.moneroone.ui.components.QrFocusItem
 import one.monero.moneroone.ui.components.QrRecedeEdge
 import one.monero.moneroone.ui.components.qrFocusRecede
 import one.monero.moneroone.ui.components.rememberSaveQrToPhotos
+import one.monero.moneroone.ui.screens.send.SendAmountStart
 import one.monero.moneroone.ui.components.rememberShareQr
 import one.monero.moneroone.ui.theme.WarningYellow
 
@@ -147,11 +148,16 @@ fun ReceiveScreen(
     // Saved with the screen's back stack entry, so the amount stays through a
     // trip to the address picker, as on iOS.
     var requestAmount by rememberSaveable { mutableStateOf("") }
-    var isFiatMode by rememberSaveable { mutableStateOf(false) }
-    var fiatAmount by rememberSaveable { mutableStateOf("") }
     val currentPrice by walletViewModel.currentPrice.collectAsState()
     val selectedCurrency by walletViewModel.selectedCurrency.collectAsState()
+    val fiatMode by walletViewModel.fiatMode.collectAsState()
     val xmrPrice = currentPrice?.price
+    // Fiat when Fiat Mode is on and a usable price exists, as on Send. Set once when the screen
+    // appears, so a swap to XMR stays, and a price that comes later does not change the unit.
+    var isFiatMode by rememberSaveable {
+        mutableStateOf(SendAmountStart.startsInFiat(fiatMode, xmrPrice, requestAmount))
+    }
+    var fiatAmount by rememberSaveable { mutableStateOf("") }
     val currencySymbol = selectedCurrency.symbol
 
     // A monero: URI rather than the bare address, so other wallets and the
