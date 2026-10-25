@@ -1,0 +1,9 @@
+- Transfer XMR between your wallets: tap the wallet name, then Transfer.
+- Contacts: save the people you pay.
+- Send waits for sync and shows its progress.
+- Receive starts in your currency when Fiat Mode is on.
+- Edit Wallet: rename or delete any wallet, and reorder wallets with the handle.
+- With Tor on, all app traffic goes through your Tor proxy.
+- New installs connect to a TLS node.
+- Fixed a crash with some phone languages.
+- General stability improvements and bug fixes.
