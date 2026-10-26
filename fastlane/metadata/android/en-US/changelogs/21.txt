@@ -1,0 +1,11 @@
+- Send XMR as a link. Whoever opens it claims the funds in Monero One.
+- Transfer between your wallets.
+- Contacts. Save the people you pay.
+- Send to a name.
+- New seed phrase entry.
+- Review shows the exact network fee you pay.
+- Send waits for your wallet to sync and shows its progress.
+- With Tor on, wallet sync, prices and name lookups go through your Tor proxy.
+- Rounded QR codes.
+- Fixes for custom node logins.
+- General stability improvements and bug fixes.
