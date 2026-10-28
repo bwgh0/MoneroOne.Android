@@ -2,6 +2,7 @@ package one.monero.moneroone.core.username
 
 import one.monero.moneroone.core.locale.tr
 import android.content.Context
+import io.horizontalsystems.monerokit.SyncState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -9,6 +10,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import one.monero.moneroone.core.wallet.SecurePrefs
+import one.monero.moneroone.core.wallet.SyncRecovery
 import java.util.Calendar
 import java.util.UUID
 
@@ -63,10 +65,15 @@ class UsernameStore(private val persistence: UsernamePersistence) {
         val pending = mutable.value.pending ?: return
         if (walletKey == null || pending.walletKey == walletKey) save(mutable.value.copy(pending = null))
     }
-    @Synchronized fun accept(binding: UsernameBinding) {
+    /**
+     * [usesFreeClaim] is false for a name the wallet already held (a restore): no claim ran on this phone,
+     * so its free claim date stays.
+     */
+    @Synchronized fun accept(binding: UsernameBinding, usesFreeClaim: Boolean = true) {
         val old = mutable.value.binding(binding.walletKey, binding.network)
         if (old != null && old.genesisHash != binding.genesisHash) throw UsernameException("verification")
-        val next = Calendar.getInstance().apply { timeInMillis = binding.claimedAt; add(Calendar.MONTH, 12) }.timeInMillis
+        val next = if (!usesFreeClaim) mutable.value.nextFreeClaim
+            else Calendar.getInstance().apply { timeInMillis = binding.claimedAt; add(Calendar.MONTH, 12) }.timeInMillis
         save(mutable.value.copy(
             bindings = mutable.value.bindings.filterNot { it.walletKey == binding.walletKey && it.network == binding.network } + binding,
             pending = null, nextFreeClaim = next
@@ -96,6 +103,8 @@ class UsernameStore(private val persistence: UsernamePersistence) {
 class UsernameException(val code: String) : Exception(when (code) {
     "storage" -> tr("Your username could not be saved securely. Unlock the app and try again.")
     "wallet_changed" -> tr("The wallet changed. Open this flow from the wallet you want to use.")
+    "wallet.opening" -> tr("Your wallet is still opening. Try again in a moment.")
+    "wallet.offline" -> tr("Could not reach the node. Check your connection and try again.")
     "name.unavailable" -> tr("This username is unavailable.")
     "device.slot_used" -> tr("A free username isn't available on this phone.")
     "device.invalid", "device.unsupported" -> tr("This phone can't claim a username.")
@@ -107,4 +116,13 @@ class UsernameException(val code: String) : Exception(when (code) {
     "nonce.invalid" -> tr("The request expired. Please claim again.")
     "handle.blocked", "handle.reserved" -> tr("This username is reserved to protect users from scams.")
     else -> tr("The username service couldn't complete the request. Please try again.")
-})
+}) {
+    companion object {
+        /**
+         * A claim step needs the wallet file open, and it is not, though the wallet is the same: it is
+         * still opening or connecting, or its node failed and the sync stopped ([SyncRecovery.reopens]).
+         */
+        fun walletNotReady(syncState: SyncState) =
+            UsernameException(if (SyncRecovery.reopens(syncState)) "wallet.offline" else "wallet.opening")
+    }
+}

@@ -33,7 +33,7 @@ class UsernameClaimFlowTest {
             sign = { message, address -> signed += message to address; "signature" },
             // Made from the wallet at each claim, as the app does.
             claimKey = { claimKeys++; UsernameDeviceProof.claimKey(testViewKey) },
-            isCurrentWallet = { current })
+            ownsSubaddress = { false }, isCurrentWallet = { current })
     }
 
     private fun tokens(token: String = "token") = IntegrityTokenSource { requestHashes += it; token }

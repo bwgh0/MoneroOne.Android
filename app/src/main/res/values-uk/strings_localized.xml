@@ -1339,6 +1339,7 @@
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Ваше ім’я користувача, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"У гаманця ще немає адреси для отримання. Дочекайтеся завантаження й повторіть спробу."</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"Гаманець зайнятий. Повторіть спробу за мить."</string>
+    <string name="l10n_your_wallet_is_still_opening_try_again_in_a_moment_71ea3bc9" formatted="false">"Гаманець ще відкривається. Повторіть спробу за мить."</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"Гаманець синхронізується в недовіреному місці. Якщо це навмисно, додайте це місце до довірених у Параметрах."</string>
     <string name="l10n_about_s_549742af" formatted="false">"приблизно %1$s"</string>
     <string name="l10n_about_s_xmr_13b5b2b2" formatted="false">"приблизно %1$s XMR"</string>

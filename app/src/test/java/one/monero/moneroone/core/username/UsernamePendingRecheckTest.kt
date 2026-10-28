@@ -18,7 +18,7 @@ class UsernamePendingRecheckTest {
     private fun claim(handle: String, wallet: String = "wallet-a"): UsernameBinding = runBlocking {
         testRegistry(api).claim(handle, wallet, "mainnet", store,
             makeSubaddress = { "subaddress-${++subaddresses}" }, sign = { _, _ -> "signature" }, claimKey = { testClaimKey },
-            isCurrentWallet = { true })
+            ownsSubaddress = { false }, isCurrentWallet = { true })
     }
 
     private fun <T : Any> assertNotNull(value: T?): T { org.junit.Assert.assertNotNull(value); return value!! }
@@ -102,7 +102,7 @@ class UsernamePendingRecheckTest {
         val binding = runBlocking {
             testRegistry(api, repinned).claim("joe", "wallet-a", "mainnet", store,
                 makeSubaddress = { "subaddress-new" }, sign = { _, _ -> "signature" }, claimKey = { testClaimKey },
-                isCurrentWallet = { true })
+                ownsSubaddress = { false }, isCurrentWallet = { true })
         }
         assertEquals("subaddress-new", binding.subaddress)
     }

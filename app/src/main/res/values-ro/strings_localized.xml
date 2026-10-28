@@ -1339,6 +1339,7 @@
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Numele tău de utilizator, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Portofelul tău nu are încă o adresă de primire. Așteaptă să se încarce, apoi încearcă din nou."</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"Portofelul tău este ocupat. Încearcă din nou peste puțin timp."</string>
+    <string name="l10n_your_wallet_is_still_opening_try_again_in_a_moment_71ea3bc9" formatted="false">"Portofelul tău încă se deschide. Încearcă din nou peste puțin timp."</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"Portofelul se sincronizează dintr-o locație nesigură. Dacă este intenționat, adaugă această locație ca locație de încredere în Configurări."</string>
     <string name="l10n_about_s_549742af" formatted="false">"circa %1$s"</string>
     <string name="l10n_about_s_xmr_13b5b2b2" formatted="false">"circa %1$s XMR"</string>

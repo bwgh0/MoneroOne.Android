@@ -40,6 +40,7 @@ class UsernameViewModel(application: Application) : AndroidViewModel(application
                     makeSubaddress = { wallets.createUsernameSubaddress(session) },
                     sign = { message, address -> wallets.signUsername(message, address, session) },
                     claimKey = { wallets.usernameClaimKey(session) },
+                    ownsSubaddress = { address -> wallets.usernameOwnsSubaddress(address, session) },
                     isCurrentWallet = { !wallets.isLocked.value && wallets.walletSessionId.value == session &&
                         wallets.activeWallet.value?.cachedPrimaryAddress == key })
                 if (generation == attempt) mutable.value = mutable.value.copy(stage = UsernameStage.REVEALED, binding = binding)

@@ -17,6 +17,10 @@ internal class MemoryUsernames : UsernamePersistence {
 /** The registry, in memory. A record it admits is "admitted:<record hash>". */
 internal class FakeRegistryApi : UsernameRegistryApi {
     val handles = mutableMapOf<String, List<String>>()
+    /** Full lookup replies (a restore reads the head, owner and tombstone). They win over [handles]. */
+    val found = mutableMapOf<String, HeldName>()
+    /** Each request, in order: "info", "lookup <handle>", "nonce" or "claim". */
+    val calls = mutableListOf<String>()
     var unreachable = false
     /** The registry admits the claim, but its reply never arrives. */
     var loseReply = false
@@ -32,15 +36,17 @@ internal class FakeRegistryApi : UsernameRegistryApi {
     private var nonces = 0
 
     private fun reach() { if (unreachable) throw IOException("test registry unreachable") }
-    override suspend fun checkedRules(network: String): String { reach(); return "rules" }
-    override suspend fun records(handle: String): List<String>? {
+    override suspend fun checkedRules(network: String): String { reach(); calls += "info"; return "rules" }
+    override suspend fun lookup(handle: String): HeldName? {
         reach()
-        return handles[handle].also { afterRecords?.invoke() }
+        calls += "lookup $handle"
+        return (found[handle] ?: handles[handle]?.let { rows -> HeldName(rows.map { HeldRecord(it) }) }).also { afterRecords?.invoke() }
     }
     /** 32 bytes in lowercase hex, as the registry sends them. */
-    override suspend fun nonce(handle: String, subaddress: String): String { reach(); return "%064x".format(++nonces) }
+    override suspend fun nonce(handle: String, subaddress: String): String { reach(); calls += "nonce"; return "%064x".format(++nonces) }
     override suspend fun claim(pending: PendingUsernameClaim, device: DeviceProof): Pair<String, String> {
         reach()
+        calls += "claim"
         claims++
         savedAtPost = store?.state?.value?.pending
         this.device = device
@@ -53,6 +59,14 @@ internal class FakeRegistryApi : UsernameRegistryApi {
     }
 }
 
+/**
+ * A genesis record as the fake core reads it: what the real one's verify_claim checks (the record hash,
+ * handle, owner subaddress, network, registrar key and rules hash), in one string.
+ */
+internal fun genesisRecord(handle: String, owner: String, hash: String, network: String = "mainnet",
+                           registrarKey: String = testConfiguration.registrarKey, rulesHash: String = testConfiguration.rulesHash) =
+    "genesis:$handle:$owner:$network:$hash:$registrarKey:$rulesHash"
+
 /** Stands in for the Rust core: a record belongs to a claim when it carries the claim's hash. */
 internal object FakeClaimCore : UsernameClaimCore {
     override fun normalize(input: String) = input.lowercase()
@@ -60,7 +74,8 @@ internal object FakeClaimCore : UsernameClaimCore {
     override fun prepare(handle: String, subaddress: String, nonce: String, network: String, rules: String, rulesHash: String) =
         Triple(Base64.getUrlEncoder().withoutPadding().encodeToString("record:$handle:$subaddress:$nonce".toByteArray()),
             "hash:$handle:$subaddress:$nonce", "message:$handle")
-    override fun isOwnClaim(record: String, pending: PendingUsernameClaim) = record == "admitted:${pending.recordHash}"
+    override fun isOwnClaim(record: String, pending: PendingUsernameClaim) = record == "admitted:${pending.recordHash}" ||
+        record == genesisRecord(pending.handle, pending.subaddress, pending.recordHash, pending.network, pending.registrarKey, pending.rulesHash)
 }
 
 internal val testConfiguration = UsernameConfiguration("http://localhost:8787", "a".repeat(64), "b".repeat(64))

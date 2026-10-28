@@ -1342,6 +1342,7 @@ internal val localizedStrings: Map<String, Int> = mapOf(
     "Your username, %s" to R.string.l10n_your_username_s_3932c5a7,
     "Your wallet has no receive address yet. Wait for it to load, then try again." to R.string.l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257,
     "Your wallet is busy. Try again in a moment." to R.string.l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57,
+    "Your wallet is still opening. Try again in a moment." to R.string.l10n_your_wallet_is_still_opening_try_again_in_a_moment_71ea3bc9,
     "Your wallet is syncing from an untrusted location. Add this location as trusted in Settings if this is intentional." to R.string.l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648,
     "about %s" to R.string.l10n_about_s_549742af,
     "about %s XMR" to R.string.l10n_about_s_xmr_13b5b2b2,

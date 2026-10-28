@@ -1339,6 +1339,7 @@
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Twoja nazwa użytkownika, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Twój portfel nie ma jeszcze adresu odbiorczego. Poczekaj, aż się wczyta, i spróbuj ponownie."</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"Twój portfel jest zajęty. Spróbuj ponownie za chwilę."</string>
+    <string name="l10n_your_wallet_is_still_opening_try_again_in_a_moment_71ea3bc9" formatted="false">"Twój portfel wciąż się otwiera. Spróbuj ponownie za chwilę."</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"Portfel synchronizuje się w niezaufanej lokalizacji. Jeśli to zamierzone, dodaj tę lokalizację jako zaufaną w Ustawieniach."</string>
     <string name="l10n_about_s_549742af" formatted="false">"około %1$s"</string>
     <string name="l10n_about_s_xmr_13b5b2b2" formatted="false">"około %1$s XMR"</string>

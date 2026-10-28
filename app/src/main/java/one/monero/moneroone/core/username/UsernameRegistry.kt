@@ -25,12 +25,25 @@ data class UsernameConfiguration(val url: String, val registrarKey: String, val 
     }
 }
 
+/** One record of a held name, as `GET /v1/handles/{h}` lists it. */
+data class HeldRecord(val record: String, val recordHash: String? = null)
+
+/**
+ * A held name, as `GET /v1/handles/{h}` answers it. [records] is the whole chain, oldest first. A field
+ * that is missing or of another type is null, and a restore then refuses the name.
+ */
+data class HeldName(
+    val records: List<HeldRecord>, val handle: String? = null, val owner: String? = null,
+    val genesisHash: String? = null, val tombstoned: Boolean? = null, val headSeq: Long? = null,
+    val headHash: String? = null,
+)
+
 /** The registry calls a claim makes. Unit tests replace it. */
 interface UsernameRegistryApi {
     /** The rules text, after the registry's info matches the pinned configuration for [network]. */
     suspend fun checkedRules(network: String): String
-    /** The handle's records, oldest first, or null while the handle is free. */
-    suspend fun records(handle: String): List<String>?
+    /** The held name, or null while the handle is free. */
+    suspend fun lookup(handle: String): HeldName?
     suspend fun nonce(handle: String, subaddress: String): String
     /** Posts the signed claim. Returns the handle and the record the registry admitted. */
     suspend fun claim(pending: PendingUsernameClaim, device: DeviceProof): Pair<String, String>
@@ -73,10 +86,18 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
         return request("rules")
     }
 
-    override suspend fun records(handle: String): List<String>? {
-        val rows = try { JSONObject(request("handles/$handle")).getJSONArray("records") }
+    override suspend fun lookup(handle: String): HeldName? {
+        val found = try { JSONObject(request("handles/$handle")) }
             catch (e: UsernameException) { if (e.code == "handle.not_found") return null else throw e }
-        return List(rows.length()) { rows.getJSONObject(it).getString("record") }
+        val rows = found.getJSONArray("records")
+        val head = found.opt("head") as? JSONObject
+        return HeldName(
+            records = List(rows.length()) { rows.getJSONObject(it).let { row -> HeldRecord(row.getString("record"), row.opt("record_hash") as? String) } },
+            handle = found.opt("handle") as? String, owner = found.opt("owner") as? String,
+            genesisHash = found.opt("genesis_hash") as? String, tombstoned = found.opt("tombstoned") as? Boolean,
+            headSeq = when (val seq = head?.opt("seq")) { is Int -> seq.toLong(); is Long -> seq; else -> null },
+            headHash = head?.opt("record_hash") as? String,
+        )
     }
 
     override suspend fun nonce(handle: String, subaddress: String): String =
@@ -121,19 +142,25 @@ class UsernameRegistry internal constructor(
         /** The name points to the pending claim's wallet: the claim is done. */
         data class Finished(val binding: UsernameBinding) : Recheck
         /** The name is free, or someone else holds it. The pending claim is cleared. */
-        data class Cleared(val taken: Boolean) : Recheck
+        data object Cleared : Recheck
     }
 
-    /** [claimKey] gives the claiming wallet's claim key ([UsernameDeviceProof.claimKey]). */
+    /**
+     * [claimKey] gives the claiming wallet's claim key ([UsernameDeviceProof.claimKey]). [ownsSubaddress] is
+     * true for a subaddress of the open wallet: a name that already points to one comes back with no new
+     * claim ([restore]).
+     */
     suspend fun claim(displayHandle: String, walletKey: String, network: String, store: UsernameStore,
                       makeSubaddress: suspend () -> String, sign: suspend (String, String) -> String,
-                      claimKey: suspend () -> String, isCurrentWallet: () -> Boolean): UsernameBinding {
+                      claimKey: suspend () -> String, ownsSubaddress: suspend (String) -> Boolean,
+                      isCurrentWallet: () -> Boolean): UsernameBinding {
         if (!isCurrentWallet() || walletKey.isEmpty()) throw UsernameException("wallet_changed")
         if (store.storageError) throw UsernameException("storage")
         if (!store.claimMutex.tryLock()) throw UsernameException("pending")
         try {
             val handle = core.normalize(displayHandle)
-            // This wallet's earlier claim of the same name, cleared because the name was free.
+            // This wallet's earlier claim of the same name, cleared at the re-check (the name was free, or another
+            // genesis held it).
             var earlier: PendingUsernameClaim? = null
             store.state.value.pending?.let { pending ->
                 val same = pending.walletKey == walletKey && pending.network == network && pending.handle == handle
@@ -145,18 +172,23 @@ class UsernameRegistry internal constructor(
                 when (outcome) {
                     // One username per device: another wallet's finished claim used the slot.
                     is Recheck.Finished -> if (same) return outcome.binding else throw UsernameException("device.slot_used")
-                    is Recheck.Cleared -> if (same) {
-                        if (outcome.taken) throw UsernameException("name.unavailable")
-                        earlier = pending
-                    }
+                    // The name is free, or another genesis holds it (that can be this wallet's, from another
+                    // phone): a new claim starts here, and a taken name stops at the lookup below (iOS parity).
+                    is Recheck.Cleared -> if (same) earlier = pending
                 }
             }
             val rules = api.checkedRules(network)
             if (!isCurrentWallet()) throw UsernameException("wallet_changed")
-            api.records(handle)?.let { records ->
+            api.lookup(handle)?.let { found ->
+                val records = found.records.map { it.record }
                 // A slow earlier POST can land after the re-check found the name free.
                 val own = earlier?.takeIf { records.size == 1 && core.isOwnClaim(records[0], it) }
                 if (own != null) return bind(records[0], own, store)
+                // This wallet already holds the name: a new phone, a restored wallet or cleared app data.
+                if (isCurrentWallet()) {
+                    restore(found, handle, displayHandle, walletKey, network, rules, ownsSubaddress, isCurrentWallet, store)
+                        ?.let { return it }
+                }
                 throw UsernameException("name.unavailable")
             }
             if (!isCurrentWallet()) throw UsernameException("wallet_changed")
@@ -187,17 +219,17 @@ class UsernameRegistry internal constructor(
         // Signed under other pins, it can never finish here.
         if (pending.registrarKey != configuration.registrarKey || pending.rulesHash != configuration.rulesHash) {
             store.savePending(null)
-            return Recheck.Cleared(taken = false)
+            return Recheck.Cleared
         }
-        val records = api.records(pending.handle)
+        val records = api.lookup(pending.handle)?.records?.map { it.record }
         if (records == null) {
             store.savePending(null)
-            return Recheck.Cleared(taken = false)
+            return Recheck.Cleared
         }
         if (records.isEmpty()) throw UsernameException("verification")
         if (records.size == 1 && core.isOwnClaim(records[0], pending)) return Recheck.Finished(bind(records[0], pending, store))
         store.savePending(null)
-        return Recheck.Cleared(taken = true)
+        return Recheck.Cleared
     }
 
     private suspend fun submit(pending: PendingUsernameClaim, device: DeviceProof, store: UsernameStore): UsernameBinding {
@@ -214,9 +246,37 @@ class UsernameRegistry internal constructor(
         }
     }
 
-    private fun bind(record: String, pending: PendingUsernameClaim, store: UsernameStore): UsernameBinding =
+    /**
+     * The found name as this wallet's binding, or null when a check fails. The chain must be one record
+     * that is the head, with no tombstone, the claim checks of the core (registrar and owner signatures,
+     * handle, owner, network, rules) must pass, and its owner must be a subaddress of the open wallet. No
+     * nonce, signature or device proof is made, nothing is posted, and the phone's free claim stays. A chain
+     * with later records (a rotation, a subhandle) stays unavailable: the app makes none, and verify_claim
+     * checks a genesis head only (iOS parity).
+     */
+    private suspend fun restore(found: HeldName, handle: String, displayHandle: String, walletKey: String, network: String,
+                                rules: String, owns: suspend (String) -> Boolean, isCurrentWallet: () -> Boolean,
+                                store: UsernameStore): UsernameBinding? {
+        val owner = found.owner ?: return null
+        val hash = found.headHash ?: return null
+        val row = found.records.singleOrNull() ?: return null
+        if (found.handle != handle || found.tombstoned != false || found.headSeq != 0L || found.genesisHash != hash ||
+            row.recordHash != hash || owner.isEmpty()) return null
+        // The checks of a claim's reply, with the found head and owner in place of a saved claim. It is
+        // never saved and holds no request or signature.
+        val held = PendingUsernameClaim(walletKey, network, handle, displayHandle, owner, nonce = "", unsignedRecord = "",
+            recordHash = hash, ownerSignature = "", registrarKey = configuration.registrarKey, rules = rules,
+            rulesHash = configuration.rulesHash)
+        // The record verifies before the wallet is asked: one that fails never makes the wallet list a subaddress.
+        if (!core.isOwnClaim(row.record, held)) return null
+        if (!owns(owner)) return null
+        if (!isCurrentWallet()) throw UsernameException("wallet_changed")
+        return bind(row.record, held, store, usesFreeClaim = false)
+    }
+
+    private fun bind(record: String, pending: PendingUsernameClaim, store: UsernameStore, usesFreeClaim: Boolean = true): UsernameBinding =
         UsernameBinding(pending.walletKey, pending.network, pending.handle, pending.displayHandle, pending.subaddress,
-            pending.recordHash, record, System.currentTimeMillis()).also(store::accept)
+            pending.recordHash, record, System.currentTimeMillis()).also { store.accept(it, usesFreeClaim) }
 }
 
 internal fun json(vararg fields: Pair<String, Any>) = JSONObject().apply { fields.forEach { (k,v) -> put(k,v) } }

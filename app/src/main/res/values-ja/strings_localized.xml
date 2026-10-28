@@ -1339,6 +1339,7 @@
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"あなたのユーザ名、%1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"ウォレットにはまだ受取アドレスがありません。読み込みが終わるまで待ってから、もう一度お試しください。"</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"ウォレットが処理中です。しばらくしてからもう一度お試しください。"</string>
+    <string name="l10n_your_wallet_is_still_opening_try_again_in_a_moment_71ea3bc9" formatted="false">"ウォレットを開いているところです。しばらくしてからもう一度お試しください。"</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"ウォレットが信頼されていない場所で同期しています。意図的な場合は、「設定」でこの場所を信頼できる場所として追加してください。"</string>
     <string name="l10n_about_s_549742af" formatted="false">"約%1$s"</string>
     <string name="l10n_about_s_xmr_13b5b2b2" formatted="false">"約%1$s XMR"</string>

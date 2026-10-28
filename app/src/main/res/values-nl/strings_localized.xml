@@ -1339,6 +1339,7 @@
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Je gebruikersnaam, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Je portemonnee heeft nog geen ontvangstadres. Wacht tot het is geladen en probeer het dan opnieuw."</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"Je portemonnee is bezig. Probeer het zo meteen opnieuw."</string>
+    <string name="l10n_your_wallet_is_still_opening_try_again_in_a_moment_71ea3bc9" formatted="false">"Je portemonnee wordt nog geopend. Probeer het zo meteen opnieuw."</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"Je portemonnee synchroniseert vanaf een niet-vertrouwde locatie. Voeg deze locatie toe als vertrouwd in Instellingen als dit de bedoeling is."</string>
     <string name="l10n_about_s_549742af" formatted="false">"circa %1$s"</string>
     <string name="l10n_about_s_xmr_13b5b2b2" formatted="false">"circa %1$s XMR"</string>

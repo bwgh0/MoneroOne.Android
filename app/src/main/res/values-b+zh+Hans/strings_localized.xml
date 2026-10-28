@@ -1339,6 +1339,7 @@
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"你的用户名，%1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"你的钱包还没有收款地址。请等待加载完成，然后重试。"</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"你的钱包正忙。请稍后重试。"</string>
+    <string name="l10n_your_wallet_is_still_opening_try_again_in_a_moment_71ea3bc9" formatted="false">"你的钱包仍在打开。请稍后重试。"</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"你的钱包正在从不可信位置同步。如果这是有意为之，请在“设置”中将此位置添加为可信位置。"</string>
     <string name="l10n_about_s_549742af" formatted="false">"约 %1$s"</string>
     <string name="l10n_about_s_xmr_13b5b2b2" formatted="false">"约 %1$s XMR"</string>

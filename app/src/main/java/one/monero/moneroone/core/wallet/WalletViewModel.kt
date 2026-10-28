@@ -11,6 +11,7 @@ import io.horizontalsystems.monerokit.CakeWalletStyleConverter
 import io.horizontalsystems.monerokit.MoneroKit
 import io.horizontalsystems.monerokit.PreparedTransactionLostException
 import io.horizontalsystems.monerokit.Seed
+import io.horizontalsystems.monerokit.SignMessageException
 import io.horizontalsystems.monerokit.SignedTransaction
 import io.horizontalsystems.monerokit.SyncState
 import io.horizontalsystems.monerokit.data.Subaddress
@@ -38,6 +39,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import one.monero.moneroone.core.openalias.OpenAliasPinStore
 import one.monero.moneroone.core.review.ReviewPromptGate
+import one.monero.moneroone.core.username.UsernameException
 import one.monero.moneroone.data.model.Currency
 import one.monero.moneroone.data.model.CurrentPrice
 import one.monero.moneroone.data.repository.PriceRepository
@@ -2412,45 +2414,110 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         return walletMutationMutex.withLock { createSubaddressLocked(walletId, manual = true) }
     }
 
-    suspend fun createUsernameSubaddress(expectedSession: Long): String = walletMutationMutex.withLock {
-        val info = _activeWallet.value ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
-        val kit = WalletManager.kit ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
-        val shown = _walletState.value.addressesOf(info.id)
-        if (_isLocked.value || _walletSessionId.value != expectedSession || info.isViewOnly || info.deviceWalletId != null ||
-            WalletManager.currentWalletId != info.derivedWalletId || shown == null || !shown.complete || shown.blocked) {
-            throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+    /**
+     * The open wallet of [expectedSession] for a username step. Throws "wallet_changed" when the user
+     * switched, locked or removed the wallet (or its keys failed a check), and [usernameNotReady] when it
+     * is the same wallet but its file is not open: still opening or connecting, or closed after its node
+     * failed. [needsAddresses]: its receive addresses must be read and checked too.
+     */
+    private fun usernameWallet(expectedSession: Long, needsAddresses: Boolean = false): Pair<WalletInfo, MoneroKit> {
+        val info = _activeWallet.value
+        if (info == null || _isLocked.value || _walletSessionId.value != expectedSession || info.isViewOnly ||
+            info.deviceWalletId != null) throw UsernameException("wallet_changed")
+        val kit = WalletManager.kit
+        if (kit == null || WalletManager.currentWalletId != info.derivedWalletId || !kit.isWalletOpen) throw usernameNotReady()
+        if (needsAddresses) {
+            val shown = _walletState.value.addressesOf(info.id)
+            if (shown?.blocked == true) throw UsernameException("wallet_changed")
+            if (shown == null || !shown.complete) throw usernameNotReady()
         }
+        return info to kit
+    }
+
+    private fun usernameNotReady(): UsernameException = UsernameException.walletNotReady(_walletState.value.syncState)
+
+    /** The same session still holds the wallet, or this throws "wallet_changed". */
+    private fun checkUsernameSession(expectedSession: Long) {
+        if (_isLocked.value || _walletSessionId.value != expectedSession) throw UsernameException("wallet_changed")
+    }
+
+    /**
+     * A new subaddress for a username claim. The kit stores the wallet right after the add, and the
+     * wallet's row keeps the count, so a quit or a rebuilt cache cannot hand the next claim the same one.
+     */
+    suspend fun createUsernameSubaddress(expectedSession: Long): String = walletMutationMutex.withLock {
+        val (info, kit) = usernameWallet(expectedSession, needsAddresses = true)
         val created = withContext(Dispatchers.IO) { kit.addSubaddress() }
-            ?: throw one.monero.moneroone.core.username.UsernameException("server")
+        if (created == null) {
+            // No wallet was open for the add: it closed, or its node failed.
+            checkUsernameSession(expectedSession)
+            throw usernameNotReady()
+        }
+        // Kept for the wallet that made it, even when a switch came during the native call.
         mergeWalletUpdate(info.id) { it.copy(userCreatedSubaddressIndices = (it.userCreatedSubaddressIndices + (created.addressIndex + 1)).distinct()) }
         publishAddresses(info, kit)
-        if (_isLocked.value || _walletSessionId.value != expectedSession) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        checkUsernameSession(expectedSession)
         created.address
     }
 
     suspend fun signUsername(message: String, subaddress: String, expectedSession: Long): String = walletMutationMutex.withLock {
-        val info = _activeWallet.value ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
-        val kit = WalletManager.kit ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
-        if (_isLocked.value || _walletSessionId.value != expectedSession || info.isViewOnly || info.deviceWalletId != null ||
-            WalletManager.currentWalletId != info.derivedWalletId) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
-        val signature = withContext(Dispatchers.IO) { kit.signMessage(message, subaddress) }
-        if (_isLocked.value || _walletSessionId.value != expectedSession) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        val (_, kit) = usernameWallet(expectedSession)
+        val signature = try {
+            withContext(Dispatchers.IO) { kit.signMessage(message, subaddress) }
+        } catch (_: SignMessageException.WalletNotOpen) {
+            checkUsernameSession(expectedSession)
+            throw usernameNotReady()
+        }
+        checkUsernameSession(expectedSession)
         signature
     }
 
-    /** The claiming wallet's username claim key, made from its private view key. Never log or store it. */
+    /**
+     * The claiming wallet's username claim key, made from its private view key. The kit reads the view key
+     * alone, so no spend key leaves the wallet for a username. Never log or store it.
+     */
     suspend fun usernameClaimKey(expectedSession: Long): String = walletMutationMutex.withLock {
-        val info = _activeWallet.value ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
-        val kit = WalletManager.kit ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
-        if (_isLocked.value || _walletSessionId.value != expectedSession || info.isViewOnly || info.deviceWalletId != null ||
-            WalletManager.currentWalletId != info.derivedWalletId) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
-        val viewKey = withContext(Dispatchers.IO) { kit.getKeys()?.privateViewKey }
-            ?.takeIf { Regex("[0-9a-fA-F]{64}").matches(it) }
+        val (_, kit) = usernameWallet(expectedSession)
+        val hex = withContext(Dispatchers.IO) { kit.getPrivateViewKey() }
+        checkUsernameSession(expectedSession)
+        if (hex == null) throw usernameNotReady()
+        // A null (all zero) key is no wallet's key (iOS parity).
+        val viewKey = hex.takeIf { Regex("[0-9a-fA-F]{64}").matches(it) && it.any { c -> c != '0' } }
             ?.chunked(2)?.map { it.toInt(16).toByte() }?.toByteArray()
-            ?: throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+            ?: throw UsernameException("wallet_changed")
         val claimKey = try { one.monero.moneroone.core.username.UsernameDeviceProof.claimKey(viewKey) } finally { viewKey.fill(0) }
-        if (_isLocked.value || _walletSessionId.value != expectedSession) throw one.monero.moneroone.core.username.UsernameException("wallet_changed")
+        checkUsernameSession(expectedSession)
         claimKey
+    }
+
+    /**
+     * True when [address] is a subaddress of the wallet of [expectedSession]: a name it already holds comes
+     * back (a new phone, a restored wallet, cleared app data). The kit looks the address up where wallet2
+     * finds this wallet's payments ([MoneroKit.subaddressIndex]), so a wallet restored from its seed finds
+     * it too. An index past the wallet's list is added to the list (kept with the wallet's row, created in
+     * wallet2 and stored), so Receive shows it and a rebuilt cache keeps it.
+     */
+    suspend fun usernameOwnsSubaddress(address: String, expectedSession: Long): Boolean = walletMutationMutex.withLock {
+        val (info, kit) = usernameWallet(expectedSession, needsAddresses = true)
+        val shown = _walletState.value.addressesOf(info.id)
+        if (shown != null && shown.list.any { it.addressIndex > 0 && it.address == address }) return@withLock true
+        val index = withContext(Dispatchers.IO) { kit.subaddressIndex(address) }
+        checkUsernameSession(expectedSession)
+        if (index == null) {
+            // The wallet closed during the lookup: no answer yet.
+            if (!kit.isWalletOpen) throw usernameNotReady()
+            return@withLock false
+        }
+        val required = index + 1
+        // The row first: the next open creates it even when the add below cannot run.
+        mergeWalletUpdate(info.id) { it.copy(userCreatedSubaddressIndices = (it.userCreatedSubaddressIndices + required).distinct()) }
+        kit.requiredSubaddressCount = maxOf(kit.requiredSubaddressCount, required)
+        withContext(Dispatchers.IO) {
+            runCatching { kit.ensureSubaddresses(required) }.onFailure { Timber.w(it, "usernameOwnsSubaddress: could not extend the subaddress list") }
+        }
+        publishAddresses(info, kit)
+        checkUsernameSession(expectedSession)
+        true
     }
 
     private suspend fun createSubaddressLocked(walletId: String, manual: Boolean): Boolean {

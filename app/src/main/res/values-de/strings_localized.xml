@@ -1339,6 +1339,7 @@
     <string name="l10n_your_username_s_3932c5a7" formatted="false">"Dein Benutzername, %1$s"</string>
     <string name="l10n_your_wallet_has_no_receive_address_yet_wait_for_it_to_l_255cc257" formatted="false">"Deine Wallet hat noch keine Empfangsadresse. Warte, bis sie geladen ist, und versuche es dann erneut."</string>
     <string name="l10n_your_wallet_is_busy_try_again_in_a_moment_2a5a8a57" formatted="false">"Deine Wallet ist beschäftigt. Versuche es gleich noch einmal."</string>
+    <string name="l10n_your_wallet_is_still_opening_try_again_in_a_moment_71ea3bc9" formatted="false">"Deine Wallet wird noch geöffnet. Versuche es gleich noch einmal."</string>
     <string name="l10n_your_wallet_is_syncing_from_an_untrusted_location_add_t_0aef1648" formatted="false">"Deine Wallet synchronisiert an einem nicht vertrauenswürdigen Ort. Füge diesen Ort in den Einstellungen als vertrauenswürdig hinzu, wenn das beabsichtigt ist."</string>
     <string name="l10n_about_s_549742af" formatted="false">"etwa %1$s"</string>
     <string name="l10n_about_s_xmr_13b5b2b2" formatted="false">"etwa %1$s XMR"</string>
