@@ -180,9 +180,12 @@ fun AnimatedMoneroLogo(
     }
 }
 
-/** The shine band, drawn centered and moved so its left edge sits at [offset] x [logoSize]. */
+/**
+ * The shine band, drawn centered and moved so its left edge sits at [offset] x [logoSize].
+ * [height] is the art's height (the username card is wider than it is tall).
+ */
 @Composable
-private fun ShineBand(logoSize: Dp, offset: () -> Float) {
+internal fun ShineBand(logoSize: Dp, offset: () -> Float, height: Dp = logoSize) {
     val density = LocalDensity.current
     val band = logoSize * ShineWidth
     val pad = ShineSigma * 3
@@ -191,7 +194,7 @@ private fun ShineBand(logoSize: Dp, offset: () -> Float) {
     }
     Box(
         modifier = Modifier
-            .requiredSize(width = band + pad * 2, height = logoSize + pad * 2)
+            .requiredSize(width = band + pad * 2, height = height + pad * 2)
             .graphicsLayer {
                 val logo = logoSize.toPx()
                 translationX = offset() * logo - (logo - band.toPx()) / 2f
@@ -205,7 +208,7 @@ private fun ShineBand(logoSize: Dp, offset: () -> Float) {
             )
             .drawBehind {
                 val p = pad.toPx()
-                val logo = logoSize.toPx()
+                val logo = height.toPx()
                 if (preBlurred != null) {
                     drawRect(preBlurred, topLeft = Offset(0f, p), size = Size(this.size.width, logo))
                 } else {
@@ -230,7 +233,7 @@ private fun ShineBand(logoSize: Dp, offset: () -> Float) {
 
 /** The glow ellipse, blurred, with room around it for the blur to spread. */
 @Composable
-private fun GlowEllipse(
+internal fun GlowEllipse(
     width: Dp,
     height: Dp,
     color: Color,

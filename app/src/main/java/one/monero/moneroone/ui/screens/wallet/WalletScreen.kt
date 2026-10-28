@@ -211,7 +211,10 @@ fun WalletScreen(
     val activeWallet by walletViewModel.activeWallet.collectAsState()
     val walletSessionId by walletViewModel.walletSessionId.collectAsState()
     val usernames: UsernameViewModel = viewModel()
-    val usernameState by usernames.store.state.collectAsState()
+    val liveUsernameState by usernames.store.state.collectAsState()
+    // A claim and its moment keep Home as it was; Home redraws once, after the shine (iOS holdUpdates).
+    val heldUsernameState by usernames.homeHold.collectAsState()
+    val usernameState = heldUsernameState ?: liveUsernameState
     val locked by walletViewModel.isLocked.collectAsState()
     var showUsername by remember(walletSessionId) { mutableStateOf(false) }
     var shownUsername by remember(walletSessionId) { mutableStateOf<UsernameBinding?>(null) }
@@ -766,12 +769,13 @@ internal fun BalanceCard(
     GlassCard(modifier = Modifier.fillMaxWidth().testTag("wallet.balanceCard").drawWithContent {
         drawContent()
         if (username != null) {
-            // The Core edge: a 2 dp band inside the card's top edge that thins to nothing
-            // around the corners (the card shape minus itself moved down), as on iOS.
+            // The Core edge: a 2 dp band inside the card's bottom edge that thins to nothing
+            // around the corners (the card shape minus itself moved up), as on iOS
+            // (UsernameBottomEdge). The username row stays at the top of the card.
             val r = CornerRadius(20.dp.toPx())
             val card = Path().apply { addRoundRect(RoundRect(size.toRect(), r)) }
-            val below = Path().apply { addRoundRect(RoundRect(size.toRect().translate(0f, 2.dp.toPx()), r)) }
-            drawPath(Path.combine(PathOperation.Difference, card, below), usernameEdge)
+            val above = Path().apply { addRoundRect(RoundRect(size.toRect().translate(0f, -2.dp.toPx()), r)) }
+            drawPath(Path.combine(PathOperation.Difference, card, above), usernameEdge)
         }
     }) {
         Column {

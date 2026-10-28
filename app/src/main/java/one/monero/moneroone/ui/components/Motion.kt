@@ -33,6 +33,12 @@ object Motion {
     /** tokens.json stepBack, iOS `.spring(response: 0.5, dampingFraction: 0.8)`: the way back, a little slower. */
     fun <T> stepBack(): SpringSpec<T> = spring(dampingRatio = 0.8f, stiffness = 157.9f)
 
+    /** tokens.json settle, iOS `.spring(response: 0.4, dampingFraction: 0.8)`: a layout that moves into its new place. */
+    fun <T> settle(): SpringSpec<T> = spring(dampingRatio = 0.8f, stiffness = 246.7f)
+
+    /** tokens.json celebrate, iOS `.spring(response: 0.5, dampingFraction: 0.7)`: a success. */
+    fun <T> celebrate(): SpringSpec<T> = spring(dampingRatio = 0.7f, stiffness = 157.9f)
+
     /** Rolling digits and other small value changes. */
     const val DIGIT_MS = 200
 

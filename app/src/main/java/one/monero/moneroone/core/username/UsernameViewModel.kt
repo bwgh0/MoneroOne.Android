@@ -19,12 +19,30 @@ class UsernameViewModel(application: Application) : AndroidViewModel(application
     private val mutable = MutableStateFlow(UsernameFlowState())
     val state = mutable.asStateFlow()
     private var generation = 0L
+    private val held = MutableStateFlow<UsernameState?>(null)
+    /**
+     * The store state Home shows while a claim and its moment run, or null when Home follows the
+     * store. Home redraws once, after the moment, not under the claim edge or the pop (iOS holdUpdates).
+     */
+    val homeHold = held.asStateFlow()
+    /** Home follows the store again. The sheet calls it when the moment ends or the sheet closes. */
+    fun releaseHome() { held.value = null }
     fun open(wallet: WalletInfo) {
         generation++
+        held.value = null
         val pending = store.state.value.pending?.takeIf { it.walletKey == wallet.cachedPrimaryAddress && it.network == "mainnet" }
         mutable.value = if (pending != null) UsernameFlowState(UsernameStage.CONFIRM, pending.displayHandle) else UsernameFlowState()
     }
     fun choose() { mutable.value = mutable.value.copy(stage = UsernameStage.CHOOSE, error = null) }
+    /** The back arrow and the system back: Choose goes to Welcome, Confirm to Choose. Other stages stay. */
+    fun back() {
+        val stage = when (mutable.value.stage) {
+            UsernameStage.CHOOSE -> UsernameStage.WELCOME
+            UsernameStage.CONFIRM -> UsernameStage.CHOOSE
+            else -> return
+        }
+        mutable.value = mutable.value.copy(stage = stage, error = null)
+    }
     fun input(value: String) { mutable.value = mutable.value.copy(input = value.take(15), error = null) }
     fun confirm() { mutable.value = mutable.value.copy(stage = UsernameStage.CONFIRM, error = null) }
     fun claim(wallet: WalletInfo, session: Long, wallets: WalletViewModel) {
@@ -33,6 +51,7 @@ class UsernameViewModel(application: Application) : AndroidViewModel(application
         val input = mutable.value.input
         val key = wallet.cachedPrimaryAddress?.takeIf { it.isNotEmpty() } ?: return
         val attempt = generation
+        if (held.value == null) held.value = store.state.value
         mutable.value = mutable.value.copy(stage = UsernameStage.CLAIMING, error = null)
         viewModelScope.launch {
             try {
@@ -45,6 +64,7 @@ class UsernameViewModel(application: Application) : AndroidViewModel(application
                         wallets.activeWallet.value?.cachedPrimaryAddress == key })
                 if (generation == attempt) mutable.value = mutable.value.copy(stage = UsernameStage.REVEALED, binding = binding)
             } catch (e: Exception) {
+                if (generation == attempt) releaseHome()
                 if (generation == attempt) mutable.value = mutable.value.copy(
                     stage = if ((e as? UsernameException)?.code == "device.slot_used") UsernameStage.NO_FREE_CLAIM else UsernameStage.CONFIRM,
                     error = if (e is UsernameException) e.message else tr("The claim could not be completed. Please try again."))
