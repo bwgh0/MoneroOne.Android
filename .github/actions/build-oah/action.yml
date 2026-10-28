@@ -1,0 +1,53 @@
+name: Build oah native libraries
+description: >
+  Builds liboah_mobile.so and liboah_jni.so (arm64-v8a, x86_64) into app/src/main/jniLibs from
+  the private bwgh0/oah repository at a pinned commit. The libraries are gitignored, so every job
+  that builds an APK or AAB runs this first.
+
+inputs:
+  deploy-key:
+    description: A read-only SSH deploy key of bwgh0/oah (the OAH_DEPLOY_KEY secret).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check oah access
+      shell: bash
+      env:
+        OAH_DEPLOY_KEY: ${{ inputs.deploy-key }}
+      run: |
+        if [ -z "$OAH_DEPLOY_KEY" ]; then
+          echo "::error::Secret OAH_DEPLOY_KEY is not set. It must hold a read-only deploy key of bwgh0/oah."
+          exit 1
+        fi
+
+    # bwgh0/oah feature/mobile-claim. Move this pin when the app needs a newer oah-mobile.
+    - name: Checkout oah
+      uses: actions/checkout@v4
+      with:
+        repository: bwgh0/oah
+        ref: ef77ae2b583e80ccdd7776f8919084bb201d5132
+        path: oah-src
+        ssh-key: ${{ inputs.deploy-key }}
+        persist-credentials: false
+
+    - name: Build oah-mobile and the JNI bridge
+      shell: bash
+      env:
+        OAH_NDK: 27.0.12077973
+        OAH_RUST: 1.92.0
+      run: |
+        set -euo pipefail
+        yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$OAH_NDK" > /dev/null || true
+        test -d "$ANDROID_HOME/ndk/$OAH_NDK"
+        rustup toolchain install "$OAH_RUST" --profile minimal
+        rustup target add --toolchain "$OAH_RUST" aarch64-linux-android x86_64-linux-android
+        RUSTUP_TOOLCHAIN="$OAH_RUST" OAH_REPO="$GITHUB_WORKSPACE/oah-src" \
+          ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$OAH_NDK" bash scripts/build-oah-android.sh
+        for abi in arm64-v8a x86_64; do
+          for lib in liboah_mobile.so liboah_jni.so; do
+            test -s "app/src/main/jniLibs/$abi/$lib"
+          done
+        done
+        ls -l app/src/main/jniLibs/*/liboah_*.so

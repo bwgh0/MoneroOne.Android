@@ -3,7 +3,12 @@ set -euo pipefail
 app_dir="$(cd "$(dirname "$0")/.." && pwd)"
 oah_repo="${OAH_REPO:-$app_dir/../../oah}"
 ndk_dir="${ANDROID_NDK_HOME:-$HOME/Library/Android/sdk/ndk/27.0.12077973}"
-toolchain="$ndk_dir/toolchains/llvm/prebuilt/darwin-x86_64/bin"
+case "$(uname -s)" in
+  Darwin) host_tag=darwin-x86_64 ;;
+  Linux) host_tag=linux-x86_64 ;;
+  *) echo "build-oah-android.sh: unsupported host $(uname -s)" >&2; exit 1 ;;
+esac
+toolchain="$ndk_dir/toolchains/llvm/prebuilt/$host_tag/bin"
 for entry in 'aarch64-linux-android arm64-v8a' 'x86_64-linux-android x86_64'; do
   read -r rust_target abi <<< "$entry"
   linker="$toolchain/${rust_target}27-clang"

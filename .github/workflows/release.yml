@@ -45,6 +45,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Build oah native libraries
+        uses: ./.github/actions/build-oah
+        with:
+          deploy-key: ${{ secrets.OAH_DEPLOY_KEY }}
+
       # Gate every release artifact: a dropped or stubbed wallet2 symbol must never ship.
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --no-daemon
