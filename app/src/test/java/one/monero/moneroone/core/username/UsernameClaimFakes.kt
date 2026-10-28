@@ -78,7 +78,7 @@ internal object FakeClaimCore : UsernameClaimCore {
         record == genesisRecord(pending.handle, pending.subaddress, pending.recordHash, pending.network, pending.registrarKey, pending.rulesHash)
 }
 
-internal val testConfiguration = UsernameConfiguration("http://localhost:8787", "a".repeat(64), "b".repeat(64))
+internal val testConfiguration = UsernameConfiguration("http://localhost:8787", "a".repeat(64), "b".repeat(64), "local-development-v1")
 
 /** The test wallet's private view key: the bytes 0x00 to 0x1f. */
 internal val testViewKey get() = ByteArray(32) { it.toByte() }

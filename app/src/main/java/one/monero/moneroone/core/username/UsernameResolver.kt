@@ -73,8 +73,7 @@ data class UsernameResolutionConfiguration(val registry: UsernameConfiguration, 
         val current: UsernameResolutionConfiguration? get() {
             val registry = UsernameConfiguration.current ?: return null
             val uri = runCatching { URI(BuildConfig.USERNAME_MIRROR_URL) }.getOrNull() ?: return null
-            if (!BuildConfig.DEBUG || uri.host != "localhost" || uri.scheme !in listOf("http", "https") ||
-                uri.userInfo != null || uri.query != null || uri.fragment != null || uri.toString().trimEnd('/') == registry.url ||
+            if (!UsernameHosts.allows(uri, BuildConfig.DEBUG) || uri.toString().trimEnd('/') == registry.url ||
                 !BuildConfig.USERNAME_GENESIS_ROOT.matches(Regex("[0-9a-f]{64}"))) return null
             return UsernameResolutionConfiguration(registry, uri.toString().trimEnd('/'), BuildConfig.USERNAME_GENESIS_ROOT)
         }

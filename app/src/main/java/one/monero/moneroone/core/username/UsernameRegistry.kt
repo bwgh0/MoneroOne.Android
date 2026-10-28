@@ -12,16 +12,43 @@ import org.json.JSONObject
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
-data class UsernameConfiguration(val url: String, val registrarKey: String, val rulesHash: String) {
+/**
+ * The registry this build talks to. Release builds carry the production values and accept only the
+ * production hosts. Debug builds carry the staging values by default and accept only this machine,
+ * the developer's Tailscale network over HTTPS, or the staging hosts (never production).
+ */
+data class UsernameConfiguration(val url: String, val registrarKey: String, val rulesHash: String, val termsVersion: String) {
     companion object {
-        val current: UsernameConfiguration? get() {
-            if (!BuildConfig.DEBUG) return null
-            val uri = runCatching { URI(BuildConfig.USERNAME_REGISTRY_URL) }.getOrNull() ?: return null
-            if (uri.host != "localhost" || uri.scheme !in listOf("http", "https") || uri.userInfo != null || uri.query != null || uri.fragment != null) return null
+        val current: UsernameConfiguration? get() = from(BuildConfig.USERNAME_REGISTRY_URL, BuildConfig.USERNAME_REGISTRAR_KEY,
+            BuildConfig.USERNAME_RULES_HASH, BuildConfig.USERNAME_TERMS_VERSION, BuildConfig.DEBUG)
+
+        internal fun from(rawUrl: String, registrarKey: String, rulesHash: String, termsVersion: String, debug: Boolean): UsernameConfiguration? {
+            val uri = runCatching { URI(rawUrl) }.getOrNull() ?: return null
+            if (!UsernameHosts.allows(uri, debug)) return null
             val hex = Regex("[0-9a-f]{64}")
-            if (!hex.matches(BuildConfig.USERNAME_REGISTRAR_KEY) || !hex.matches(BuildConfig.USERNAME_RULES_HASH)) return null
-            return UsernameConfiguration(uri.toString().trimEnd('/'), BuildConfig.USERNAME_REGISTRAR_KEY, BuildConfig.USERNAME_RULES_HASH)
+            if (!hex.matches(registrarKey) || !hex.matches(rulesHash)) return null
+            if (!Regex("[!-~]{1,64}").matches(termsVersion)) return null
+            return UsernameConfiguration(uri.toString().trimEnd('/'), registrarKey, rulesHash, termsVersion)
         }
+    }
+}
+
+/** The registry and mirror hosts a build may reach. */
+internal object UsernameHosts {
+    private val production = setOf("registry.monero.one", "mirror.monero.one")
+    private val staging = setOf("staging-registry.monero.one", "staging-mirror.monero.one")
+
+    fun allows(uri: URI, debug: Boolean): Boolean {
+        val scheme = uri.scheme?.lowercase() ?: return false
+        val host = uri.host?.lowercase() ?: return false
+        if (uri.userInfo != null || uri.query != null || uri.fragment != null) return false
+        if (!debug) return scheme == "https" && uri.port == -1 && host in production
+        if (host == "localhost") return scheme in listOf("http", "https")
+        if (scheme != "https") return false
+        if (host in staging) return uri.port == -1
+        val labels = host.split(".")
+        return labels.size >= 3 && labels.takeLast(2) == listOf("ts", "net") &&
+            labels.all { label -> label.isNotEmpty() && label.all { it in 'a'..'z' || it in '0'..'9' || it == '-' } }
     }
 }
 
@@ -106,7 +133,7 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
     override suspend fun claim(pending: PendingUsernameClaim, device: DeviceProof): Pair<String, String> {
         val response = JSONObject(request("claims", json("nonce" to pending.nonce, "record" to pending.unsignedRecord,
             "owner_signature" to pending.ownerSignature, "device" to json("platform" to device.platform, "proof" to device.proof),
-            "terms_version" to "local-development-v1")))
+            "terms_version" to configuration.termsVersion)))
         return response.optString("handle") to response.getString("record")
     }
 }
