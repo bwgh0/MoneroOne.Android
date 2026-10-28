@@ -264,7 +264,7 @@ class NativeWalletCreationTest {
             wallet.close()
         }
         val kit = MoneroKit.getInstance(
-            context, bip39.seed, RESTORE_HEIGHT.toString(), id, "127.0.0.1:1", false
+            context, bip39.seed, RESTORE_HEIGHT.toString(), id, WalletFilePasswords.throwaway(), "127.0.0.1:1", false
         )
         try {
             assertNull(kit.checkedWalletFilePrimaryAddress)

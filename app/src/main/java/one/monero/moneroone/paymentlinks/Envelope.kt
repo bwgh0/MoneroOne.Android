@@ -8,6 +8,7 @@ import one.monero.moneroone.core.wallet.DefaultNodes
 import one.monero.moneroone.core.wallet.SecurePrefs
 import one.monero.moneroone.core.wallet.SeedType
 import one.monero.moneroone.core.wallet.SeedValidation
+import one.monero.moneroone.core.wallet.WalletFilePasswords
 import timber.log.Timber
 import java.io.File
 
@@ -68,13 +69,19 @@ object EnvelopeFiles {
     }
 
     fun delete(context: Context, id: String) {
-        if (!dir(context, id).deleteRecursively()) Timber.w("PaymentLinks: could not delete envelope files")
+        if (dir(context, id).deleteRecursively()) {
+            WalletFilePasswords.get(context).delete(WalletFilePasswords.envelopeName(id))
+        } else {
+            Timber.w("PaymentLinks: could not delete envelope files")
+        }
     }
 
     /** Deletes the files of every envelope not in [keep] (settled or removed links). */
     fun sweep(context: Context, keep: Set<String>) {
         root(context).listFiles()?.forEach { file ->
-            if (file.name !in keep) file.deleteRecursively()
+            if (file.name !in keep && file.deleteRecursively()) {
+                WalletFilePasswords.get(context).delete(WalletFilePasswords.envelopeName(file.name))
+            }
         }
     }
 }
@@ -154,7 +161,7 @@ object EnvelopeFactory {
         val file = File(dir, "restore-check")
         return try {
             val wallet = NativeWalletManager.getInstance()
-                .recoveryWallet(file, "", words.joinToString(" "), "", height)
+                .recoveryWallet(file, WalletFilePasswords.throwaway(), words.joinToString(" "), "", height)
             try {
                 if (wallet.status.isOk) wallet.address else null
             } finally {

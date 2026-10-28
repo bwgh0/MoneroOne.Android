@@ -1,5 +1,6 @@
 package one.monero.moneroone.core.network
 
+import one.monero.moneroone.core.wallet.WalletFilePasswords
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.horizontalsystems.monerokit.MoneroKit
@@ -24,7 +25,7 @@ class NativeTorRoutingTest {
 
     private fun withKit(node: String, proxy: String, block: (MoneroKit) -> Unit) {
         val id = "tor-test-${UUID.randomUUID()}"
-        val kit = MoneroKit.getInstance(context, seed, "0", id, node, false, proxy)
+        val kit = MoneroKit.getInstance(context, seed, "0", id, WalletFilePasswords.throwaway(), node, false, proxy)
         try { block(kit) } finally {
             kit.release()
             runBlocking { kit.stop() }

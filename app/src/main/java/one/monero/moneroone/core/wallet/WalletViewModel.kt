@@ -264,6 +264,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
 
     private val store by lazy { WalletStore(prefs) }
     private val secrets by lazy { WalletSecrets(encryptedPrefs) }
+    private val walletFilePasswords by lazy { WalletFilePasswords.get(context) }
     private val nodeCredentials by lazy { NodeCredentialStore(encryptedPrefs) }
 
     // A sync error on a node that rejects the login names the login, as on iOS: one check per error.
@@ -389,6 +390,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     private fun deleteWalletFiles(cacheId: String) {
         MoneroKit.deleteWallet(context, cacheId)
         runCatching { File(Helper.getWalletRoot(context), "$cacheId.unportable").delete() }
+        // The password goes only with the `.keys` file that needs it.
+        if (!MoneroKit.keysFile(context, cacheId).exists()) walletFilePasswords.delete(cacheId)
     }
 
     // =========================================================================
@@ -599,11 +602,28 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             val nodeUri = getSelectedNode()
             Timber.d("openActiveWallet: wallet=${info.id} cacheId=$cacheId node=$nodeUri seedType=$seedType")
 
+            // An unreadable password (a damaged entry, a Keystore failure) fails this open, writes
+            // nothing, and the next open tries again.
+            val walletPassword = try {
+                withContext(Dispatchers.IO) { walletFilePasswords.forKitWallet(context, cacheId, cacheId) }
+            } catch (e: WalletFilePasswordException.Missing) {
+                // The file was re-keyed and its password is gone, so it never opens again. Keep it and
+                // rebuild from the seed under a new cache id, as for an unloadable cache. The old file
+                // never gets a new password.
+                if (healed) throw e
+                Timber.e("openActiveWallet: cache $cacheId has no stored file password; rebuilding the cache, files kept")
+                check(!hasSeedMismatch(info.id)) { "Seed phrase doesn't match current wallet; original files preserved" }
+                retainFilesForRebuild(info, seedData.first)
+                openActiveWallet(healed = true)
+                return
+            }
+
             val kit = WalletManager.initialize(
                 context = context,
                 seed = moneroSeed(seedWords, seedType),
                 restoreDateOrHeight = info.restoreHeight.toString(),
                 walletId = cacheId,
+                walletPassword = walletPassword,
                 node = nodeCredentials.kitNodeString(nodeUri),
                 trustNode = false,
                 networkType = NetworkType.NetworkType_Mainnet
@@ -1025,6 +1045,9 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 throw InvalidSeedException()
             }
 
+            // Before anything is persisted: a password that cannot be made or read fails the add here.
+            val walletPassword = withContext(Dispatchers.IO) { walletFilePasswords.forKitWallet(context, derived, derived) }
+
             // Snapshot the outgoing wallet's live data before switching away.
             snapshotActiveWalletCache()
 
@@ -1059,6 +1082,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                 seed = kitSeed,
                 restoreDateOrHeight = restoreHeight.toString(),
                 walletId = derived,
+                walletPassword = walletPassword,
                 node = nodeCredentials.kitNodeString(getSelectedNode()),
                 trustNode = false,
                 networkType = NetworkType.NetworkType_Mainnet

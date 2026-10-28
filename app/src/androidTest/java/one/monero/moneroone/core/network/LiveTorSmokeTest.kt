@@ -1,5 +1,6 @@
 package one.monero.moneroone.core.network
 
+import one.monero.moneroone.core.wallet.WalletFilePasswords
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.horizontalsystems.monerokit.MoneroKit
@@ -39,7 +40,7 @@ class LiveTorSmokeTest {
     private fun withKit(node: String, block: suspend (MoneroKit) -> Unit) = runBlocking {
         val id = "live-tor-test-${UUID.randomUUID()}"
         val kit = MoneroKit.getInstance(context, Seed.WatchOnly(address, viewKey),
-            MoneroKit.restoreHeightForNewWallet().toString(), id, node, false, parseProxyEndpoint(proxy!!)!!.address)
+            MoneroKit.restoreHeightForNewWallet().toString(), id, WalletFilePasswords.throwaway(), node, false, parseProxyEndpoint(proxy!!)!!.address)
         try { block(kit) } finally {
             kit.release()
             kit.stop()

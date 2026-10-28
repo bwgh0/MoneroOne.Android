@@ -88,6 +88,8 @@ object WalletManager {
         seed: Seed,
         restoreDateOrHeight: String,
         walletId: String,
+        /** The `.keys` password of [walletId] ([WalletFilePasswords]). */
+        walletPassword: String,
         node: String,
         trustNode: Boolean,
         networkType: NetworkType = NetworkType.NetworkType_Mainnet
@@ -109,6 +111,7 @@ object WalletManager {
                 seed = seed,
                 restoreDateOrHeight = restoreDateOrHeight,
                 walletId = walletId,
+                walletPassword = walletPassword,
                 node = node,
                 trustNode = trustNode,
                 proxyAddress = proxy

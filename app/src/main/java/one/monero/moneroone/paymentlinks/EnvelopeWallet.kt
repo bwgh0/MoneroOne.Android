@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import one.monero.moneroone.core.network.TorNetwork
 import one.monero.moneroone.core.network.isOnionNode
+import one.monero.moneroone.core.wallet.WalletFilePasswords
 import one.monero.moneroone.core.wallet.WalletManager
 import timber.log.Timber
 
@@ -248,11 +249,14 @@ class EnvelopeWallet private constructor(
                         Timber.w("PaymentLinks: envelope scan from %d never finished: restoring the envelope", restoreHeight)
                         EnvelopeFiles.deleteWallet(app, link.id)
                     }
+                    val walletId = EnvelopeFiles.kitWalletId(app, link.id)
                     MoneroKit.getInstance(
                         context = app,
                         seed = Seed.Electrum(link.words, ""),
                         restoreDateOrHeight = restoreHeight.toString(),
-                        walletId = EnvelopeFiles.kitWalletId(app, link.id),
+                        walletId = walletId,
+                        walletPassword = WalletFilePasswords.get(app)
+                            .forKitWallet(app, WalletFilePasswords.envelopeName(link.id), walletId),
                         node = node,
                         trustNode = false,
                         proxyAddress = proxy
