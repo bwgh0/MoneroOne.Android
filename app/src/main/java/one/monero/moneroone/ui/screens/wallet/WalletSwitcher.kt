@@ -735,11 +735,12 @@ fun WalletRowCard(
     contentAlpha: Float = 1f,
     /** In place of the address, at full strength: why a faded row cannot be picked. */
     note: String? = null,
+    /** In place of [balanceText]'s text: a balance drawn by the caller, such as one that rolls. */
+    balance: (@Composable () -> Unit)? = null,
     /** Before the emoji: the switcher's room for its drag handle. */
     leading: @Composable RowScope.() -> Unit = {},
-    trailing: @Composable RowScope.() -> Unit = {},
-    /** In place of [balanceText]'s text: a balance drawn by the caller, such as one that rolls. */
-    balance: (@Composable () -> Unit)? = null
+    /** Last, so a caller's trailing lambda fills this slot, not [balance]. */
+    trailing: @Composable RowScope.() -> Unit = {}
 ) {
     GlassCard(
         modifier = modifier.then(
