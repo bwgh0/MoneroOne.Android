@@ -7,6 +7,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import one.monero.moneroone.core.openalias.OpenAliasFailure
+import one.monero.moneroone.ui.screens.send.failureText
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -549,5 +551,28 @@ class UsernameRetireTest {
         assertEquals(unavailable, e.message)
         assertEquals(listOf("info", "lookup alice"), api.calls)
         assertNull(store.state.value.pending)
+    }
+
+    // Send: another person's held name
+
+    @Test fun sendGetsTheHeldResultOnlyForACheckedHold() {
+        val rows = listOf(
+            Triple("checked hold", 451 to heldBody(UsernameHoldReason.ORDER), OpenAliasFailure.USERNAME_HELD),
+            Triple("bad signature", 451 to heldBody(UsernameHoldReason.ORDER, signature = Hold.signatures[UsernameHoldReason.NOTICE]),
+                OpenAliasFailure.USERNAME_UNAVAILABLE),
+            Triple("other 451", 451 to """{"error":{"code":"geo.blocked"}}""", OpenAliasFailure.USERNAME_UNAVAILABLE),
+            Triple("no body", 451 to null, OpenAliasFailure.USERNAME_UNAVAILABLE),
+            Triple("not found", 404 to """{"error":{"code":"handle.not_found"}}""", OpenAliasFailure.USERNAME_UNAVAILABLE),
+            Triple("found", 200 to "{}", null),
+        )
+        for ((name, answer, expected) in rows) {
+            assertEquals(name, expected, UsernameLookupAnswer.failure(answer.first, answer.second, "alice", Hold.KEY))
+        }
+        // Another name's hold, or no handle named: unavailable.
+        assertEquals(OpenAliasFailure.USERNAME_UNAVAILABLE, UsernameLookupAnswer.failure(451, heldBody(UsernameHoldReason.ORDER), "bobby", Hold.KEY))
+        assertEquals(OpenAliasFailure.USERNAME_UNAVAILABLE, UsernameLookupAnswer.failure(451, heldBody(UsernameHoldReason.ORDER), null, Hold.KEY))
+        // A held name keeps today's text until its own text lands, and a retry does not help.
+        assertEquals(failureText(OpenAliasFailure.USERNAME_UNAVAILABLE), failureText(OpenAliasFailure.USERNAME_HELD))
+        assertFalse(OpenAliasFailure.USERNAME_HELD.canRetry)
     }
 }

@@ -62,7 +62,9 @@ enum class DnssecStatus { VALID, OFF }
 
 enum class OpenAliasFailure {
     NO_RECORD, SEVERAL_ADDRESSES, PAYMENT_ID, INVALID_ADDRESS, WRONG_NETWORK,
-    DNSSEC_FAILED, TIMEOUT, NETWORK, TOR, USERNAME_UNAVAILABLE, USERNAME_VERIFICATION, USERNAME_STALE, USERNAME_NOT_CONFIGURED;
+    DNSSEC_FAILED, TIMEOUT, NETWORK, TOR, USERNAME_UNAVAILABLE, USERNAME_VERIFICATION, USERNAME_STALE, USERNAME_NOT_CONFIGURED,
+    /** The registry holds the name (`451 name.held`, its notice checked with the pinned registrar key). */
+    USERNAME_HELD;
 
     /** The errors that a second try can fix. */
     val canRetry: Boolean get() = this == TIMEOUT || this == NETWORK || this == TOR

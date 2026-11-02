@@ -609,7 +609,8 @@ private fun dnssecWord(dnssec: DnssecStatus): String =
     if (dnssec == DnssecStatus.VALID) tr("DNSSEC valid") else tr("DNSSEC off")
 
 internal fun failureText(failure: OpenAliasFailure): String = when (failure) {
-    OpenAliasFailure.USERNAME_UNAVAILABLE -> tr("This username is unavailable")
+    // A held name keeps the unavailable text until its own text lands.
+    OpenAliasFailure.USERNAME_UNAVAILABLE, OpenAliasFailure.USERNAME_HELD -> tr("This username is unavailable")
     OpenAliasFailure.USERNAME_VERIFICATION -> tr("Username signature check failed. Do not send to this address.")
     OpenAliasFailure.USERNAME_STALE -> tr("The public username records are too old for a first payment. Try again later.")
     OpenAliasFailure.USERNAME_NOT_CONFIGURED -> tr("Username payments aren't available yet")

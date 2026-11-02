@@ -80,6 +80,20 @@ data class UsernameResolutionConfiguration(val registry: UsernameConfiguration, 
     }
 }
 
+/** How the registry's refusal of a Send lookup shows. */
+internal object UsernameLookupAnswer {
+    /**
+     * The failure for a lookup answer with HTTP [status], or null for a status that is not a refusal of the
+     * name. A `451 name.held` for [held] whose notice passes the check with [registrarKey] is
+     * [OpenAliasFailure.USERNAME_HELD]; any other 451, or a 404, keeps the unavailable result.
+     */
+    fun failure(status: Int, body: String?, held: String?, registrarKey: String): OpenAliasFailure? = when {
+        status == 451 && body != null && held != null && UsernameHold.parse(body, held, registrarKey) != null -> OpenAliasFailure.USERNAME_HELD
+        status == 404 || status == 451 -> OpenAliasFailure.USERNAME_UNAVAILABLE
+        else -> null
+    }
+}
+
 /** Saves signed evidence before exposing a payment destination. Receipts are
  * never evicted: forgetting a genesis would silently restore first-contact trust. */
 class UsernameResolver(private val context: Context,
@@ -95,9 +109,21 @@ class UsernameResolver(private val context: Context,
         val client = buildDohClient(if (tor is TorState.On) 30_000 else 15_000, (tor as? TorState.On)?.proxy)
             .newBuilder().followRedirects(false).followSslRedirects(false).callTimeout(45, TimeUnit.SECONDS).build()
         try {
-            fun fetch(base: String, path: String): ByteArray {
+            /**
+             * [held] names the handle of the registry lookup: its `451 name.held` with a notice that passes the
+             * check is [OpenAliasFailure.USERNAME_HELD]. A 451 is an answer: the lookup stops there and never
+             * reads the mirror.
+             */
+            fun fetch(base: String, path: String, held: String? = null): ByteArray {
                 client.newCall(Request.Builder().url("$base/$path").header("Cache-Control", "no-cache").build()).execute().use { response ->
-                    if (response.code == 404 || response.code == 451) throw LookupFailure(OpenAliasFailure.USERNAME_UNAVAILABLE)
+                    if (response.code == 404 || response.code == 451) {
+                        val body = if (response.code == 451 && held != null) response.body?.source()?.let { source ->
+                            source.request(65_537)
+                            if (source.buffer.size > 65_536) null else source.readUtf8()
+                        } else null
+                        throw LookupFailure(UsernameLookupAnswer.failure(response.code, body, held, configuration.registry.registrarKey)
+                            ?: OpenAliasFailure.USERNAME_UNAVAILABLE)
+                    }
                     if (response.code != 200) throw LookupFailure(netError)
                     val source = response.body?.source() ?: throw LookupFailure(netError)
                     source.request(4_194_305)
@@ -112,7 +138,7 @@ class UsernameResolver(private val context: Context,
             val api = configuration.registry.url
             val mirror = configuration.mirror
             // The operator is checked on every resolve, including holds.
-            val rows = JSONObject(String(fetch(api, "v1/handles/$handle"), Charsets.UTF_8)).getJSONArray("records")
+            val rows = JSONObject(String(fetch(api, "v1/handles/$handle", held = handle), Charsets.UTF_8)).getJSONArray("records")
             if (rows.length() !in 1..4096) throw LookupFailure(OpenAliasFailure.USERNAME_VERIFICATION)
             val records = JSONArray().apply { for (i in 0 until rows.length()) put(rows.getJSONObject(i).getString("record")) }
             val rules = String(fetch(api, "v1/rules"), Charsets.UTF_8)
