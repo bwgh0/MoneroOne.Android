@@ -17,6 +17,7 @@
     <string name="l10n_s_is_up_to_date_48532316" formatted="false">"%s 已是最新"</string>
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$s 公里"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"半径 %1$s 公里"</string>
+    <string name="l10n_s_of_s_confirmations_f0f22b2a" formatted="false">"确认数 %1$s/%2$s"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s / %2$s 个单词"</string>
     <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"确认数 %s/10"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%2$s：%1$s"</string>
@@ -731,6 +732,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"备注仅保存在这部手机上。"</string>
     <string name="l10n_open_ed077f3d" formatted="false">"开盘"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"打开“设置”"</string>
+    <string name="l10n_open_the_username_claim_04d1dfba" formatted="false">"打开用户名注册"</string>
     <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"打开你的用户名卡片"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"正在打开设备钱包…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"打开地址选择器以更改收款地址"</string>
@@ -747,6 +749,7 @@
     <string name="l10n_opens_the_receive_screen_with_your_address_and_qr_code_9118b3d5" formatted="false">"打开收款页面，显示你的地址和二维码"</string>
     <string name="l10n_opens_the_send_transaction_screen_280e34b5" formatted="false">"打开发送交易页面"</string>
     <string name="l10n_opens_the_transaction_in_an_in_app_browser_88c02a39" formatted="false">"在 App 内浏览器中打开此交易"</string>
+    <string name="l10n_opens_the_username_claim_44a44748" formatted="false">"打开用户名注册"</string>
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"打开钱包列表，选择款项转入哪个钱包"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"打开钱包列表，你可以在其中切换、重新命名或添加钱包"</string>
     <string name="l10n_opens_your_username_card_9482da3c" formatted="false">"打开你的用户名卡片"</string>
@@ -840,6 +843,7 @@
     <string name="l10n_receive_xmr_36808f57" formatted="false">"接收 XMR"</string>
     <string name="l10n_receive_xmr_to_start_tracking_your_wallet_s_value_2ca47a95" formatted="false">"收到 XMR 后即可开始跟踪钱包价值。"</string>
     <string name="l10n_received_49f19bee" formatted="false">"已收款"</string>
+    <string name="l10n_received_s_1cbab545" formatted="false">"已收款 %1$s"</string>
     <string name="l10n_received_s_xmr_c7cf4364" formatted="false">"已收款 %1$s XMR"</string>
     <string name="l10n_received_an_implausible_xmr_price_keeping_the_last_know_ba5ee207" formatted="false">"收到的 XMR 价格不合理。将继续使用上次已知的价格。"</string>
     <string name="l10n_received_an_out_of_date_price_response_keeping_the_last_6012a12e" formatted="false">"收到的价格数据已过期。将继续使用上次已知的价格。"</string>

@@ -17,6 +17,7 @@
     <string name="l10n_s_is_up_to_date_48532316" formatted="false">"%s is bijgewerkt"</string>
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$s km"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"Straal van %1$s km"</string>
+    <string name="l10n_s_of_s_confirmations_f0f22b2a" formatted="false">"%1$s van %2$s bevestigingen"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s van %2$s woorden"</string>
     <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"%s van 10 bevestigingen"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%1$s op %2$s"</string>
@@ -731,6 +732,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Alleen deze telefoon bewaart de notitie."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Opening"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Open Instellingen"</string>
+    <string name="l10n_open_the_username_claim_04d1dfba" formatted="false">"Het claimen van een gebruikersnaam openen"</string>
     <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"Je gebruikersnaamkaart openen"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Hardwareportemonnee openen…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Opent de adreskiezer om het ontvangstadres te wijzigen"</string>
@@ -747,6 +749,7 @@
     <string name="l10n_opens_the_receive_screen_with_your_address_and_qr_code_9118b3d5" formatted="false">"Opent het ontvangstscherm met je adres en QR-code"</string>
     <string name="l10n_opens_the_send_transaction_screen_280e34b5" formatted="false">"Opent het scherm om een transactie te verzenden"</string>
     <string name="l10n_opens_the_transaction_in_an_in_app_browser_88c02a39" formatted="false">"Opent de transactie in een browser in de app"</string>
+    <string name="l10n_opens_the_username_claim_44a44748" formatted="false">"Opent het claimen van een gebruikersnaam"</string>
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"Opent de lijst met portemonnees om te kiezen waar het geld naartoe gaat"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"Opent de lijst met portemonnees, waar je portemonnees kunt wisselen, hernoemen of toevoegen"</string>
     <string name="l10n_opens_your_username_card_9482da3c" formatted="false">"Opent je gebruikersnaamkaart"</string>
@@ -840,6 +843,7 @@
     <string name="l10n_receive_xmr_36808f57" formatted="false">"Ontvang XMR"</string>
     <string name="l10n_receive_xmr_to_start_tracking_your_wallet_s_value_2ca47a95" formatted="false">"Ontvang XMR om de waarde van je portemonnee te volgen."</string>
     <string name="l10n_received_49f19bee" formatted="false">"Ontvangen"</string>
+    <string name="l10n_received_s_1cbab545" formatted="false">"%1$s ontvangen"</string>
     <string name="l10n_received_s_xmr_c7cf4364" formatted="false">"%1$s XMR ontvangen"</string>
     <string name="l10n_received_an_implausible_xmr_price_keeping_the_last_know_ba5ee207" formatted="false">"Onwaarschijnlijke XMR-prijs ontvangen. De laatst bekende waarde blijft staan."</string>
     <string name="l10n_received_an_out_of_date_price_response_keeping_the_last_6012a12e" formatted="false">"Verouderde prijsgegevens ontvangen. De laatst bekende waarde blijft staan."</string>

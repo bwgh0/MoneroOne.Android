@@ -17,6 +17,7 @@
     <string name="l10n_s_is_up_to_date_48532316" formatted="false">"%s is up to date"</string>
     <string name="l10n_s_km_7ae04f84" formatted="false">"%s km"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"%s km radius"</string>
+    <string name="l10n_s_of_s_confirmations_f0f22b2a" formatted="false">"%s of %s confirmations"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%s of %s words"</string>
     <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"%s of 10 confirmations"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%s on %s"</string>
@@ -731,6 +732,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Only this phone keeps the note."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Open"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Open Settings"</string>
+    <string name="l10n_open_the_username_claim_04d1dfba" formatted="false">"Open the username claim"</string>
     <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"Open your username card"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Opening device wallet…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Opens address picker to change receiving address"</string>
@@ -747,6 +749,7 @@
     <string name="l10n_opens_the_receive_screen_with_your_address_and_qr_code_9118b3d5" formatted="false">"Opens the receive screen with your address and QR code"</string>
     <string name="l10n_opens_the_send_transaction_screen_280e34b5" formatted="false">"Opens the send transaction screen"</string>
     <string name="l10n_opens_the_transaction_in_an_in_app_browser_88c02a39" formatted="false">"Opens the transaction in an in-app browser"</string>
+    <string name="l10n_opens_the_username_claim_44a44748" formatted="false">"Opens the username claim"</string>
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"Opens the wallet list to choose where the money goes"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"Opens the wallet list, where you can switch, rename or add wallets"</string>
     <string name="l10n_opens_your_username_card_9482da3c" formatted="false">"Opens your username card"</string>
@@ -840,6 +843,7 @@
     <string name="l10n_receive_xmr_36808f57" formatted="false">"Receive XMR"</string>
     <string name="l10n_receive_xmr_to_start_tracking_your_wallet_s_value_2ca47a95" formatted="false">"Receive XMR to start tracking your wallet’s value."</string>
     <string name="l10n_received_49f19bee" formatted="false">"Received"</string>
+    <string name="l10n_received_s_1cbab545" formatted="false">"Received %s"</string>
     <string name="l10n_received_s_xmr_c7cf4364" formatted="false">"Received %s XMR"</string>
     <string name="l10n_received_an_implausible_xmr_price_keeping_the_last_know_ba5ee207" formatted="false">"Received an implausible XMR price. Keeping the last known value."</string>
     <string name="l10n_received_an_out_of_date_price_response_keeping_the_last_6012a12e" formatted="false">"Received an out-of-date price response. Keeping the last known value."</string>

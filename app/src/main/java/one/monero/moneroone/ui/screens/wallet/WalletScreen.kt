@@ -3,7 +3,6 @@ package one.monero.moneroone.ui.screens.wallet
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.geometry.CornerRadius
@@ -369,12 +368,6 @@ fun WalletScreen(
                 expanded = switcherExpanded,
                 onToggleSwitcher = { switcherExpanded = !switcherExpanded }
             )
-            if (offersUsername && !switcherExpanded) {
-                TextButton(onClick = { activeWallet?.let { usernames.open(it); shownUsername = null; showUsername = true } }) {
-                    Text(tr("Get Your Username"), color = MoneroOrange)
-                }
-            }
-
             // Offline banner, 8dp under the greeting as in the iOS header:
             // slides down from the top and fades in, and leaves the same way
             // (tokens.json motion.curves.banner, tween 350). Its slot grows
@@ -485,6 +478,9 @@ fun WalletScreen(
                             BalanceCard(
                                 username = ownUsername,
                                 onUsernameTap = { shownUsername = ownUsername; showUsername = true },
+                                onClaimUsername = if (offersUsername) {
+                                    { activeWallet?.let { usernames.open(it); shownUsername = null; showUsername = true } }
+                                } else null,
                                 balance = walletState.balance.all,
                                 unlockedBalance = walletState.balance.unlocked,
                                 formatXmr = walletViewModel::formatXmr,
@@ -695,10 +691,38 @@ private fun GreetingHeader(
     }
 }
 
+/** The balance card's first row: "@name" once claimed, the invite before (iOS BalanceCard.nameRow). */
+@Composable
+private fun NameRow(
+    label: androidx.compose.ui.text.AnnotatedString,
+    color: Color = Color.Unspecified,
+    description: String,
+    actionLabel: String,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    // Follows the text size up to 20 (iOS usernameMaxSize); one size for every name length.
+    val fontSize = with(LocalDensity.current) { minOf(18.sp.toDp(), 20.dp).toSp() }
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        .clearAndSetSemantics {
+            contentDescription = description
+            role = Role.Button
+            onClick(label = actionLabel) { onClick(); true }
+        }
+        .clickable(onClick = onClick)
+        .padding(horizontal = 24.dp).testTag(testTag), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = color, fontSize = fontSize, letterSpacing = (-0.35).sp, fontWeight = FontWeight.Medium, maxLines = 1,
+            overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+    }
+}
+
 @Composable
 internal fun BalanceCard(
     username: UsernameBinding? = null,
     onUsernameTap: () -> Unit = {},
+    /** Set while the wallet can claim a username: the name row invites the claim, in the slot "@name" takes after it. */
+    onClaimUsername: (() -> Unit)? = null,
     balance: Long,
     unlockedBalance: Long,
     formatXmr: (Long) -> String,
@@ -780,24 +804,27 @@ internal fun BalanceCard(
     }) {
         Column {
         if (username != null) {
-            // Follows the text size up to 20 (iOS usernameMaxSize); one size for every name length.
-            val usernameFontSize = with(LocalDensity.current) { minOf(18.sp.toDp(), 20.dp).toSp() }
             // TalkBack reads "Your username, @name" and then "Double-tap to open your username card", as VoiceOver does on iOS.
-            val usernameLabel = tr("Your username, %s", username.shortName)
-            val usernameAction = tr("Open your username card")
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                .clearAndSetSemantics {
-                    contentDescription = usernameLabel
-                    role = Role.Button
-                    onClick(label = usernameAction) { onUsernameTap(); true }
-                }
-                .clickable(onClick = onUsernameTap)
-                .padding(horizontal = 24.dp).testTag("wallet.username"), verticalAlignment = Alignment.CenterVertically) {
-                Text(androidx.compose.ui.text.buildAnnotatedString {
+            NameRow(
+                label = androidx.compose.ui.text.buildAnnotatedString {
                     pushStyle(androidx.compose.ui.text.SpanStyle(color = usernameEdge)); append("@"); pop(); append(username.displayHandle)
-                }, fontSize = usernameFontSize, letterSpacing = (-0.35).sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-            }
+                },
+                description = tr("Your username, %s", username.shortName),
+                actionLabel = tr("Open your username card"),
+                testTag = "wallet.username",
+                onClick = onUsernameTap
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+        } else if (onClaimUsername != null) {
+            // The invite takes the row "@name" takes after the claim, so a claim changes one row (iOS).
+            NameRow(
+                label = androidx.compose.ui.text.AnnotatedString(tr("Get Your Username")),
+                color = MoneroOrange,
+                description = tr("Get Your Username"),
+                actionLabel = tr("Open the username claim"),
+                testTag = "wallet.usernameInvite",
+                onClick = onClaimUsername
+            )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
         }
         Column(

@@ -17,6 +17,7 @@
     <string name="l10n_s_is_up_to_date_48532316" formatted="false">"%s은(는) 최신 상태입니다"</string>
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$skm"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"반경 %1$skm"</string>
+    <string name="l10n_s_of_s_confirmations_f0f22b2a" formatted="false">"확인 수 %1$s/%2$s"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s / %2$s단어"</string>
     <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"확인 수 %s/10"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%2$s의 %1$s"</string>
@@ -731,6 +732,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"메모는 이 휴대폰에만 저장됩니다."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"시가"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"설정 열기"</string>
+    <string name="l10n_open_the_username_claim_04d1dfba" formatted="false">"사용자 이름 등록 열기"</string>
     <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"내 사용자 이름 카드 열기"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"기기 지갑 여는 중…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"받는 주소를 변경할 수 있는 주소 선택기를 엽니다"</string>
@@ -747,6 +749,7 @@
     <string name="l10n_opens_the_receive_screen_with_your_address_and_qr_code_9118b3d5" formatted="false">"주소와 QR 코드가 있는 받기 화면을 엽니다"</string>
     <string name="l10n_opens_the_send_transaction_screen_280e34b5" formatted="false">"보내기 화면을 엽니다"</string>
     <string name="l10n_opens_the_transaction_in_an_in_app_browser_88c02a39" formatted="false">"앱 내 브라우저에서 거래를 엽니다"</string>
+    <string name="l10n_opens_the_username_claim_44a44748" formatted="false">"사용자 이름 등록을 엽니다"</string>
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"돈이 들어갈 지갑을 선택할 수 있도록 지갑 목록을 엽니다"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"지갑을 전환하거나 이름을 변경하거나 추가할 수 있는 지갑 목록을 엽니다"</string>
     <string name="l10n_opens_your_username_card_9482da3c" formatted="false">"내 사용자 이름 카드를 엽니다"</string>
@@ -840,6 +843,7 @@
     <string name="l10n_receive_xmr_36808f57" formatted="false">"XMR 받기"</string>
     <string name="l10n_receive_xmr_to_start_tracking_your_wallet_s_value_2ca47a95" formatted="false">"XMR을 받으면 지갑 가치 추적이 시작됩니다."</string>
     <string name="l10n_received_49f19bee" formatted="false">"받음"</string>
+    <string name="l10n_received_s_1cbab545" formatted="false">"%1$s 받음"</string>
     <string name="l10n_received_s_xmr_c7cf4364" formatted="false">"%1$s XMR 받음"</string>
     <string name="l10n_received_an_implausible_xmr_price_keeping_the_last_know_ba5ee207" formatted="false">"비정상적인 XMR 가격을 받았습니다. 마지막으로 확인된 값을 유지합니다."</string>
     <string name="l10n_received_an_out_of_date_price_response_keeping_the_last_6012a12e" formatted="false">"오래된 가격 응답을 받았습니다. 마지막으로 확인된 값을 유지합니다."</string>

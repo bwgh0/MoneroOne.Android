@@ -17,6 +17,7 @@
     <string name="l10n_s_is_up_to_date_48532316" formatted="false">"%s は最新です"</string>
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$s km"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"半径%1$s km"</string>
+    <string name="l10n_s_of_s_confirmations_f0f22b2a" formatted="false">"承認数 %1$s/%2$s"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s / %2$s語"</string>
     <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"承認数 %s/10"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%1$s（%2$s宛）"</string>
@@ -731,6 +732,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"メモはこの端末にのみ保存されます。"</string>
     <string name="l10n_open_ed077f3d" formatted="false">"始値"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"設定を開く"</string>
+    <string name="l10n_open_the_username_claim_04d1dfba" formatted="false">"ユーザ名の取得を開く"</string>
     <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"ユーザ名カードを開く"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"デバイスウォレットを開いています…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"受取アドレスを変更するためのアドレス選択画面を開きます"</string>
@@ -747,6 +749,7 @@
     <string name="l10n_opens_the_receive_screen_with_your_address_and_qr_code_9118b3d5" formatted="false">"アドレスとQRコードを表示する受け取り画面を開きます"</string>
     <string name="l10n_opens_the_send_transaction_screen_280e34b5" formatted="false">"送金画面を開きます"</string>
     <string name="l10n_opens_the_transaction_in_an_in_app_browser_88c02a39" formatted="false">"App内ブラウザでトランザクションを開きます"</string>
+    <string name="l10n_opens_the_username_claim_44a44748" formatted="false">"ユーザ名の取得を開きます"</string>
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"ウォレットリストを開き、お金の送り先を選びます"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"ウォレットリストを開きます。ウォレットの切り替え、名称変更、追加ができます"</string>
     <string name="l10n_opens_your_username_card_9482da3c" formatted="false">"ユーザ名カードを開きます"</string>
@@ -840,6 +843,7 @@
     <string name="l10n_receive_xmr_36808f57" formatted="false">"XMRを受け取る"</string>
     <string name="l10n_receive_xmr_to_start_tracking_your_wallet_s_value_2ca47a95" formatted="false">"XMRを受け取ると、ウォレットの価値の記録が始まります。"</string>
     <string name="l10n_received_49f19bee" formatted="false">"受取済み"</string>
+    <string name="l10n_received_s_1cbab545" formatted="false">"受取済み %1$s"</string>
     <string name="l10n_received_s_xmr_c7cf4364" formatted="false">"受取済み %1$s XMR"</string>
     <string name="l10n_received_an_implausible_xmr_price_keeping_the_last_know_ba5ee207" formatted="false">"不自然なXMR価格を受信しました。最後に取得した値を使用します。"</string>
     <string name="l10n_received_an_out_of_date_price_response_keeping_the_last_6012a12e" formatted="false">"古い価格データを受信しました。最後に取得した値を使用します。"</string>

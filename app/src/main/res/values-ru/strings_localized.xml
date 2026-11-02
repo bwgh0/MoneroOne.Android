@@ -17,6 +17,7 @@
     <string name="l10n_s_is_up_to_date_48532316" formatted="false">"%s: данные актуальны"</string>
     <string name="l10n_s_km_7ae04f84" formatted="false">"%1$s км"</string>
     <string name="l10n_s_km_radius_0ce6b318" formatted="false">"Радиус %1$s км"</string>
+    <string name="l10n_s_of_s_confirmations_f0f22b2a" formatted="false">"%1$s из %2$s подтверждений"</string>
     <string name="l10n_s_of_s_words_262b50ac" formatted="false">"%1$s из %2$s слов"</string>
     <string name="l10n_s_of_10_confirmations_b16ca550" formatted="false">"%s из 10 подтверждений"</string>
     <string name="l10n_s_on_s_745fc552" formatted="false">"%1$s на «%2$s»"</string>
@@ -731,6 +732,7 @@
     <string name="l10n_only_this_phone_keeps_the_note_7ab4fa09" formatted="false">"Заметку хранит только этот телефон."</string>
     <string name="l10n_open_ed077f3d" formatted="false">"Открытие"</string>
     <string name="l10n_open_settings_3f940108" formatted="false">"Открыть Настройки"</string>
+    <string name="l10n_open_the_username_claim_04d1dfba" formatted="false">"Открыть регистрацию имени пользователя"</string>
     <string name="l10n_open_your_username_card_0c0ad8d9" formatted="false">"Открыть карточку вашего имени пользователя"</string>
     <string name="l10n_opening_device_wallet_3ac96873" formatted="false">"Открытие кошелька устройства…"</string>
     <string name="l10n_opens_address_picker_to_change_receiving_address_153e531f" formatted="false">"Открывает выбор адреса, чтобы сменить адрес получения"</string>
@@ -747,6 +749,7 @@
     <string name="l10n_opens_the_receive_screen_with_your_address_and_qr_code_9118b3d5" formatted="false">"Открывает экран получения с вашим адресом и QR-кодом"</string>
     <string name="l10n_opens_the_send_transaction_screen_280e34b5" formatted="false">"Открывает экран отправки транзакции"</string>
     <string name="l10n_opens_the_transaction_in_an_in_app_browser_88c02a39" formatted="false">"Открывает транзакцию во встроенном браузере"</string>
+    <string name="l10n_opens_the_username_claim_44a44748" formatted="false">"Открывает регистрацию имени пользователя"</string>
     <string name="l10n_opens_the_wallet_list_to_choose_where_the_money_goes_8e1668c9" formatted="false">"Открывает список кошельков, чтобы выбрать, куда поступят деньги"</string>
     <string name="l10n_opens_the_wallet_list_where_you_can_switch_rename_or_ad_900e32f3" formatted="false">"Открывает список кошельков, где можно переключать, переименовывать и добавлять кошельки"</string>
     <string name="l10n_opens_your_username_card_9482da3c" formatted="false">"Открывает карточку вашего имени пользователя"</string>
@@ -840,6 +843,7 @@
     <string name="l10n_receive_xmr_36808f57" formatted="false">"Получить XMR"</string>
     <string name="l10n_receive_xmr_to_start_tracking_your_wallet_s_value_2ca47a95" formatted="false">"Получите XMR, чтобы начать отслеживать стоимость кошелька."</string>
     <string name="l10n_received_49f19bee" formatted="false">"Получено"</string>
+    <string name="l10n_received_s_1cbab545" formatted="false">"Получено %1$s"</string>
     <string name="l10n_received_s_xmr_c7cf4364" formatted="false">"Получено %1$s XMR"</string>
     <string name="l10n_received_an_implausible_xmr_price_keeping_the_last_know_ba5ee207" formatted="false">"Получена неправдоподобная цена XMR. Сохранено последнее известное значение."</string>
     <string name="l10n_received_an_out_of_date_price_response_keeping_the_last_6012a12e" formatted="false">"Получен устаревший ответ о цене. Сохранено последнее известное значение."</string>

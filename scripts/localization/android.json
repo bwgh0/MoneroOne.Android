@@ -2089,5 +2089,22 @@
     "uk": "Гаманець ще відкривається. Повторіть спробу за мить.",
     "zh-Hans": "你的钱包仍在打开。请稍后重试。",
     "zh-Hant": "你的錢包仍在開啟中。請稍後再試一次。"
+  },
+  "Open the username claim": {
+    "de": "Registrierung eines Benutzernamens öffnen",
+    "es": "Abrir la reserva de un nombre de usuario",
+    "fr": "Ouvrir la réservation d’un nom d’utilisateur",
+    "it": "Apri la richiesta del nome utente",
+    "ja": "ユーザ名の取得を開く",
+    "ko": "사용자 이름 등록 열기",
+    "nl": "Het claimen van een gebruikersnaam openen",
+    "pl": "Otwórz rezerwację nazwy użytkownika",
+    "pt-BR": "Abrir a reserva de nome de usuário",
+    "ro": "Deschide rezervarea numelui de utilizator",
+    "ru": "Открыть регистрацию имени пользователя",
+    "tr": "Kullanıcı adı talebini aç",
+    "uk": "Відкрити реєстрацію імені користувача",
+    "zh-Hans": "打开用户名注册",
+    "zh-Hant": "打開使用者名稱註冊"
   }
 }
