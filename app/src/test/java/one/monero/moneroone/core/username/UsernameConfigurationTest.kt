@@ -32,18 +32,18 @@ class UsernameConfigurationTest {
     }
 
     @Test fun configurationKeepsTheTermsVersionAndTrimsTheUrl() {
-        val release = UsernameConfiguration.from("https://registry.monero.one/", key, rules, "terms-pending-v1", debug = false)
-        assertEquals(UsernameConfiguration("https://registry.monero.one", key, rules, "terms-pending-v1"), release)
+        val release = UsernameConfiguration.from("https://registry.monero.one/", key, rules, "usernames-2026-11-01", debug = false)
+        assertEquals(UsernameConfiguration("https://registry.monero.one", key, rules, "usernames-2026-11-01"), release)
         assertNotNull(UsernameConfiguration.from("https://staging-registry.monero.one", key, rules, "local-development-v1", debug = true))
     }
 
     @Test fun configurationRefusesBadKeysAndTermsVersions() {
         val url = "https://registry.monero.one"
-        assertNull(UsernameConfiguration.from(url, "A".repeat(64), rules, "terms-pending-v1", debug = false))
-        assertNull(UsernameConfiguration.from(url, key, "b".repeat(63), "terms-pending-v1", debug = false))
+        assertNull(UsernameConfiguration.from(url, "A".repeat(64), rules, "usernames-2026-11-01", debug = false))
+        assertNull(UsernameConfiguration.from(url, key, "b".repeat(63), "usernames-2026-11-01", debug = false))
         assertNull(UsernameConfiguration.from(url, key, rules, "", debug = false))
         assertNull(UsernameConfiguration.from(url, key, rules, "terms pending", debug = false))
         assertNull(UsernameConfiguration.from(url, key, rules, "t".repeat(65), debug = false))
-        assertNull(UsernameConfiguration.from("", key, rules, "terms-pending-v1", debug = false))
+        assertNull(UsernameConfiguration.from("", key, rules, "usernames-2026-11-01", debug = false))
     }
 }

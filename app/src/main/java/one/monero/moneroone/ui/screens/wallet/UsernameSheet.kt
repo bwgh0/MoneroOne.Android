@@ -90,6 +90,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import one.monero.moneroone.BuildConfig
 import one.monero.moneroone.R
 import one.monero.moneroone.core.locale.tr
 import one.monero.moneroone.core.locale.trRes
@@ -556,7 +557,10 @@ fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, m
                                 modifier = Modifier.graphicsLayer { alpha = shown })
                         } else if (stage == UsernameStage.CONFIRM) {
                             Text(tr("Usernames are permanent."))
-                            Text(tr("This is a local development claim."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            // A development build must not pretend this is public registration.
+                            if (BuildConfig.DEBUG) {
+                                Text(tr("This is a local development claim."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                             UsernamePrimary(tr("Claim @%s", state.input)) {
                                 edge = ClaimEdge(System.nanoTime())
                                 landed = 0

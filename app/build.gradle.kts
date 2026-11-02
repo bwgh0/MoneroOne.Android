@@ -25,8 +25,8 @@ val usernameProduction = mapOf(
     "usernameGenesisRoot" to "37c80669fb410913857b678d9aea9a54c5344fe152c0fb247549040d05477f26",
     "usernameRegistrarKey" to "40f69d3b401370c38c6f0b62976a688fd44b56abe22be66168b1f9a44822a988",
     "usernameRulesHash" to "b775ea7a655fd01c57820f09d08a421e51b0739240fbd940f399e65bd6fcdeac",
-    // Placeholder until the terms text exists: replace it before a release build ships.
-    "usernameTermsVersion" to "terms-pending-v1",
+    // The Username Terms the claim agrees to (monero.one/username-terms); both registries accept this version.
+    "usernameTermsVersion" to "usernames-2026-11-01",
 )
 val usernameStaging = mapOf(
     "usernameRegistryUrl" to "https://staging-registry.monero.one",
@@ -34,7 +34,7 @@ val usernameStaging = mapOf(
     "usernameGenesisRoot" to "f0f5024f667e6957ce56d0a746a358b5bae36f7772dd56a0dd489a66a85e815e",
     "usernameRegistrarKey" to "809d48344049bab6e37503094af5b3a947184ee0be45b304305d7c916d1588e2",
     "usernameRulesHash" to "b775ea7a655fd01c57820f09d08a421e51b0739240fbd940f399e65bd6fcdeac",
-    "usernameTermsVersion" to "local-development-v1",
+    "usernameTermsVersion" to "usernames-2026-11-01",
 )
 val usernameFields = mapOf(
     "usernameRegistryUrl" to "USERNAME_REGISTRY_URL",
