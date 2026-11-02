@@ -26,6 +26,7 @@ serialization = "1.6.3"
 work = "2.10.0"
 glance = "1.2.0-rc01"
 playIntegrity = "1.6.0"
+tink = "1.8.0"
 
 [libraries]
 # AndroidX Core
@@ -103,6 +104,9 @@ androidx-glance-material3 = { group = "androidx.glance", name = "glance-material
 
 # Play Integrity (standard API) for username claims
 play-integrity = { group = "com.google.android.play", name = "integrity", version.ref = "playIntegrity" }
+
+# Tink (pure Java Ed25519): username hold notices and registrar countersignatures
+tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tink" }
 
 # Logging
 timber = { group = "com.jakewharton.timber", name = "timber", version = "5.0.1" }

@@ -7,7 +7,10 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import one.monero.moneroone.BuildConfig
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URI
 import java.util.concurrent.TimeUnit
@@ -69,11 +72,36 @@ data class HeldName(
 interface UsernameRegistryApi {
     /** The rules text, after the registry's info matches the pinned configuration for [network]. */
     suspend fun checkedRules(network: String): String
-    /** The held name, or null while the handle is free. */
+    /**
+     * The held name, or null while the handle is free. A name the registry holds throws [UsernameException]
+     * [UsernameException.HELD] with its checked hold; one whose notice fails the check throws the generic error.
+     */
     suspend fun lookup(handle: String): HeldName?
     suspend fun nonce(handle: String, subaddress: String): String
     /** Posts the signed claim. Returns the handle and the record the registry admitted. */
     suspend fun claim(pending: PendingUsernameClaim, device: DeviceProof): Pair<String, String>
+    /**
+     * Posts an owner record (`POST /v1/handles/{handle}/records` with `{record, owner_signatures}`): here a
+     * tombstone. Returns the handle and the record the registry admitted. A hold throws as in [lookup].
+     */
+    suspend fun appendRecord(handle: String, record: String, ownerSignatures: List<String>): Pair<String, String>
+}
+
+/** How a registry refusal becomes a [UsernameException]. */
+internal object UsernameRegistryAnswer {
+    /**
+     * The failure for an answer with HTTP [status] and body [text]. [held] names the handle of a lookup or an
+     * owner record: a `451 name.held` for it is [UsernameException.HELD] once its notice passes the check with
+     * [registrarKey]. A notice that fails a check, or a hold for another request, gives the generic error with
+     * no reason. Other codes stay as the registry sends them (for example [UsernameException.TERMS_OUTDATED]).
+     */
+    fun failure(status: Int, text: String, held: String?, registrarKey: String): UsernameException {
+        val body = runCatching { Json.parseToJsonElement(text) }.getOrNull()
+        val code = ((body as? JsonObject)?.get("error") as? JsonObject)?.get("code").text() ?: "server"
+        if (code != UsernameException.HELD) return UsernameException(code)
+        val hold = if (status == 451 && held != null && body != null) UsernameHold.parse(body, held, registrarKey) else null
+        return if (hold != null) UsernameException(UsernameException.HELD, hold) else UsernameException("server")
+    }
 }
 
 /** The shared Rust core's claim operations. Unit tests replace it. */
@@ -89,7 +117,8 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
     private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
         .callTimeout(25, TimeUnit.SECONDS).build()
 
-    private suspend fun request(path: String, body: JSONObject? = null): String = withContext(Dispatchers.IO) {
+    /** [held]: the handle of a lookup or an owner record, whose `451 name.held` gives its checked hold. */
+    private suspend fun request(path: String, body: JSONObject? = null, held: String? = null): String = withContext(Dispatchers.IO) {
         val request = Request.Builder().url("${configuration.url}/v1/$path").apply {
             if (body != null) post(body.toString().toRequestBody("application/json".toMediaType()))
         }.build()
@@ -98,10 +127,7 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
             source.request(1_048_577)
             if (source.buffer.size > 1_048_576) throw UsernameException("verification")
             val text = source.readUtf8()
-            if (!response.isSuccessful) {
-                val code = runCatching { JSONObject(text).getJSONObject("error").getString("code") }.getOrDefault("server")
-                throw UsernameException(code)
-            }
+            if (!response.isSuccessful) throw UsernameRegistryAnswer.failure(response.code, text, held, configuration.registrarKey)
             text
         }
     }
@@ -114,7 +140,7 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
     }
 
     override suspend fun lookup(handle: String): HeldName? {
-        val found = try { JSONObject(request("handles/$handle")) }
+        val found = try { JSONObject(request("handles/$handle", held = handle)) }
             catch (e: UsernameException) { if (e.code == "handle.not_found") return null else throw e }
         val rows = found.getJSONArray("records")
         val head = found.opt("head") as? JSONObject
@@ -134,6 +160,12 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
         val response = JSONObject(request("claims", json("nonce" to pending.nonce, "record" to pending.unsignedRecord,
             "owner_signature" to pending.ownerSignature, "device" to json("platform" to device.platform, "proof" to device.proof),
             "terms_version" to configuration.termsVersion)))
+        return response.optString("handle") to response.getString("record")
+    }
+
+    override suspend fun appendRecord(handle: String, record: String, ownerSignatures: List<String>): Pair<String, String> {
+        val body = JSONObject().put("record", record).put("owner_signatures", JSONArray(ownerSignatures))
+        val response = JSONObject(request("handles/$handle/records", body, held = handle))
         return response.optString("handle") to response.getString("record")
     }
 }
@@ -206,7 +238,8 @@ class UsernameRegistry internal constructor(
             }
             val rules = api.checkedRules(network)
             if (!isCurrentWallet()) throw UsernameException("wallet_changed")
-            api.lookup(handle)?.let { found ->
+            // A held name stops the claim here, and a saved claim stays.
+            lookUp(handle, network, store)?.let { found ->
                 val records = found.records.map { it.record }
                 // A slow earlier POST can land after the re-check found the name free.
                 val own = earlier?.takeIf { records.size == 1 && core.isOwnClaim(records[0], it) }
@@ -248,7 +281,8 @@ class UsernameRegistry internal constructor(
             store.savePending(null)
             return Recheck.Cleared
         }
-        val records = api.lookup(pending.handle)?.records?.map { it.record }
+        // A held name throws here and keeps the saved claim: its result is not known.
+        val records = lookUp(pending.handle, pending.network, store)?.records?.map { it.record }
         if (records == null) {
             store.savePending(null)
             return Recheck.Cleared
@@ -257,6 +291,19 @@ class UsernameRegistry internal constructor(
         if (records.size == 1 && core.isOwnClaim(records[0], pending)) return Recheck.Finished(bind(records[0], pending, store))
         store.savePending(null)
         return Recheck.Cleared
+    }
+
+    /**
+     * `GET /v1/handles/{handle}`. The store learns the name's hold: a checked hold is saved, then thrown as
+     * [UsernameException.HELD]; a live or unknown name clears it. A hold is an answer: nothing is read elsewhere.
+     */
+    private suspend fun lookUp(handle: String, network: String, store: UsernameStore): HeldName? {
+        val found = try { api.lookup(handle) } catch (e: UsernameException) {
+            e.hold?.let { store.noteHold(it, handle, network) }
+            throw e
+        }
+        store.noteHold(null, handle, network)
+        return found
     }
 
     private suspend fun submit(pending: PendingUsernameClaim, device: DeviceProof, store: UsernameStore): UsernameBinding {
@@ -304,6 +351,86 @@ class UsernameRegistry internal constructor(
     private fun bind(record: String, pending: PendingUsernameClaim, store: UsernameStore, usesFreeClaim: Boolean = true): UsernameBinding =
         UsernameBinding(pending.walletKey, pending.network, pending.handle, pending.displayHandle, pending.subaddress,
             pending.recordHash, record, System.currentTimeMillis()).also { store.accept(it, usesFreeClaim) }
+
+    // The wallet's own name: its state and its retire.
+
+    /**
+     * The registry's state of the wallet's own name. The store learns a hold (or its end), so
+     * [UsernameStore.nameState] shows it; the @name screen runs this when it opens. It signs and saves nothing
+     * else. Throws while the registry cannot answer, or [UsernameException] "verification" when its answer is
+     * not about this name (another genesis or owner).
+     */
+    suspend fun status(binding: UsernameBinding, store: UsernameStore): UsernameNameStatus {
+        val found = try { lookUp(binding.handle, binding.network, store) } catch (e: UsernameException) {
+            e.hold?.let { return UsernameNameStatus.Held(it) }
+            throw e
+        } ?: return UsernameNameStatus.NotFound
+        if (found.handle != binding.handle || found.genesisHash != binding.genesisHash) throw UsernameException("verification")
+        val tombstoned = found.tombstoned ?: throw UsernameException("verification")
+        if (tombstoned) return UsernameNameStatus.Retired
+        // The owner signs the retire: the name must still point to it.
+        val head = UsernameHead.of(found.headSeq, found.headHash)
+        if (found.owner != binding.subaddress || head == null || (head.seq == 0L && head.recordHash != binding.genesisHash))
+            throw UsernameException("verification")
+        return UsernameNameStatus.Live(head)
+    }
+
+    /**
+     * Retires the wallet's own name: signs a tombstone with the owner key and posts it
+     * (`POST /v1/handles/{handle}/records`). A live name gets it at head seq + 1 over the head hash; a `notice`
+     * or `terms` hold at `hold.head.seq + 1` over `hold.head.record_hash`. On success, and when the registry
+     * shows the name retired or gone already, the app forgets the name, its saved claim and its hold; the free
+     * claim date stays.
+     *
+     * Throws [UsernameException]: [UsernameException.HELD] for an `order` or `sanctions` hold (no retire; the
+     * store shows the hold), "wallet_changed", "storage", "pending" (a claim runs), "verification" (a reply that
+     * fails a check: the name stays), and the registry's other refusals as in a claim. [sign] is the claim's
+     * signer: (message, subaddress) to a `SigV2` string.
+     */
+    suspend fun retire(binding: UsernameBinding, store: UsernameStore, sign: suspend (String, String) -> String,
+                       isCurrentWallet: () -> Boolean) {
+        if (!isCurrentWallet() || binding.walletKey.isEmpty()) throw UsernameException("wallet_changed")
+        if (store.storageError) throw UsernameException("storage")
+        // One username request at a time: a claim and a retire never overlap.
+        if (!store.claimMutex.tryLock()) throw UsernameException("pending")
+        try {
+            if (store.state.value.binding(binding.walletKey, binding.network) != binding) throw UsernameException("wallet_changed")
+            val head = when (val status = status(binding, store)) {
+                // An earlier retire landed (its reply was lost), or the epoch erased the name.
+                UsernameNameStatus.Retired, UsernameNameStatus.NotFound -> { store.forget(binding); return }
+                is UsernameNameStatus.Live -> status.head
+                is UsernameNameStatus.Held -> {
+                    val held = status.hold.head?.takeIf { status.hold.allowsRetire }
+                        ?: throw UsernameException(UsernameException.HELD, status.hold)
+                    // A genesis head must be this wallet's genesis.
+                    if (held.seq == 0L && held.recordHash != binding.genesisHash) throw UsernameException("verification")
+                    held
+                }
+            }
+            val unsigned = UsernameTombstone.unsigned(binding.handle, head.seq + 1, head.recordHash)
+                ?: throw UsernameException("verification")
+            if (!isCurrentWallet()) throw UsernameException("wallet_changed")
+            val signature = sign(UsernameTombstone.signingMessage(unsigned), binding.subaddress)
+            if (!signature.startsWith("SigV2")) throw UsernameException("verification")
+            if (!isCurrentWallet()) throw UsernameException("wallet_changed")
+            val reply = try { api.appendRecord(binding.handle, UsernameBase64.encode(unsigned), listOf(signature)) }
+                catch (e: UsernameException) {
+                    when {
+                        // The hold changed to `order` or `sanctions` since the lookup.
+                        e.hold != null -> { store.noteHold(e.hold, binding.handle, binding.network); throw e }
+                        // The same retire landed from an earlier try.
+                        e.code == UsernameException.RETIRED -> null
+                        else -> throw e
+                    }
+                }
+            if (reply != null) {
+                val record = UsernameBase64.decode(reply.second)
+                if (reply.first != binding.handle || record == null ||
+                    !UsernameTombstone.isCountersigned(record, unsigned, configuration.registrarKey)) throw UsernameException("verification")
+            }
+            store.forget(binding)
+        } finally { store.claimMutex.unlock() }
+    }
 }
 
 internal fun json(vararg fields: Pair<String, Any>) = JSONObject().apply { fields.forEach { (k,v) -> put(k,v) } }

@@ -19,7 +19,14 @@ internal class FakeRegistryApi : UsernameRegistryApi {
     val handles = mutableMapOf<String, List<String>>()
     /** Full lookup replies (a restore reads the head, owner and tombstone). They win over [handles]. */
     val found = mutableMapOf<String, HeldName>()
-    /** Each request, in order: "info", "lookup <handle>", "nonce" or "claim". */
+    /**
+     * Refusals of a lookup, by handle: (HTTP status, body). They become failures as in the HTTP client: a
+     * `451 name.held` whose notice passes the check with [registrarKey] throws "name.held" with its hold.
+     */
+    val refusals = mutableMapOf<String, Pair<Int, String>>()
+    /** The pinned registrar key of the HTTP client's hold check. */
+    var registrarKey = testConfiguration.registrarKey
+    /** Each request, in order: "info", "lookup <handle>", "nonce", "claim" or "append <handle>". */
     val calls = mutableListOf<String>()
     var unreachable = false
     /** The registry admits the claim, but its reply never arrives. */
@@ -40,6 +47,7 @@ internal class FakeRegistryApi : UsernameRegistryApi {
     override suspend fun lookup(handle: String): HeldName? {
         reach()
         calls += "lookup $handle"
+        refusals[handle]?.let { (status, body) -> throw UsernameRegistryAnswer.failure(status, body, handle, registrarKey) }
         return (found[handle] ?: handles[handle]?.let { rows -> HeldName(rows.map { HeldRecord(it) }) }).also { afterRecords?.invoke() }
     }
     /** 32 bytes in lowercase hex, as the registry sends them. */
@@ -56,6 +64,19 @@ internal class FakeRegistryApi : UsernameRegistryApi {
         handles[pending.handle] = listOf(record)
         if (loseReply) throw IOException("test reply lost")
         return pending.handle to record
+    }
+    /** The posted owner records: (handle, record, owner signatures). */
+    val appended = mutableListOf<Triple<String, String, List<String>>>()
+    /** The reply to an owner record: (handle, record). With neither this nor [appendRefusal], a post fails the test. */
+    var appendReply: Pair<String, String>? = null
+    /** The registry refuses the owner record: (HTTP status, body), mapped as in [refusals]. */
+    var appendRefusal: Pair<Int, String>? = null
+    override suspend fun appendRecord(handle: String, record: String, ownerSignatures: List<String>): Pair<String, String> {
+        reach()
+        calls += "append $handle"
+        appended += Triple(handle, record, ownerSignatures)
+        appendRefusal?.let { (status, body) -> throw UsernameRegistryAnswer.failure(status, body, handle, registrarKey) }
+        return appendReply ?: throw AssertionError("No owner record may be posted")
     }
 }
 

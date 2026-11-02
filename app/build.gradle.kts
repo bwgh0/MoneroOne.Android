@@ -203,6 +203,8 @@ dependencies {
 
     // Username claims: the device check (Play Integrity, standard API)
     implementation(libs.play.integrity)
+    // Username retire and holds: the registrar's Ed25519 signatures (Tink, already in the app through security-crypto)
+    implementation(libs.tink.android)
 
     // Logging
     implementation(libs.timber)

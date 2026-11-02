@@ -4,14 +4,15 @@ import one.monero.moneroone.core.locale.tr
 import android.content.Context
 import io.horizontalsystems.monerokit.SyncState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import one.monero.moneroone.core.wallet.SecurePrefs
 import one.monero.moneroone.core.wallet.SyncRecovery
-import java.util.Calendar
 import java.util.UUID
 
 @Serializable
@@ -39,7 +40,9 @@ data class UsernameState(
     fun binding(walletKey: String?, network: String) = bindings.firstOrNull {
         !walletKey.isNullOrEmpty() && it.walletKey == walletKey && it.network == network
     }
-    fun hasLocalClaimSlot(now: Long = System.currentTimeMillis()) = nextFreeClaim == null || nextFreeClaim <= now
+    fun hasLocalClaimSlot(now: Long = System.currentTimeMillis()) = inviteHiddenUntil(now) == null
+    /** This phone's next free claim while it is still ahead, else null. Home hides the invite until then. */
+    fun inviteHiddenUntil(now: Long = System.currentTimeMillis()): Long? = nextFreeClaim?.takeIf { it > now }
 }
 
 interface UsernamePersistence {
@@ -72,13 +75,49 @@ class UsernameStore(private val persistence: UsernamePersistence) {
     @Synchronized fun accept(binding: UsernameBinding, usesFreeClaim: Boolean = true) {
         val old = mutable.value.binding(binding.walletKey, binding.network)
         if (old != null && old.genesisHash != binding.genesisHash) throw UsernameException("verification")
-        val next = if (!usesFreeClaim) mutable.value.nextFreeClaim
-            else Calendar.getInstance().apply { timeInMillis = binding.claimedAt; add(Calendar.MONTH, 12) }.timeInMillis
+        // The registry's rule, rounded up. A later saved date stays.
+        val saved = mutable.value.nextFreeClaim
+        val next = if (!usesFreeClaim) saved
+            else UsernameClaimSlot.nextFreeClaim(binding.claimedAt).let { free -> maxOf(free, saved ?: free) }
         save(mutable.value.copy(
             bindings = mutable.value.bindings.filterNot { it.walletKey == binding.walletKey && it.network == binding.network } + binding,
             pending = null, nextFreeClaim = next
         ))
     }
+    /**
+     * After a retire: the name, its saved claim and its hold go. The free claim date stays, so Home hides the
+     * invite until the phone can claim again.
+     */
+    @Synchronized fun forget(binding: UsernameBinding) {
+        val state = mutable.value
+        val pending = state.pending?.takeUnless {
+            it.walletKey == binding.walletKey && it.network == binding.network && it.handle == binding.handle
+        }
+        save(state.copy(bindings = state.bindings.filterNot {
+            it.walletKey == binding.walletKey && it.network == binding.network && it.genesisHash == binding.genesisHash
+        }, pending = pending))
+        heldNames.update { it - holdKey(binding.handle, binding.network) }
+    }
+
+    private val heldNames = MutableStateFlow<Map<String, UsernameHold>>(emptyMap())
+    /**
+     * The checked hold of each name the registry holds, by "network:handle". Kept in memory: the @name screen
+     * checks again when it opens ([UsernameRegistry.status]).
+     */
+    val holds: StateFlow<Map<String, UsernameHold>> = heldNames.asStateFlow()
+    /** Saves the hold of a name, or clears it (null) when the registry shows the name live again or gone. */
+    fun noteHold(hold: UsernameHold?, handle: String, network: String) {
+        val key = holdKey(handle, network)
+        heldNames.update { if (hold == null) it - key else it + (key to hold) }
+    }
+    fun hold(binding: UsernameBinding): UsernameHold? = heldNames.value[holdKey(binding.handle, binding.network)]
+    private fun holdKey(handle: String, network: String) = "$network:$handle"
+    /** This phone's next free claim while it is still ahead, else null. Home hides the invite until then. */
+    fun inviteHiddenUntil(now: Long = System.currentTimeMillis()): Long? = mutable.value.inviteHiddenUntil(now)
+    /** What the @name screen shows for this wallet's name. */
+    fun nameState(binding: UsernameBinding, now: Long = System.currentTimeMillis()) =
+        UsernameNameState(hold(binding), inviteHiddenUntil(now))
+
     private fun save(state: UsernameState) {
         if (storageError) throw UsernameException("storage")
         try { persistence.write(state) } catch (_: Exception) { throw UsernameException("storage") }
@@ -100,12 +139,19 @@ class UsernameStore(private val persistence: UsernamePersistence) {
     }
 }
 
-class UsernameException(val code: String) : Exception(when (code) {
+/**
+ * A username failure, by registry code or app code. [hold] is set for [HELD] only: a `451 name.held` whose
+ * notice passed the check with the pinned registrar key. Its text is the taken text: in the claim flow the
+ * name is not free; the @name screen shows the hold from [UsernameStore.nameState] instead. [TERMS_OUTDATED]
+ * (`400 terms.outdated`): the registry no longer accepts this build's Username Terms version, and only an app
+ * update helps; the saved claim stays, and its text stays the generic error until the update text lands.
+ */
+class UsernameException(val code: String, val hold: UsernameHold? = null) : Exception(when (code) {
     "storage" -> tr("Your username could not be saved securely. Unlock the app and try again.")
     "wallet_changed" -> tr("The wallet changed. Open this flow from the wallet you want to use.")
     "wallet.opening" -> tr("Your wallet is still opening. Try again in a moment.")
     "wallet.offline" -> tr("Could not reach the node. Check your connection and try again.")
-    "name.unavailable" -> tr("This username is unavailable.")
+    "name.unavailable", HELD -> tr("This username is unavailable.")
     "device.slot_used" -> tr("A free username isn't available on this phone.")
     "device.invalid", "device.unsupported" -> tr("This phone can't claim a username.")
     "device.unavailable" -> tr("The claim could not be completed. Please try again.")
@@ -118,6 +164,11 @@ class UsernameException(val code: String) : Exception(when (code) {
     else -> tr("The username service couldn't complete the request. Please try again.")
 }) {
     companion object {
+        const val HELD = "name.held"
+        const val TERMS_OUTDATED = "terms.outdated"
+        /** A tombstone already ends the chain: an earlier retire landed. */
+        const val RETIRED = "chain.record_after_tombstone"
+
         /**
          * A claim step needs the wallet file open, and it is not, though the wallet is the same: it is
          * still opening or connecting, or its node failed and the sync stopped ([SyncRecovery.reopens]).
