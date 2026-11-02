@@ -203,6 +203,7 @@ internal val localizedStrings: Map<String, Int> = mapOf(
     "Broadcast failed: %s" to R.string.l10n_broadcast_failed_s_99ac586d,
     "Broadcasting…" to R.string.l10n_broadcasting_01aaf862,
     "But a rating really helps people find Monero One. I'll never ask again." to R.string.l10n_but_a_rating_really_helps_people_find_monero_one_i_ll_n_5af2ce08,
+    "By claiming, you confirm you are 18 or older and agree to the [Username Terms](https://monero.one/username-terms)." to R.string.l10n_by_claiming_you_confirm_you_are_18_or_older_and_agree_t_06caf4b4,
     "Camera Permission Required" to R.string.l10n_camera_permission_required_9407beac,
     "Camera input not supported" to R.string.l10n_camera_input_not_supported_55e44330,
     "Campus" to R.string.l10n_campus_99a2b0e2,

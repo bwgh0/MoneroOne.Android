@@ -200,6 +200,7 @@
     <string name="l10n_broadcast_failed_s_99ac586d" formatted="false">"전송 실패: %1$s"</string>
     <string name="l10n_broadcasting_01aaf862" formatted="false">"전송 중…"</string>
     <string name="l10n_but_a_rating_really_helps_people_find_monero_one_i_ll_n_5af2ce08" formatted="false">"그래도 평점은 사람들이 Monero One을 찾는 데 정말 도움이 돼요. 다시는 부탁하지 않을게요."</string>
+    <string name="l10n_by_claiming_you_confirm_you_are_18_or_older_and_agree_t_06caf4b4" formatted="false">"등록하면 만 18세 이상임을 확인하고 [사용자 이름 약관](https://monero.one/username-terms)에 동의하게 됩니다."</string>
     <string name="l10n_camera_permission_required_9407beac" formatted="false">"카메라 권한 필요"</string>
     <string name="l10n_camera_input_not_supported_55e44330" formatted="false">"카메라 입력이 지원되지 않음"</string>
     <string name="l10n_campus_99a2b0e2" formatted="false">"캠퍼스"</string>

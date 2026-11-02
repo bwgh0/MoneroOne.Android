@@ -200,6 +200,7 @@
     <string name="l10n_broadcast_failed_s_99ac586d" formatted="false">"Transmiterea a eșuat: %1$s"</string>
     <string name="l10n_broadcasting_01aaf862" formatted="false">"Se transmite…"</string>
     <string name="l10n_but_a_rating_really_helps_people_find_monero_one_i_ll_n_5af2ce08" formatted="false">"Dar o evaluare chiar îi ajută pe oameni să găsească Monero One. Nu voi mai cere niciodată."</string>
+    <string name="l10n_by_claiming_you_confirm_you_are_18_or_older_and_agree_t_06caf4b4" formatted="false">"Prin rezervare, confirmi că ai cel puțin 18 ani și accepți [Termenii pentru numele de utilizator](https://monero.one/username-terms)."</string>
     <string name="l10n_camera_permission_required_9407beac" formatted="false">"Este necesară permisiunea camerei"</string>
     <string name="l10n_camera_input_not_supported_55e44330" formatted="false">"Camera nu este acceptată"</string>
     <string name="l10n_campus_99a2b0e2" formatted="false">"Campus"</string>

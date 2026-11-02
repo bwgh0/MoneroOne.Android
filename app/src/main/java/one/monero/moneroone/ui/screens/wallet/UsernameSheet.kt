@@ -80,12 +80,16 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -561,11 +565,14 @@ fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, m
                             if (BuildConfig.DEBUG) {
                                 Text(tr("This is a local development claim."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            UsernamePrimary(tr("Claim @%s", state.input)) {
-                                edge = ClaimEdge(System.nanoTime())
-                                landed = 0
-                                arrived = 0
-                                model.claim(wallet, session, wallets)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                UsernamePrimary(tr("Claim @%s", state.input)) {
+                                    edge = ClaimEdge(System.nanoTime())
+                                    landed = 0
+                                    arrived = 0
+                                    model.claim(wallet, session, wallets)
+                                }
+                                UsernameTermsNote()
                             }
                         }
                         // The buttons are laid out, hidden, as soon as the result is in, so the pop does
@@ -628,6 +635,30 @@ fun UsernameSheet(wallet: WalletInfo, session: Long, wallets: WalletViewModel, m
         Text("${wallet.emoji} ${wallet.name}", fontWeight = FontWeight.Medium)
     }
 }
+/**
+ * The agreement the claim records (the terms version is in build.gradle.kts). The link opens in the
+ * browser, like the monero.one links in Settings, and TalkBack reads it as a link (iOS termsNote).
+ */
+@Composable private fun UsernameTermsNote() {
+    val text = tr("By claiming, you confirm you are 18 or older and agree to the [Username Terms](https://monero.one/username-terms).")
+    val brand = MoneroOrange
+    val note = remember(text, brand) { markdownLinks(text, TextLinkStyles(SpanStyle(color = brand))) }
+    Text(note, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+}
+
+/** Each "[words](https://...)" in a translated string becomes a link on the words, as iOS Text reads its Markdown. */
+internal fun markdownLinks(text: String, styles: TextLinkStyles? = null): AnnotatedString = buildAnnotatedString {
+    var at = 0
+    for (match in MARKDOWN_LINK.findAll(text)) {
+        append(text, at, match.range.first)
+        withLink(LinkAnnotation.Url(match.groupValues[2], styles)) { append(match.groupValues[1]) }
+        at = match.range.last + 1
+    }
+    append(text, at, text.length)
+}
+
+private val MARKDOWN_LINK = Regex("""\[([^\]]+)]\((https://[^)\s]+)\)""")
+
 /** The sheet's primary button. The whole button takes taps (the iOS Continue bug: text only). */
 @Composable internal fun UsernamePrimary(title: String, enabled: Boolean = true, action: () -> Unit) {
     Button(onClick = action, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),

@@ -200,6 +200,7 @@
     <string name="l10n_broadcast_failed_s_99ac586d" formatted="false">"Не вдалося передати транзакцію в мережу: %1$s"</string>
     <string name="l10n_broadcasting_01aaf862" formatted="false">"Передавання в мережу…"</string>
     <string name="l10n_but_a_rating_really_helps_people_find_monero_one_i_ll_n_5af2ce08" formatted="false">"Але оцінка справді допомагає людям знайти Monero One. Більше я не проситиму."</string>
+    <string name="l10n_by_claiming_you_confirm_you_are_18_or_older_and_agree_t_06caf4b4" formatted="false">"Реєструючи ім’я, ви підтверджуєте, що вам виповнилося 18 років, і приймаєте [Умови для імен користувачів](https://monero.one/username-terms)."</string>
     <string name="l10n_camera_permission_required_9407beac" formatted="false">"Потрібен доступ до камери"</string>
     <string name="l10n_camera_input_not_supported_55e44330" formatted="false">"Введення з камери не підтримується"</string>
     <string name="l10n_campus_99a2b0e2" formatted="false">"Кампус"</string>

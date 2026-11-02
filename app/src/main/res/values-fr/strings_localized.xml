@@ -200,6 +200,7 @@
     <string name="l10n_broadcast_failed_s_99ac586d" formatted="false">"Échec de la diffusion : %1$s"</string>
     <string name="l10n_broadcasting_01aaf862" formatted="false">"Diffusion…"</string>
     <string name="l10n_but_a_rating_really_helps_people_find_monero_one_i_ll_n_5af2ce08" formatted="false">"Mais une note aide vraiment les gens à trouver Monero One. Je ne le redemanderai jamais."</string>
+    <string name="l10n_by_claiming_you_confirm_you_are_18_or_older_and_agree_t_06caf4b4" formatted="false">"En réservant, vous confirmez avoir 18 ans ou plus et acceptez les [Conditions des noms d’utilisateur](https://monero.one/username-terms)."</string>
     <string name="l10n_camera_permission_required_9407beac" formatted="false">"Autorisation de caméra requise"</string>
     <string name="l10n_camera_input_not_supported_55e44330" formatted="false">"Entrée de l’appareil photo non prise en charge"</string>
     <string name="l10n_campus_99a2b0e2" formatted="false">"Campus"</string>
