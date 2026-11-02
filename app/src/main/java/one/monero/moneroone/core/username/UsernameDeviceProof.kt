@@ -101,7 +101,8 @@ object UsernameDeviceProof {
 
 /**
  * Picks the device proof of a claim. A release build sends only a Play Integrity proof.
- * A debug build sends the development proof when the phone cannot make a token.
+ * A debug build sends the development proof when the phone cannot make a token, and the
+ * staging test proof first when a launch gave the test key ([UsernameTestDevice], debug source set).
  */
 class UsernameDeviceGate(debug: Boolean, private val integrity: IntegrityTokenSource?) {
     // The build-time guard: a release build never sends the development proof.
@@ -109,6 +110,9 @@ class UsernameDeviceGate(debug: Boolean, private val integrity: IntegrityTokenSo
 
     /** Throws [UsernameException]: "not_configured", "device.unsupported" or "device.unavailable". */
     suspend fun proof(pending: PendingUsernameClaim, deviceId: String, claimKey: suspend () -> String): DeviceProof {
+        // A debug launch with the staging test key: an emulator cannot pass Play Integrity, so the
+        // signed dev proof goes first. Release builds hold a stub that is never active.
+        if (development && UsernameTestDevice.active) UsernameTestDevice.proof(claimKey())?.let { return it }
         val source = integrity ?: return fallback(deviceId, "not_configured")
         val requestHash = UsernameDeviceProof.requestHash(UsernameDeviceProof.claimDigest(pending))
         val key = claimKey()

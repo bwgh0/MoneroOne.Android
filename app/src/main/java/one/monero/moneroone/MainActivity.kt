@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import one.monero.moneroone.core.username.UsernameTestDevice
 import one.monero.moneroone.paymentlinks.PaymentLinkStore
 import one.monero.moneroone.ui.navigation.MoneroOneNavHost
 import one.monero.moneroone.ui.theme.MoneroOneTheme
@@ -24,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        UsernameTestDevice.capture(this, intent)
         acceptPaymentLink(intent)
     }
 
@@ -56,6 +58,8 @@ class MainActivity : AppCompatActivity() {
         // only changed this process's copy): it was taken on the first launch, so it must not
         // queue the claim sheet again. A new link while the app is up comes through onNewIntent.
         if (savedInstanceState == null) acceptPaymentLink(intent)
+        // Debug builds: the staging test device key from the launch. The release stub does nothing.
+        UsernameTestDevice.capture(this, intent)
         // A language change recreates this activity: rename the channels to match.
         (application as MoneroOneApp).createNotificationChannels()
 
