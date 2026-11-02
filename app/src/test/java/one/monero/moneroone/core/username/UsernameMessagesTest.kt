@@ -17,6 +17,10 @@ class UsernameMessagesTest {
             "not_configured" to "Username registration isn't available yet.",
             "device.slot_used" to "A free username isn't available on this phone.",
             "name.unavailable" to "This username is unavailable.",
+            // A checked hold in the claim flow: the name is not free.
+            "name.held" to "This username is unavailable.",
+            // An app update helps; the generic text stays until the update text lands.
+            "terms.outdated" to "The username service couldn't complete the request. Please try again.",
             "handle.reserved" to "This username is reserved to protect users from scams.",
             "handle.blocked" to "This username is reserved to protect users from scams.",
             "rate_limited" to "The username service couldn't complete the request. Please try again.",

@@ -156,6 +156,26 @@ class UsernameClaimFlowTest {
         assertNotNull(store.state.value.pending)
     }
 
+    /**
+     * registry e2e claims.rs: an old terms version gets 400 terms.outdated, and the nonce and the phone's claim
+     * slot stay unused. The saved claim stays (the user updates the app and claims again); the text stays the
+     * generic error until the update text lands.
+     */
+    @Test fun outdatedTermsGiveTheirOwnFailureAndKeepTheSavedClaim() {
+        api.claimError = UsernameException.TERMS_OUTDATED
+        val e = failure { claim() } as UsernameException
+        assertEquals("terms.outdated", e.code)
+        assertEquals("The username service couldn't complete the request. Please try again.", e.message)
+        assertEquals(1, api.claims)
+        assertNotNull(store.state.value.pending)
+        assertNotNull(UsernameStore(disk).state.value.pending)
+        assertTrue(store.state.value.bindings.isEmpty())
+        assertNull(store.state.value.nextFreeClaim)
+        // Another 400 is not an outdated app.
+        api.claimError = "request.bad_field"
+        assertEquals("request.bad_field", code { claim() })
+    }
+
     @Test fun aStorageFailureStopsBeforeThePost() {
         disk.fail = true
         assertEquals("storage", code { claim() })
