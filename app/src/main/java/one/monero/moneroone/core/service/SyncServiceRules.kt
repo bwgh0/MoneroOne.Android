@@ -23,3 +23,43 @@ internal object SyncTimeLimit {
     fun shouldStop(nowUptime: Long, lastForegroundUptime: Long, appInForeground: Boolean): Boolean =
         !appInForeground && nowUptime >= stopAt(lastForegroundUptime)
 }
+
+/**
+ * Foreground starts sent whose onStartCommand has not run yet. A service stopped before it
+ * calls startForeground crashes the app (ForegroundServiceDidNotStartInTimeException), so a
+ * stop asked for while a start is pending runs after that start instead.
+ */
+internal class PendingStarts {
+    private var count = 0
+    private var stopWhenStarted = false
+
+    /** A foreground start was sent. It cancels an earlier stop that waits for a start. */
+    @Synchronized
+    fun sent() {
+        count++
+        stopWhenStarted = false
+    }
+
+    @Synchronized
+    fun any(): Boolean = count > 0
+
+    /** Stop the service as soon as the pending starts have run. */
+    @Synchronized
+    fun stopWhenStarted() {
+        if (count > 0) stopWhenStarted = true
+    }
+
+    /**
+     * A foreground start reached onStartCommand. True when it is the last pending start and a
+     * stop waits for it: the service then stops right after its startForeground.
+     */
+    @Synchronized
+    fun ran(): Boolean {
+        count = (count - 1).coerceAtLeast(0)
+        if (count == 0 && stopWhenStarted) {
+            stopWhenStarted = false
+            return true
+        }
+        return false
+    }
+}

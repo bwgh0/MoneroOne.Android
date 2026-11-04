@@ -29,7 +29,6 @@ import one.monero.moneroone.R
 import one.monero.moneroone.core.wallet.WalletManager
 import one.monero.moneroone.core.wallet.WalletStore
 import timber.log.Timber
-import java.util.concurrent.atomic.AtomicInteger
 
 class WalletSyncService : Service() {
 
@@ -45,13 +44,13 @@ class WalletSyncService : Service() {
          * stopped before it calls startForeground crashes the app
          * (ForegroundServiceDidNotStartInTimeException).
          */
-        private val pendingStarts = AtomicInteger(0)
+        private val pendingStarts = PendingStarts()
 
         fun start(context: Context) {
             val intent = Intent(context, WalletSyncService::class.java)
             try {
                 context.startForegroundService(intent)
-                pendingStarts.incrementAndGet()
+                pendingStarts.sent()
             } catch (e: IllegalStateException) {
                 // Android 12+ throws ForegroundServiceStartNotAllowedException
                 // when the app may not start a foreground service now.
@@ -61,16 +60,19 @@ class WalletSyncService : Service() {
 
         fun stop(context: Context) {
             val intent = Intent(context, WalletSyncService::class.java)
-            if (pendingStarts.get() > 0) {
+            if (pendingStarts.any()) {
                 // The app came back before the service ran (a quick trip to the
                 // background). stopService now would crash the app; a stop action
                 // runs after the pending start has called startForeground.
                 try {
                     context.startService(intent.setAction(ACTION_STOP))
-                    return
                 } catch (e: IllegalStateException) {
-                    Timber.w(e, "WalletSyncService: stop action not allowed")
+                    // stopService would still crash the app here. The pending start
+                    // stops the service right after its startForeground instead.
+                    Timber.w(e, "WalletSyncService: stop action not allowed, stopping after the pending start")
+                    pendingStarts.stopWhenStarted()
                 }
+                return
             }
             context.stopService(intent)
         }
@@ -79,6 +81,13 @@ class WalletSyncService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private val handler = Handler(Looper.getMainLooper())
+
+    /**
+     * The startId of the last onStartCommand. stopSelf(lastStartId) leaves a foreground
+     * start that is still pending alone: stopping before it calls startForeground
+     * crashes the app (ForegroundServiceDidNotStartInTimeException).
+     */
+    private var lastStartId = 0
 
     /** Uptime when the app was last in the foreground: the dataSync time limit counts from it. */
     private var lastForegroundUptime = 0L
@@ -99,6 +108,7 @@ class WalletSyncService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        lastStartId = startId
         if (intent?.action == ACTION_STOP) {
             // From the notification's Stop button or from stop(): a plain start,
             // not a foreground one. stopSelf(startId) leaves a later start alone.
@@ -107,7 +117,8 @@ class WalletSyncService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        if (intent != null) pendingStarts.updateAndGet { (it - 1).coerceAtLeast(0) }
+        // True when stop() ran while this start was pending.
+        val stopAfterStart = intent != null && pendingStarts.ran()
 
         // Every branch calls startForeground before it stops: a foreground start
         // that stops first crashes the app (ForegroundServiceDidNotStartInTimeException).
@@ -123,8 +134,9 @@ class WalletSyncService : Service() {
 
         // A null intent is a system restart after the process died. The new
         // process has no open wallet, so stop.
-        if (intent == null || !inForeground) {
+        if (intent == null || !inForeground || stopAfterStart) {
             if (intent == null) Timber.d("WalletSyncService: restart without a wallet, stopping")
+            if (stopAfterStart) Timber.d("WalletSyncService: stop asked for while starting, stopping")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf(startId)
             return START_NOT_STICKY
@@ -154,8 +166,10 @@ class WalletSyncService : Service() {
      */
     override fun onTimeout(startId: Int, fgsType: Int) {
         Timber.w("WalletSyncService: dataSync time limit reached, stopping")
+        // Not onTimeout's startId: the system passes the last start sent, which can
+        // still be pending. stopForeground alone meets the time limit.
         stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        stopSelf(lastStartId)
     }
 
     /**
@@ -179,7 +193,7 @@ class WalletSyncService : Service() {
         }
         Timber.w("WalletSyncService: dataSync time limit is near, stopping")
         stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        stopSelf(lastStartId)
     }
 
     override fun onDestroy() {
