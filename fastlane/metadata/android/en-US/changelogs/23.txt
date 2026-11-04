@@ -1,0 +1,1 @@
+- Fixes rare crashes in background sync, seed word entry and at app launch.
