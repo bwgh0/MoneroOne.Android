@@ -226,6 +226,31 @@ class UsernameClaimFlowTest {
         assertEquals(2, requestHashes.distinct().size)
     }
 
+    /**
+     * Audit F3: Google refreshes device recall only in the warmup, so every claim and every retry prepares its
+     * own provider. A provider kept from the first claim would show the phone's claim slot as unused again.
+     */
+    @Test fun eachClaimAndEachRetryPreparesANewIntegrityProvider() {
+        val play = FakePlayIntegrity()
+        val integrity = PlayIntegrityTokenSource(play)
+        // A first claim whose reply is lost, then its retry: the name was still free, so a new claim runs.
+        api.loseReply = true
+        failure { claim(integrity = integrity, developmentClaims = false) }
+        api.handles.clear()
+        api.loseReply = false
+        claim(integrity = integrity, developmentClaims = false)
+        // A transient Play failure, then a retry.
+        play.requestErrors += com.google.android.play.core.integrity.model.StandardIntegrityErrorCode.NETWORK_ERROR
+        assertEquals("device.unavailable", code { claim("Ann", "wallet-b", integrity = integrity, developmentClaims = false) })
+        // Another wallet's claim on the same phone.
+        claim("Ann", "wallet-b", integrity = integrity, developmentClaims = false)
+        assertEquals(4, play.prepares)
+        assertEquals(listOf(1, 2, 3, 4), play.requests.map { it.first })
+        // Each POST carried the token of its own provider.
+        assertEquals(UsernameDeviceProof.android("token-4", testClaimKey), api.device)
+        assertEquals(3, api.claims)
+    }
+
     @Test fun aPhoneThatCannotMakeATokenSavesNoPendingClaim() {
         for ((failure, release) in listOf(IntegrityFailure.PERMANENT to "device.unsupported", IntegrityFailure.TRANSIENT to "device.unavailable",
                                           IntegrityFailure.NOT_CONFIGURED to "not_configured")) {

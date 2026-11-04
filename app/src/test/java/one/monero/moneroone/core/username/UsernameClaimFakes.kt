@@ -81,6 +81,30 @@ internal class FakeRegistryApi : UsernameRegistryApi {
 }
 
 /**
+ * Play Integrity, in memory. Each prepare (Google's warmup) makes a new provider with the next number; a
+ * provider's token is "token-<number>".
+ */
+internal class FakePlayIntegrity : StandardIntegrityPlay {
+    var prepares = 0
+        private set
+    /** Each token request, in order: (provider number, request hash). */
+    val requests = mutableListOf<Pair<Int, String>>()
+    /** The error codes of the next requests, in order. */
+    val requestErrors = ArrayDeque<Int>()
+    /** The error code of every prepare, while set. */
+    var prepareError: Int? = null
+    override suspend fun prepare(): StandardIntegrityProvider {
+        prepareError?.let { throw PlayIntegrityError(it) }
+        val provider = ++prepares
+        return StandardIntegrityProvider { requestHash ->
+            requests += provider to requestHash
+            requestErrors.removeFirstOrNull()?.let { throw PlayIntegrityError(it) }
+            "token-$provider"
+        }
+    }
+}
+
+/**
  * A genesis record as the fake core reads it: what the real one's verify_claim checks (the record hash,
  * handle, owner subaddress, network, registrar key and rules hash), in one string.
  */
