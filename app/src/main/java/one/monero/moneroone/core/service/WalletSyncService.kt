@@ -7,8 +7,16 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import io.horizontalsystems.monerokit.SyncState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,8 +78,23 @@ class WalletSyncService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    private val handler = Handler(Looper.getMainLooper())
+
+    /** Uptime when the app was last in the foreground: the dataSync time limit counts from it. */
+    private var lastForegroundUptime = 0L
+
+    private val timeLimitGuard = Runnable { onTimeLimitGuard() }
+
+    private val appLifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onStop(owner: LifecycleOwner) {
+            lastForegroundUptime = SystemClock.uptimeMillis()
+            armTimeLimitGuard()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
+        ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
         Timber.d("WalletSyncService: created")
     }
 
@@ -107,6 +130,10 @@ class WalletSyncService : Service() {
             return START_NOT_STICKY
         }
 
+        // start() runs when the app leaves the foreground or from the Sync screen.
+        lastForegroundUptime = SystemClock.uptimeMillis()
+        armTimeLimitGuard()
+
         scope.launch {
             WalletManager.syncStateFlow.collect { state ->
                 val notification = buildNotification(state)
@@ -131,8 +158,34 @@ class WalletSyncService : Service() {
         stopSelf()
     }
 
+    /**
+     * Some Android 15+ devices never call onTimeout, and the app then crashes at
+     * the limit. So the service also stops itself a minute before it.
+     */
+    private fun armTimeLimitGuard() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+        handler.removeCallbacks(timeLimitGuard)
+        handler.postAtTime(timeLimitGuard, SyncTimeLimit.stopAt(lastForegroundUptime))
+    }
+
+    private fun onTimeLimitGuard() {
+        val now = SystemClock.uptimeMillis()
+        val appInForeground = ProcessLifecycleOwner.get().lifecycle.currentState
+            .isAtLeast(Lifecycle.State.STARTED)
+        if (appInForeground) lastForegroundUptime = now
+        if (!SyncTimeLimit.shouldStop(now, lastForegroundUptime, appInForeground)) {
+            armTimeLimitGuard()
+            return
+        }
+        Timber.w("WalletSyncService: dataSync time limit is near, stopping")
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacks(timeLimitGuard)
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(appLifecycleObserver)
         scope.cancel()
         Timber.d("WalletSyncService: destroyed")
     }
