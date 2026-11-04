@@ -48,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -81,9 +82,11 @@ import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import one.monero.moneroone.core.locale.pluralTr
@@ -289,6 +292,8 @@ private fun SeedWordCell(
     val emptyLabel = tr("Empty")
     val invalidLabel = tr("Not in the word list")
     var wasFocused by remember { mutableStateOf(false) }
+    // Length of the text the field last laid out. See caretWithinLayout.
+    var laidOutLength by remember { mutableIntStateOf(0) }
     val numberStyle = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = TabularFigures)
 
     Row(
@@ -310,8 +315,9 @@ private fun SeedWordCell(
         }
         SeedWordInput(onDeleteWhenEmpty = { emptyBackspace(entry, index, onEffect) }) {
             BasicTextField(
-                value = value,
+                value = if (wasFocused) value else caretWithinLayout(value, laidOutLength),
                 onValueChange = { onEffect(entry.onValueChange(index, it)) },
+                onTextLayout = { laidOutLength = it.layoutInput.text.length },
                 modifier = Modifier
                     .weight(1f)
                     // As tall as the cell: the scroll view keeps the focused field
@@ -518,6 +524,27 @@ internal fun seedWordInputType(inputType: Int, keepTextType: Boolean): Int =
         InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
             InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
     }
+
+/**
+ * [value] with its caret held inside the text the field last laid out.
+ *
+ * Code puts a word with its caret at the end into a cell (paste, a picked
+ * suggestion). When that cell takes focus in the same frame, before the new
+ * word is laid out, Compose places the caret against the old layout and
+ * crashes ("offset(5) is out of bounds [0, 0)"). A cell without focus shows
+ * no caret, so the held caret does not change what the cell shows. After the
+ * next layout the lengths match and [value] passes through unchanged.
+ */
+internal fun caretWithinLayout(value: TextFieldValue, laidOutLength: Int): TextFieldValue {
+    val selection = value.selection
+    if (selection.max <= laidOutLength) return value
+    return value.copy(
+        selection = TextRange(
+            selection.start.coerceAtMost(laidOutLength),
+            selection.end.coerceAtMost(laidOutLength)
+        )
+    )
+}
 
 /**
  * True when a seed field keeps the plain text type, so that the keyboard
