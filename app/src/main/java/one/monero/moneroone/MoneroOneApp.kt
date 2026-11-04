@@ -102,9 +102,16 @@ class MoneroOneApp : Application() {
             PriceAlertWorker.schedule(this)
         }
 
-        // Refresh all widgets on startup
-        PriceWidget.updateAll(this)
-        WalletWidget.updateAll(this)
+        // Refresh all widgets on startup, off Main: each refresh makes binder calls to the
+        // widget service and draws bitmaps, and on Main it held up the launch (ANR).
+        thread(name = "widget-refresh", isDaemon = true) {
+            try {
+                PriceWidget.updateAll(this)
+                WalletWidget.updateAll(this)
+            } catch (e: Exception) {
+                Timber.w(e, "Widget refresh on startup failed")
+            }
+        }
 
         Timber.d("MoneroOne Application started")
     }

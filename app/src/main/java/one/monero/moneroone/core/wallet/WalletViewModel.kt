@@ -477,7 +477,8 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                             currency.symbol
                         )
                         // The 24h line and its high/low come from ChartViewModel.
-                        PriceWidget.updateAll(context)
+                        // Off Main: the redraw makes binder calls per widget.
+                        viewModelScope.launch(Dispatchers.IO) { PriceWidget.updateAll(context) }
                     }
                     fetchingCurrency = null
                 }
@@ -1508,7 +1509,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
                     .edit()
                     .clear()
                     .apply()
-                WalletWidget.updateAll(context)
+                withContext(Dispatchers.IO) { WalletWidget.updateAll(context) }
 
                 // OpenAlias pins record which names were paid.
                 OpenAliasPinStore.create(context).clearAll()

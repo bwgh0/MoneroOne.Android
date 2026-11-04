@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +35,8 @@ import one.monero.moneroone.ui.components.GlassCard
 import one.monero.moneroone.ui.theme.MoneroTheme
 import one.monero.moneroone.widget.WalletWidget
 import one.monero.moneroone.widget.WidgetDataStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Settings > Home Screen Widget, as iOS WidgetSettingsView: one switch that
@@ -43,6 +46,7 @@ import one.monero.moneroone.widget.WidgetDataStore
 @Composable
 fun WidgetSettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var walletWidgetEnabled by remember { mutableStateOf(WidgetDataStore.isWalletWidgetEnabled(context)) }
 
     Column(
@@ -82,7 +86,9 @@ fun WidgetSettingsScreen(onBack: () -> Unit) {
                     onCheckedChange = { enabled ->
                         walletWidgetEnabled = enabled
                         WidgetDataStore.setWalletWidgetEnabled(context, enabled)
-                        WalletWidget.updateAll(context)
+                        // Off Main: the redraw makes binder calls per widget.
+                        val appContext = context.applicationContext
+                        scope.launch(Dispatchers.IO) { WalletWidget.updateAll(appContext) }
                     },
                     showDivider = false
                 )
