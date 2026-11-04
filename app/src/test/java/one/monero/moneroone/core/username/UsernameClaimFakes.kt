@@ -71,11 +71,17 @@ internal class FakeRegistryApi : UsernameRegistryApi {
     var appendReply: Pair<String, String>? = null
     /** The registry refuses the owner record: (HTTP status, body), mapped as in [refusals]. */
     var appendRefusal: Pair<Int, String>? = null
+    /** The registry admits the owner record, but its reply never arrives. */
+    var loseAppendReply = false
+    /** The saved retires on the phone when the owner record went out. */
+    var retiresAtPost: List<UsernameRetireAttempt>? = null
     override suspend fun appendRecord(handle: String, record: String, ownerSignatures: List<String>): Pair<String, String> {
         reach()
         calls += "append $handle"
         appended += Triple(handle, record, ownerSignatures)
+        retiresAtPost = store?.state?.value?.retires
         appendRefusal?.let { (status, body) -> throw UsernameRegistryAnswer.failure(status, body, handle, registrarKey) }
+        if (loseAppendReply) throw IOException("test reply lost")
         return appendReply ?: throw AssertionError("No owner record may be posted")
     }
 }

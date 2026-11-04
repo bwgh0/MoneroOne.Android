@@ -150,6 +150,19 @@ object UsernameTombstone {
     }
 
     /**
+     * True when a lookup's chain ([records], oldest first) ends in a tombstone of [binding]'s name that the
+     * registrar countersigned with [registrarKey]: the tombstone this phone saved before its POST ([attempt]),
+     * or one at seq 1 over the name's genesis (a retire of the claim's chain from another phone). The lookup's
+     * `tombstoned` flag, a 404 and a `chain.record_after_tombstone` refusal are not signed, so they prove no
+     * retire (audit F12). [UsernameRegistry.retire] accepts a 404 only after an earlier saved retire.
+     */
+    fun endsRetired(records: List<HeldRecord>, binding: UsernameBinding, attempt: UsernameRetireAttempt?, registrarKey: String): Boolean {
+        val last = records.lastOrNull()?.record?.let(UsernameBase64::decode) ?: return false
+        val saved = attempt?.takeIf { it.isFor(binding) }?.unsigned?.let(UsernameBase64::decode)
+        return listOfNotNull(saved, unsigned(binding.handle, 1, binding.genesisHash)).any { isCountersigned(last, it, registrarKey) }
+    }
+
+    /**
      * oah-core `validate_label`: 3 to 15 of a-z, 0-9 and _, a letter first, no `__`. The blocked-name list is
      * not checked: a name that the list blocks later can still retire.
      */
@@ -193,9 +206,17 @@ sealed interface UsernameNameStatus {
     data class Live(val head: UsernameHead) : UsernameNameStatus
     /** The registry holds the name, and the notice passed its check. */
     data class Held(val hold: UsernameHold) : UsernameNameStatus
-    /** The chain ends in a tombstone; the erasure runs at the next epoch. */
+    /**
+     * The chain ends in a tombstone of this name that the registrar countersigned
+     * ([UsernameTombstone.endsRetired]); the erasure runs at the next epoch. [UsernameRegistry.retire] then
+     * forgets the name and signs nothing.
+     */
     data object Retired : UsernameNameStatus
-    /** The registry has no such name (erased, or never registered there). */
+    /**
+     * The registry answered 404: erased, or never registered there. The answer is not signed, so the name
+     * stays on this phone. [UsernameRegistry.retire] forgets it only when this phone saved a retire in an
+     * earlier try (its reply was lost, then the epoch erased the name).
+     */
     data object NotFound : UsernameNameStatus
 }
 

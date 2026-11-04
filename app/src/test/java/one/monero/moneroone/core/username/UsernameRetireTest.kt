@@ -17,6 +17,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import com.google.crypto.tink.subtle.Ed25519Sign
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
@@ -111,6 +112,9 @@ class UsernameRetireTest {
         fail("Expected a failure"); throw AssertionError()
     }
     private fun ownBinding() = store.state.value.binding("wallet-A", "mainnet")
+    /** The registry's lookup of alice after a retire: the chain ends in [tombstone] (base64url), the vector's by default. */
+    private fun retired(tombstone: String = b64(Vector.RECORD)) =
+        live.copy(tombstoned = true, owner = null, records = listOf(HeldRecord("earlier records"), HeldRecord(tombstone)))
 
     // The tombstone
 
@@ -392,26 +396,163 @@ class UsernameRetireTest {
             assertEquals(reply.toString(), "verification", failure { retire() }.code)
             assertNotNull(ownBinding())
         }
-        // The retire landed: the next try finds the tombstone and signs nothing.
-        api.found["alice"] = live.copy(tombstoned = true, owner = null)
+        // The retire landed: the next try finds the countersigned tombstone that it saved, and signs nothing.
+        api.found["alice"] = retired()
         api.calls.clear()
         retire(sign = noSignature)
         assertEquals(listOf("lookup alice"), api.calls)
         assertTrue(store.state.value.bindings.isEmpty())
+        assertTrue(store.state.value.retires.isEmpty())
     }
 
-    @Test fun aNameThatIsGoneOrRetiredAlreadyIsForgotten() {
-        // Erased at an epoch.
-        val erased = UsernameStore(MemoryUsernames()).also { it.accept(binding) }
-        runBlocking { testRegistry(FakeRegistryApi()).retire(binding, erased, noSignature) { true } }
-        assertTrue(erased.state.value.bindings.isEmpty())
-        assertNotNull(erased.state.value.nextFreeClaim)
-        // The lookup ran before an earlier retire landed.
+    // Audit F12: only the registrar's countersignature proves a retire.
+
+    @Test fun theSignedTombstoneIsSavedBeforeThePost() {
+        api.found["alice"] = live
+        api.appendReply = "alice" to b64(Vector.RECORD)
+        retire()
+        assertEquals(listOf(UsernameRetireAttempt("wallet-A", "mainnet", "alice", Vector.GENESIS, b64(Vector.UNSIGNED))), api.retiresAtPost)
+        // The retire is proved: the saved retire goes with the name.
+        assertTrue(store.state.value.retires.isEmpty())
+        assertTrue(UsernameStore(disk).state.value.retires.isEmpty())
+    }
+
+    @Test fun aRetireThatCannotBeSavedIsNeverPosted() {
+        api.found["alice"] = live
+        disk.fail = true
+        assertEquals("storage", failure { retire() }.code)
+        assertTrue(api.appended.isEmpty())
+        assertNotNull(ownBinding())
+    }
+
+    @Test fun aLostReplyIsProvedLaterByTheSavedTombstoneAlsoAfterARelaunch() {
+        api.found["alice"] = live
+        api.loseAppendReply = true
+        assertTrue(runCatching { retire() }.exceptionOrNull() is java.io.IOException)
+        assertNotNull(ownBinding())
+        // A relaunch reads the saved retire from disk.
+        val relaunched = UsernameStore(disk)
+        assertEquals(b64(Vector.UNSIGNED), relaunched.state.value.retireAttempt(binding)?.unsigned)
+        api.found["alice"] = retired()
+        api.calls.clear()
+        runBlocking { client().retire(binding, relaunched, noSignature) { true } }
+        assertEquals(listOf("lookup alice"), api.calls)
+        assertNull(relaunched.state.value.binding("wallet-A", "mainnet"))
+        assertTrue(relaunched.state.value.retires.isEmpty())
+        assertNotNull(relaunched.state.value.nextFreeClaim)
+    }
+
+    @Test fun aRefusalAfterAnEarlierRetireFinishesOnlyOnTheCountersignedTombstone() {
+        // The lookup ran before an earlier retire landed; the refusal is unsigned, so the app looks again.
         api.found["alice"] = live
         api.appendRefusal = 409 to """{"error":{"code":"chain.record_after_tombstone"}}"""
+        api.afterRecords = { api.found["alice"] = retired() }
         retire()
+        assertEquals(listOf("lookup alice", "append alice", "lookup alice"), api.calls)
         assertTrue(store.state.value.bindings.isEmpty())
         assertNotNull(store.state.value.nextFreeClaim)
+    }
+
+    @Test fun aRefusalOfThePostWithoutTheProofKeepsTheName() {
+        val afterTombstone = 409 to """{"error":{"code":"chain.record_after_tombstone"}}"""
+        val notFound = 404 to """{"error":{"code":"handle.not_found"}}"""
+        val rows = listOf(
+            "a 404 after the refusal" to (afterTombstone to null),
+            "a 404 POST, then a 404" to (notFound to null),
+            "a tombstone flag with no records" to (afterTombstone to live.copy(tombstoned = true, owner = null)),
+            "a tombstone of another registrar" to (afterTombstone to retired(b64(Vector.RECORD.dropLast(128) + "00".repeat(64)))),
+            "the countersigned tombstone, but not this name" to (afterTombstone to retired().copy(handle = "alicf")),
+        )
+        for ((name, row) in rows) {
+            val (refusal, after) = row
+            // No earlier retire on this phone: a new store and registry for each row.
+            val store = UsernameStore(MemoryUsernames()).also { it.accept(binding) }
+            val api = FakeRegistryApi().apply {
+                registrarKey = Vector.REGISTRAR_KEY
+                found["alice"] = live
+                appendRefusal = refusal
+                afterRecords = { if (after == null) found.remove("alice") else found["alice"] = after }
+            }
+            val client = testRegistry(api, UsernameConfiguration("http://localhost:8787", Vector.REGISTRAR_KEY, "c".repeat(64), "test-terms-v1"))
+            val e = runCatching { runBlocking { client.retire(binding, store, vectorSigner) { true } } }.exceptionOrNull()
+            assertEquals(name, "verification", (e as? UsernameException)?.code)
+            assertEquals(name, listOf("lookup alice", "append alice", "lookup alice"), api.calls)
+            assertNotNull(name, store.state.value.binding("wallet-A", "mainnet"))
+        }
+    }
+
+    @Test fun aNotFoundEndsTheRetireOnlyAfterAnEarlierSavedRetire() {
+        // The reply of the first try was lost, then the epoch erased the name.
+        api.found["alice"] = live
+        api.loseAppendReply = true
+        assertTrue(runCatching { retire() }.exceptionOrNull() is java.io.IOException)
+        api.found.remove("alice")
+        retire(sign = noSignature)
+        assertNull(ownBinding())
+        assertTrue(store.state.value.retires.isEmpty())
+        // The POST of an earlier retire landed while this try ran, and the epoch erased the name before the reply.
+        for (refusal in listOf("chain.record_after_tombstone" to 409, "handle.not_found" to 404)) {
+            val store = UsernameStore(MemoryUsernames()).also { it.accept(binding) }
+            store.saveRetire(UsernameRetireAttempt("wallet-A", "mainnet", "alice", Vector.GENESIS, b64(Vector.UNSIGNED)))
+            val api = FakeRegistryApi().apply {
+                registrarKey = Vector.REGISTRAR_KEY
+                found["alice"] = live
+                appendRefusal = refusal.second to """{"error":{"code":"${refusal.first}"}}"""
+                afterRecords = { found.remove("alice") }
+            }
+            runBlocking {
+                testRegistry(api, UsernameConfiguration("http://localhost:8787", Vector.REGISTRAR_KEY, "c".repeat(64), "test-terms-v1"))
+                    .retire(binding, store, vectorSigner) { true }
+            }
+            assertEquals(refusal.first, listOf("lookup alice", "append alice", "lookup alice"), api.calls)
+            assertTrue(refusal.first, store.state.value.bindings.isEmpty())
+        }
+    }
+
+    @Test fun anUnsignedAnswerNeverForgetsTheName() {
+        // No saved retire on this phone. Each answer could come from a wrong or stale registry.
+        val rows = listOf(
+            "a 404" to null,
+            "a tombstone flag with no records" to live.copy(tombstoned = true, owner = null),
+            "a tombstone flag over a live chain" to live.copy(tombstoned = true, records = listOf(HeldRecord("genesis"))),
+            // Signed by the registrar, but at seq 5: another chain of this handle, not this claim's genesis.
+            "a countersigned tombstone of another chain" to retired(),
+            "a record that is not strict base64url" to retired(b64(Vector.RECORD) + "="),
+        )
+        for ((name, answer) in rows) {
+            if (answer == null) api.found.remove("alice") else api.found["alice"] = answer
+            assertEquals(name, "verification", failure { retire(sign = noSignature) }.code)
+            assertNotNull(name, ownBinding())
+            assertTrue(name, api.appended.isEmpty())
+            // The state check forgets nothing either.
+            val status = runCatching { runBlocking { client().status(binding, store) } }
+            if (answer == null) assertEquals(name, UsernameNameStatus.NotFound, status.getOrThrow())
+            else assertEquals(name, "verification", (status.exceptionOrNull() as UsernameException).code)
+            assertNotNull(name, ownBinding())
+        }
+    }
+
+    @Test fun aRetireFromAnotherPhoneIsProvedAtSeqOneOverTheGenesis() {
+        // A registrar key made for this test only: its private half is never saved.
+        val registrar = Ed25519Sign.KeyPair.newKeyPair()
+        val registrarKey = hex(registrar.publicKey)
+        fun countersigned(unsigned: ByteArray) = UsernameBase64.encode(unsigned + ByteArray(64) +
+            Ed25519Sign(registrar.privateKey).sign(UsernameTombstone.signingMessage(unsigned).toByteArray(Charsets.US_ASCII)))
+        val first = UsernameTombstone.unsigned("alice", 1, Vector.GENESIS)!!
+        // Not this claim's chain: seq 2, another genesis, another name.
+        for ((name, unsigned) in listOf("seq 2" to UsernameTombstone.unsigned("alice", 2, Vector.GENESIS)!!,
+                                        "another genesis" to UsernameTombstone.unsigned("alice", 1, Vector.PREV)!!)) {
+            api.found["alice"] = retired(countersigned(unsigned))
+            assertEquals(name, "verification", failure { retire(client(registrarKey), sign = noSignature) }.code)
+            assertNotNull(name, ownBinding())
+        }
+        api.found["alice"] = retired(countersigned(first))
+        assertEquals(UsernameNameStatus.Retired, runBlocking { client(registrarKey).status(binding, store) })
+        // The state check forgets nothing; the retire does, and signs nothing.
+        assertNotNull(ownBinding())
+        retire(client(registrarKey), sign = noSignature)
+        assertNull(ownBinding())
+        assertTrue(api.appended.isEmpty())
     }
 
     @Test fun retireStopsOnALookupThatIsNotThisName() {
@@ -475,8 +616,9 @@ class UsernameRetireTest {
         assertEquals(UsernameNameStatus.Live(UsernameHead(4, Vector.PREV)), client(Hold.KEY).status(binding, store))
         assertNull(store.nameState(binding).hold)
         assertTrue(store.nameState(binding).retireAllowed)
-        // Retired and gone.
-        api.found["alice"] = live.copy(tombstoned = true, owner = null)
+        // Retired with the countersigned tombstone that this phone saved, and gone.
+        store.saveRetire(UsernameRetireAttempt("wallet-A", "mainnet", "alice", Vector.GENESIS, b64(Vector.UNSIGNED)))
+        api.found["alice"] = retired(b64(Hold.record))
         assertEquals(UsernameNameStatus.Retired, client(Hold.KEY).status(binding, store))
         api.found.clear()
         assertEquals(UsernameNameStatus.NotFound, client(Hold.KEY).status(binding, store))

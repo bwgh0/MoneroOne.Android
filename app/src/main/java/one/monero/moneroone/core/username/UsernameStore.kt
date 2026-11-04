@@ -32,14 +32,30 @@ data class PendingUsernameClaim(
     val ownerSignature: String, val registrarKey: String, val rules: String, val rulesHash: String
 )
 
+/**
+ * A retire this phone signed for a name: the unsigned tombstone (base64url), saved before the POST. A later
+ * lookup whose chain ends in the registrar's countersignature of these exact bytes proves that the retire
+ * landed, also when the POST's reply was lost.
+ */
+@Serializable
+data class UsernameRetireAttempt(
+    val walletKey: String, val network: String, val handle: String, val genesisHash: String, val unsigned: String
+) {
+    fun isFor(binding: UsernameBinding) = walletKey == binding.walletKey && network == binding.network &&
+        handle == binding.handle && genesisHash == binding.genesisHash
+}
+
 @Serializable
 data class UsernameState(
     val bindings: List<UsernameBinding> = emptyList(), val pending: PendingUsernameClaim? = null,
-    val nextFreeClaim: Long? = null, val deviceId: String = UUID.randomUUID().toString()
+    val nextFreeClaim: Long? = null, val deviceId: String = UUID.randomUUID().toString(),
+    val retires: List<UsernameRetireAttempt> = emptyList()
 ) {
     fun binding(walletKey: String?, network: String) = bindings.firstOrNull {
         !walletKey.isNullOrEmpty() && it.walletKey == walletKey && it.network == network
     }
+    /** The retire this phone signed last for [binding], or null. */
+    fun retireAttempt(binding: UsernameBinding) = retires.lastOrNull { it.isFor(binding) }
     fun hasLocalClaimSlot(now: Long = System.currentTimeMillis()) = inviteHiddenUntil(now) == null
     /** This phone's next free claim while it is still ahead, else null. Home hides the invite until then. */
     fun inviteHiddenUntil(now: Long = System.currentTimeMillis()): Long? = nextFreeClaim?.takeIf { it > now }
@@ -85,8 +101,20 @@ class UsernameStore(private val persistence: UsernamePersistence) {
         ))
     }
     /**
-     * After a retire: the name, its saved claim and its hold go. The free claim date stays, so Home hides the
-     * invite until the phone can claim again.
+     * Saves the unsigned tombstone of a retire before its POST. It replaces an earlier attempt for the same
+     * name: a tombstone at the same head has the same bytes, and the registry refuses one at an older head.
+     */
+    @Synchronized fun saveRetire(attempt: UsernameRetireAttempt) {
+        val state = mutable.value
+        save(state.copy(retires = state.retires.filterNot {
+            it.walletKey == attempt.walletKey && it.network == attempt.network && it.handle == attempt.handle &&
+                it.genesisHash == attempt.genesisHash
+        } + attempt))
+    }
+    /**
+     * After a retire that an answer proved ([UsernameRegistry.retire]): the name, its
+     * saved claim, its saved retire and its hold go. The free claim date stays, so Home hides the invite until
+     * the phone can claim again.
      */
     @Synchronized fun forget(binding: UsernameBinding) {
         val state = mutable.value
@@ -95,7 +123,7 @@ class UsernameStore(private val persistence: UsernamePersistence) {
         }
         save(state.copy(bindings = state.bindings.filterNot {
             it.walletKey == binding.walletKey && it.network == binding.network && it.genesisHash == binding.genesisHash
-        }, pending = pending))
+        }, pending = pending, retires = state.retires.filterNot { it.isFor(binding) }))
         heldNames.update { it - holdKey(binding.handle, binding.network) }
     }
 
@@ -166,8 +194,10 @@ class UsernameException(val code: String, val hold: UsernameHold? = null) : Exce
     companion object {
         const val HELD = "name.held"
         const val TERMS_OUTDATED = "terms.outdated"
-        /** A tombstone already ends the chain: an earlier retire landed. */
+        /** A tombstone already ends the chain: an earlier retire landed. The refusal is not signed. */
         const val RETIRED = "chain.record_after_tombstone"
+        /** `404 handle.not_found`: the registry has no such name. The answer is not signed. */
+        const val NOT_FOUND = "handle.not_found"
 
         /**
          * A claim step needs the wallet file open, and it is not, though the wallet is the same: it is

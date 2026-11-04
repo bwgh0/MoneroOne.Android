@@ -39,6 +39,25 @@ class UsernameStoreTest {
         try { store.accept(binding(hash = "replacement")); fail("Replaced the owner binding") } catch (_: UsernameException) { }
         assertEquals("genesis", store.state.value.binding("A", "mainnet")?.genesisHash)
     }
+    @Test fun aSavedRetireBelongsToItsNameAndGoesWithIt() {
+        val store = UsernameStore(Memory())
+        store.accept(binding()); store.accept(binding(wallet = "B"))
+        val attempt = UsernameRetireAttempt("A", "mainnet", "joe", "genesis", "first")
+        store.saveRetire(attempt); store.saveRetire(attempt.copy(walletKey = "B"))
+        // A new try for the same name replaces its earlier one.
+        store.saveRetire(attempt.copy(unsigned = "second"))
+        assertEquals("second", store.state.value.retireAttempt(binding())?.unsigned)
+        assertNull(store.state.value.retireAttempt(binding(hash = "another genesis")))
+        store.forget(binding())
+        assertNull(store.state.value.retireAttempt(binding()))
+        assertEquals("first", store.state.value.retireAttempt(binding(wallet = "B"))?.unsigned)
+    }
+    @Test fun aStateSavedBeforeRetiresStillReads() {
+        val old = """{"bindings":[],"nextFreeClaim":1800000000000,"deviceId":"device"}"""
+        val state = kotlinx.serialization.json.Json.decodeFromString<UsernameState>(old)
+        assertTrue(state.retires.isEmpty())
+        assertEquals("device", state.deviceId)
+    }
     @Test fun unreadableStorageFailsClosed() {
         val store = UsernameStore(object : UsernamePersistence {
             override fun read(): UsernameState = throw IllegalStateException("test unreadable store")
