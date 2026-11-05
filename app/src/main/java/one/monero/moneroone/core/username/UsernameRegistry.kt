@@ -22,6 +22,12 @@ import java.util.concurrent.TimeUnit
  */
 data class UsernameConfiguration(val url: String, val registrarKey: String, val rulesHash: String, val termsVersion: String) {
     companion object {
+        /**
+         * The registry's zone, on staging and production alike: the "zone" of the registry's
+         * `ops/host/etc/registry/staging.json` and `production.json`.
+         */
+        const val ZONE = "monero.one"
+
         val current: UsernameConfiguration? get() = from(BuildConfig.USERNAME_REGISTRY_URL, BuildConfig.USERNAME_REGISTRAR_KEY,
             BuildConfig.USERNAME_RULES_HASH, BuildConfig.USERNAME_TERMS_VERSION, BuildConfig.DEBUG)
 
@@ -77,6 +83,12 @@ interface UsernameRegistryApi {
      * [UsernameException.HELD] with its checked hold; one whose notice fails the check throws the generic error.
      */
     suspend fun lookup(handle: String): HeldName?
+    /**
+     * `GET /v1/handles/{handle}?genesis={genesisHash}`, after a lookup of the wallet's own name answered 404: the
+     * unchecked `retired` object of a `404 handle.not_found` ([UsernameRetired.answer]), or null for any other answer
+     * (a plain 404, a 400, a live or held name). Throws while the registry cannot answer.
+     */
+    suspend fun retired(handle: String, genesisHash: String): UsernameRetiredAnswer?
     suspend fun nonce(handle: String, subaddress: String): String
     /** Posts the signed claim. Returns the handle and the record the registry admitted. */
     suspend fun claim(pending: PendingUsernameClaim, device: DeviceProof): Pair<String, String>
@@ -117,8 +129,8 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
     private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false)
         .callTimeout(25, TimeUnit.SECONDS).build()
 
-    /** [held]: the handle of a lookup or an owner record, whose `451 name.held` gives its checked hold. */
-    private suspend fun request(path: String, body: JSONObject? = null, held: String? = null): String = withContext(Dispatchers.IO) {
+    /** The HTTP status and the body (at most 1 MiB) of a call. */
+    private suspend fun fetch(path: String, body: JSONObject? = null): Pair<Int, String> = withContext(Dispatchers.IO) {
         val request = Request.Builder().url("${configuration.url}/v1/$path").apply {
             if (body != null) post(body.toString().toRequestBody("application/json".toMediaType()))
         }.build()
@@ -126,16 +138,21 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
             val source = response.body?.source() ?: throw UsernameException("verification")
             source.request(1_048_577)
             if (source.buffer.size > 1_048_576) throw UsernameException("verification")
-            val text = source.readUtf8()
-            if (!response.isSuccessful) throw UsernameRegistryAnswer.failure(response.code, text, held, configuration.registrarKey)
-            text
+            response.code to source.readUtf8()
         }
+    }
+
+    /** [held]: the handle of a lookup or an owner record, whose `451 name.held` gives its checked hold. */
+    private suspend fun request(path: String, body: JSONObject? = null, held: String? = null): String {
+        val (status, text) = fetch(path, body)
+        if (status !in 200..299) throw UsernameRegistryAnswer.failure(status, text, held, configuration.registrarKey)
+        return text
     }
 
     override suspend fun checkedRules(network: String): String {
         val info = JSONObject(request("info"))
         if (info.optString("registrar_key") != configuration.registrarKey || info.optString("rules_hash") != configuration.rulesHash ||
-            info.optString("network") != network || info.optString("zone") != "monero.one" || !info.optBoolean("open")) throw UsernameException("verification")
+            info.optString("network") != network || info.optString("zone") != UsernameConfiguration.ZONE || !info.optBoolean("open")) throw UsernameException("verification")
         return request("rules")
     }
 
@@ -152,6 +169,9 @@ private class HttpUsernameRegistryApi(private val configuration: UsernameConfigu
             headHash = head?.opt("record_hash") as? String,
         )
     }
+
+    override suspend fun retired(handle: String, genesisHash: String): UsernameRetiredAnswer? =
+        fetch("handles/$handle?genesis=$genesisHash").let { (status, text) -> UsernameRetired.answer(status, text) }
 
     override suspend fun nonce(handle: String, subaddress: String): String =
         JSONObject(request("nonce", json("handle" to handle, "subaddress" to subaddress))).getString("nonce")
@@ -357,15 +377,17 @@ class UsernameRegistry internal constructor(
     /**
      * The registry's state of the wallet's own name. The store learns a hold (or its end), so
      * [UsernameStore.nameState] shows it; the @name screen runs this when it opens. It signs, saves and forgets
-     * nothing else: only [retire] forgets a name. Throws while the registry cannot answer, or [UsernameException]
-     * "verification" when its answer is not about this name (another genesis or owner), or when it shows a
-     * tombstone without the registrar's countersignature ([UsernameNameStatus.Retired]).
+     * nothing else: only [retire] forgets a name. A 404 asks again with the genesis hash ([provesErased]): the
+     * registrar's retired statement gives [UsernameNameStatus.Retired], and any other answer
+     * [UsernameNameStatus.NotFound]. Throws while the registry cannot answer the first lookup, or
+     * [UsernameException] "verification" when its answer is not about this name (another genesis or owner), or
+     * when it shows a tombstone without the registrar's countersignature ([UsernameNameStatus.Retired]).
      */
     suspend fun status(binding: UsernameBinding, store: UsernameStore): UsernameNameStatus {
         val found = try { lookUp(binding.handle, binding.network, store) } catch (e: UsernameException) {
             e.hold?.let { return UsernameNameStatus.Held(it) }
             throw e
-        } ?: return UsernameNameStatus.NotFound
+        } ?: return if (provesErased(binding)) UsernameNameStatus.Retired else UsernameNameStatus.NotFound
         if (found.handle != binding.handle || found.genesisHash != binding.genesisHash) throw UsernameException("verification")
         if (provesRetire(found, binding, store)) return UsernameNameStatus.Retired
         // A tombstone flag without the countersigned tombstone is unsigned: the name stays.
@@ -375,6 +397,20 @@ class UsernameRegistry internal constructor(
         if (found.owner != binding.subaddress || head == null || (head.seq == 0L && head.recordHash != binding.genesisHash))
             throw UsernameException("verification")
         return UsernameNameStatus.Live(head)
+    }
+
+    /**
+     * After a 404 of the wallet's own name: `GET /v1/handles/{handle}?genesis=<binding genesis hash>` gives the
+     * registrar's retired statement for this name and genesis ([UsernameRetired.proves], audit F12b). It is how a
+     * second phone of the same wallet learns that the first phone retired the name and the epoch erased it. Any other
+     * answer, and a registry that cannot answer, proves nothing: the 404 keeps its outcome and the name stays.
+     */
+    private suspend fun provesErased(binding: UsernameBinding): Boolean {
+        if (!UsernameRetired.canAsk(binding)) return false
+        val answer = try { api.retired(binding.handle, binding.genesisHash) }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { return false }
+        return answer != null && UsernameRetired.proves(answer, binding, configuration.registrarKey)
     }
 
     /** The lookup's chain ends in the registrar's countersigned tombstone of this name ([UsernameTombstone.endsRetired]). */
@@ -387,16 +423,17 @@ class UsernameRegistry internal constructor(
      * or `terms` hold at `hold.head.seq + 1` over `hold.head.record_hash`. The app forgets the name, its saved
      * claim, its saved retire and its hold (the free claim date stays) only after an answer that proves the
      * retire: the registrar's countersignature on the reply, or on a lookup's tombstone
-     * ([UsernameNameStatus.Retired]: an earlier retire landed and its reply was lost). A 404 is not signed: it
-     * ends the retire only when this phone saved a retire in an earlier try (its reply was lost, then the epoch
-     * erased the name). A `chain.record_after_tombstone` or 404 refusal of the POST is not signed either: the app
-     * looks the name up again (iOS parity).
+     * ([UsernameNameStatus.Retired]: an earlier retire landed and its reply was lost), or the registrar's retired
+     * statement after a 404 ([provesErased]: a retire from this or another phone, and the epoch erased the name). A
+     * 404 alone is not signed: it ends the retire only when this phone saved a retire in an earlier try (its reply
+     * was lost, then the epoch erased the name). A `chain.record_after_tombstone` or 404 refusal of the POST is not
+     * signed either: the app looks the name up again (iOS parity).
      *
      * Throws [UsernameException]: [UsernameException.HELD] for an `order` or `sanctions` hold (no retire; the
      * store shows the hold), "wallet_changed", "storage", "pending" (a claim runs), "verification" (an answer
      * that proves no retire: a reply that fails a check, a tombstone flag without the countersigned tombstone, a
-     * 404 with no earlier retire; the name stays), and the registry's other refusals as in a claim. [sign] is the
-     * claim's signer: (message, subaddress) to a `SigV2` string.
+     * 404 with no earlier retire and no retired statement; the name stays), and the registry's other refusals as
+     * in a claim. [sign] is the claim's signer: (message, subaddress) to a `SigV2` string.
      */
     suspend fun retire(binding: UsernameBinding, store: UsernameStore, sign: suspend (String, String) -> String,
                        isCurrentWallet: () -> Boolean) {
@@ -411,7 +448,8 @@ class UsernameRegistry internal constructor(
             val head = when (val status = status(binding, store)) {
                 // An earlier retire landed (its reply was lost): the countersigned tombstone proves it.
                 UsernameNameStatus.Retired -> { store.forget(binding); return }
-                // The epoch erased the name after this phone's earlier retire. A 404 alone is not signed: the name stays.
+                // The epoch erased the name after this phone's earlier retire. A 404 alone is not signed, and status()
+                // found no retired statement: the name stays.
                 UsernameNameStatus.NotFound -> { if (!earlier) throw UsernameException("verification"); store.forget(binding); return }
                 is UsernameNameStatus.Live -> status.head
                 is UsernameNameStatus.Held -> {
@@ -448,7 +486,7 @@ class UsernameRegistry internal constructor(
                     !UsernameTombstone.isCountersigned(record, unsigned, configuration.registrarKey)) throw UsernameException("verification")
             } else {
                 val found = lookUp(binding.handle, binding.network, store)
-                val proved = if (found == null) earlier
+                val proved = if (found == null) earlier || provesErased(binding)
                     else found.handle == binding.handle && found.genesisHash == binding.genesisHash && provesRetire(found, binding, store)
                 if (!proved) throw UsernameException("verification")
             }

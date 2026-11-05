@@ -64,6 +64,18 @@ class UsernameRetireTest {
         val record get() = Vector.RECORD.dropLast(128) + COUNTERSIGNATURE
     }
 
+    // Retired statements (registry F12b, `retired_text`), signed by the e2e harness log key [Hold.KEY].
+    private object Retired {
+        const val TEXT = "oah-registry/retired/v1\nzone monero.one\nhandle alice\ngenesis_hash ${Vector.GENESIS}\n"
+        const val SIGNATURE = "uivYb6KDIxb77rlooj2ih2jAXQVmrARu3UPZYUUpplmaY7Omg3CKGeF8_TlVuRWkB51C126civeiJshnbNv0BQ"
+        /** The same text in zone staging.monero.one (the staging DNS zone, not the registry's zone). */
+        const val STAGING_ZONE = "P8S5u_Kjgb0X3SF_61xBfIPVnto6VlTysVB-0TgIUVsvCje3Arox2ZceLYfclFNN2QKx_EG_ChLeBG-zK8RiCw"
+        /** The text for the handle alicf. */
+        const val OTHER_HANDLE = "Ad7k171qPUNw-vpUOYFbNji38BOCDLxlwbZ_qDPORT6RgDvBnvvHbOAuwuIHWd4TioUDqZhRP3OyAlIV-paECw"
+        /** The text for alice with the genesis hash [Vector.PREV]. */
+        const val OTHER_GENESIS = "cfutK0Y9OfCMsjf3Dd_WncY8fs77aYe3uTQdlAwuBICLizoGCBa949g8D8_CJ0_mBWVuZKXPeUYJvE-NR6GsBA"
+    }
+
     private fun bytes(hex: String) = ByteArray(hex.length / 2) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
     private fun hex(data: ByteArray) = data.joinToString("") { "%02x".format(it.toInt() and 0xff) }
     private fun b64(hex: String) = UsernameBase64.encode(bytes(hex))
@@ -476,7 +488,9 @@ class UsernameRetireTest {
             val client = testRegistry(api, UsernameConfiguration("http://localhost:8787", Vector.REGISTRAR_KEY, "c".repeat(64), "test-terms-v1"))
             val e = runCatching { runBlocking { client.retire(binding, store, vectorSigner) { true } } }.exceptionOrNull()
             assertEquals(name, "verification", (e as? UsernameException)?.code)
-            assertEquals(name, listOf("lookup alice", "append alice", "lookup alice"), api.calls)
+            // A 404 asks again with the genesis hash; the plain 404 there proves nothing either.
+            val again = if (after == null) listOf(genesisLookup) else emptyList()
+            assertEquals(name, listOf("lookup alice", "append alice", "lookup alice") + again, api.calls)
             assertNotNull(name, store.state.value.binding("wallet-A", "mainnet"))
         }
     }
@@ -553,6 +567,139 @@ class UsernameRetireTest {
         retire(client(registrarKey), sign = noSignature)
         assertNull(ownBinding())
         assertTrue(api.appended.isEmpty())
+    }
+
+    // The retired statement (audit F12b): a second phone of the same wallet learns that the name was erased
+
+    /** The lookup that follows a 404 of alice: the same name, with the binding's genesis hash. */
+    private val genesisLookup = "lookup alice?genesis=${Vector.GENESIS}"
+
+    /** The `404 handle.not_found` with a `retired` object, as registry service.rs `not_found_or_retired` sends it. */
+    private fun retiredBody(handle: String? = "alice", genesis: String? = Vector.GENESIS, statement: String? = Retired.TEXT,
+                            signature: JsonElement = JsonPrimitive(Retired.SIGNATURE), code: String = "handle.not_found") = buildJsonObject {
+        put("error", buildJsonObject { put("code", code); put("message", "This name was not found.") })
+        put("retired", buildJsonObject { put("handle", handle); put("genesis_hash", genesis); put("statement", statement); put("signature", signature) })
+    }.toString()
+
+    /** A phone of wallet-A that saved no retire, a registry with no alice, and [retired] as the genesis lookup's answer. */
+    private class SecondPhone(binding: UsernameBinding, retired: Pair<Int, String>?, earlier: UsernameRetireAttempt? = null) {
+        val store = UsernameStore(MemoryUsernames()).also { it.accept(binding); if (earlier != null) it.saveRetire(earlier) }
+        val api = FakeRegistryApi().apply {
+            registrarKey = Hold.KEY
+            if (retired == null) retiredUnreachable = true else retiredAnswers["alice"] = retired
+        }
+        val client = testRegistry(api, UsernameConfiguration("http://localhost:8787", Hold.KEY, "c".repeat(64), "test-terms-v1"))
+    }
+
+    @Test fun theRetiredStatementIsTheRegistryText() {
+        // registry crates/e2e/tests/retired.rs: retired_text("monero.one", "alice", genesis).
+        assertEquals("oah-registry/retired/v1\nzone monero.one\nhandle alice\ngenesis_hash ${Vector.GENESIS}\n",
+            UsernameRetired.text("alice", Vector.GENESIS))
+        assertEquals(Retired.TEXT, UsernameRetired.text("alice", Vector.GENESIS))
+        assertTrue(UsernameRegistrar.isSigned(Retired.TEXT.toByteArray(), UsernameBase64.decode(Retired.SIGNATURE)!!, Hold.KEY))
+        assertEquals(UsernameRetiredAnswer("alice", Vector.GENESIS, Retired.TEXT, Retired.SIGNATURE), UsernameRetired.answer(404, retiredBody()))
+        assertTrue(UsernameRetired.proves(UsernameRetired.answer(404, retiredBody())!!, binding, Hold.KEY))
+        // Only a 404 handle.not_found carries one; a field of another type is null.
+        assertNull(UsernameRetired.answer(200, retiredBody()))
+        assertNull(UsernameRetired.answer(404, retiredBody(code = "handle.blocked")))
+        assertNull(UsernameRetired.answer(404, """{"error":{"code":"handle.not_found"}}"""))
+        assertNull(UsernameRetired.answer(400, """{"error":{"code":"request.bad_query"}}"""))
+        assertNull(UsernameRetired.answer(404, "not json"))
+        assertEquals(UsernameRetiredAnswer("alice", Vector.GENESIS, Retired.TEXT, null),
+            UsernameRetired.answer(404, retiredBody(signature = JsonPrimitive(5))))
+    }
+
+    @Test fun aSignedRetiredStatementForgetsTheNameOnASecondPhone() {
+        // This phone saved no retire: another phone of the wallet retired the name, and the epoch erased it.
+        api.retiredAnswers["alice"] = 404 to retiredBody()
+        assertEquals(UsernameNameStatus.Retired, runBlocking { client(Hold.KEY).status(binding, store) })
+        assertEquals(listOf("lookup alice", genesisLookup), api.calls)
+        // The state check forgets nothing; the retire does, and signs and posts nothing.
+        assertNotNull(ownBinding())
+        retire(client(Hold.KEY), sign = noSignature)
+        assertNull(ownBinding())
+        assertTrue(api.appended.isEmpty())
+        assertTrue(store.state.value.retires.isEmpty())
+    }
+
+    @Test fun aSignedRetiredStatementEndsARefusedRetire() {
+        // The lookup found the name live; another phone's retire and the erasure ran before this POST.
+        for ((status, code) in listOf(409 to UsernameException.RETIRED, 404 to UsernameException.NOT_FOUND)) {
+            val phone = SecondPhone(binding, 404 to retiredBody())
+            phone.api.apply {
+                found["alice"] = live
+                appendRefusal = status to """{"error":{"code":"$code"}}"""
+                afterRecords = { found.remove("alice") }
+            }
+            runBlocking { phone.client.retire(binding, phone.store, vectorSigner) { true } }
+            assertEquals(code, listOf("lookup alice", "append alice", "lookup alice", genesisLookup), phone.api.calls)
+            assertTrue(code, phone.store.state.value.bindings.isEmpty())
+        }
+    }
+
+    @Test fun aRetiredStatementThatFailsACheckKeepsTheName() {
+        // A registrar key made for this test only: its private half is never saved.
+        val other = Ed25519Sign.KeyPair.newKeyPair()
+        val otherKey = UsernameBase64.encode(Ed25519Sign(other.privateKey).sign(Retired.TEXT.toByteArray()))
+        val stagingText = Retired.TEXT.replace("zone monero.one", "zone staging.monero.one")
+        val rows = listOf(
+            "another registrar key" to retiredBody(signature = JsonPrimitive(otherKey)),
+            "another genesis" to retiredBody(genesis = Vector.PREV, statement = UsernameRetired.text("alice", Vector.PREV),
+                signature = JsonPrimitive(Retired.OTHER_GENESIS)),
+            "another handle" to retiredBody(handle = "alicf", statement = UsernameRetired.text("alicf", Vector.GENESIS),
+                signature = JsonPrimitive(Retired.OTHER_HANDLE)),
+            "another zone" to retiredBody(statement = stagingText, signature = JsonPrimitive(Retired.STAGING_ZONE)),
+            // The signature is good for the app's own text, but the server's text differs from it.
+            "a statement text that differs" to retiredBody(statement = stagingText),
+            "a statement without its last newline" to retiredBody(statement = Retired.TEXT.dropLast(1)),
+            "no statement" to retiredBody(statement = null),
+            // The text and the signature are good, but a field names another handle or genesis.
+            "a handle field of another name" to retiredBody(handle = "alicf"),
+            "an uppercase genesis field" to retiredBody(genesis = Vector.GENESIS.uppercase()),
+            "no genesis field" to retiredBody(genesis = null),
+            "a signature with padding" to retiredBody(signature = JsonPrimitive(Retired.SIGNATURE + "==")),
+            "a signature that is not a string" to retiredBody(signature = JsonPrimitive(5)),
+            "a changed signature" to retiredBody(signature = JsonPrimitive("v" + Retired.SIGNATURE.drop(1))),
+            "the statement under another error code" to retiredBody(code = "handle.blocked"),
+        ).map { (name, body) -> name to (404 to body) } + listOf("the statement on a 200" to (200 to retiredBody()))
+        // The good answer proves the retire with the same set-up.
+        SecondPhone(binding, 404 to retiredBody()).let { assertEquals(UsernameNameStatus.Retired, runBlocking { it.client.status(binding, it.store) }) }
+        for ((name, answer) in rows) {
+            val phone = SecondPhone(binding, answer)
+            assertEquals(name, UsernameNameStatus.NotFound, runBlocking { phone.client.status(binding, phone.store) })
+            assertEquals(name, listOf("lookup alice", genesisLookup), phone.api.calls)
+            val e = runCatching { runBlocking { phone.client.retire(binding, phone.store, noSignature) { true } } }.exceptionOrNull()
+            assertEquals(name, "verification", (e as? UsernameException)?.code)
+            assertNotNull(name, phone.store.state.value.binding("wallet-A", "mainnet"))
+            assertTrue(name, phone.api.appended.isEmpty())
+        }
+    }
+
+    @Test fun aPlainNotFoundOrABadQueryKeepsTheExistingOutcome() {
+        val rows = listOf<Pair<String, Pair<Int, String>?>>(
+            "a plain 404" to (404 to """{"error":{"code":"handle.not_found","message":"This name was not found."}}"""),
+            "a 400" to (400 to """{"error":{"code":"request.bad_query","message":"The query string is not valid for this call."}}"""),
+            "a registry that cannot answer" to null,
+        )
+        val attempt = UsernameRetireAttempt("wallet-A", "mainnet", "alice", Vector.GENESIS, b64(Vector.UNSIGNED))
+        for ((name, answer) in rows) {
+            // No saved retire: the 404 proves nothing, and the name stays.
+            val phone = SecondPhone(binding, answer)
+            assertEquals(name, UsernameNameStatus.NotFound, runBlocking { phone.client.status(binding, phone.store) })
+            val e = runCatching { runBlocking { phone.client.retire(binding, phone.store, noSignature) { true } } }.exceptionOrNull()
+            assertEquals(name, "verification", (e as? UsernameException)?.code)
+            assertNotNull(name, phone.store.state.value.binding("wallet-A", "mainnet"))
+            assertEquals(name, listOf("lookup alice", genesisLookup, "lookup alice", genesisLookup), phone.api.calls)
+            // After this phone's earlier saved retire, the 404 still ends it.
+            val earlier = SecondPhone(binding, answer, attempt)
+            runBlocking { earlier.client.retire(binding, earlier.store, noSignature) { true } }
+            assertTrue(name, earlier.store.state.value.bindings.isEmpty())
+            assertTrue(name, earlier.api.appended.isEmpty())
+        }
+        // A binding with no genesis hash to name asks nothing more.
+        val phone = SecondPhone(binding, 404 to retiredBody())
+        assertEquals(UsernameNameStatus.NotFound, runBlocking { phone.client.status(binding.copy(genesisHash = "genesis"), phone.store) })
+        assertEquals(listOf("lookup alice"), phone.api.calls)
     }
 
     @Test fun retireStopsOnALookupThatIsNotThisName() {

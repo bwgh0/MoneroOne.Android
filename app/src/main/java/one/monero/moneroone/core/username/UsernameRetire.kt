@@ -63,7 +63,7 @@ data class UsernameHold(val handle: String, val reason: UsernameHoldReason, val 
         const val NOTICE_TAG = "oah-registry/hold/v1"
 
         /** [parse] of a raw answer body. */
-        fun parse(body: String, handle: String, registrarKey: String, zone: String = "monero.one"): UsernameHold? =
+        fun parse(body: String, handle: String, registrarKey: String, zone: String = UsernameConfiguration.ZONE): UsernameHold? =
             runCatching { Json.parseToJsonElement(body) }.getOrNull()?.let { parse(it, handle, registrarKey, zone) }
 
         /**
@@ -71,7 +71,7 @@ data class UsernameHold(val handle: String, val reason: UsernameHoldReason, val 
          * fails a check (the signature, the zone, the handle, the reason, the format). The caller then shows its
          * generic error, with no reason.
          */
-        fun parse(body: JsonElement, handle: String, registrarKey: String, zone: String = "monero.one"): UsernameHold? {
+        fun parse(body: JsonElement, handle: String, registrarKey: String, zone: String = UsernameConfiguration.ZONE): UsernameHold? {
             val answer = body as? JsonObject ?: return null
             if ((answer["error"] as? JsonObject)?.get("code").text() != UsernameException.HELD) return null
             val hold = answer["hold"] as? JsonObject ?: return null
@@ -171,6 +171,59 @@ object UsernameTombstone {
 }
 
 /**
+ * The `retired` object of a `404 handle.not_found`, as `GET /v1/handles/{h}?genesis=<64 hex>` sends it for a name
+ * that a tombstone retired and the epoch erased (registry README, "Retired statement"). Not checked: a field that is
+ * missing or of another type is null, and [UsernameRetired.proves] then refuses it.
+ */
+data class UsernameRetiredAnswer(val handle: String?, val genesisHash: String?, val statement: String?, val signature: String?)
+
+/**
+ * The registrar's signed statement that a name, with its genesis, was retired and erased (audit F12b). After the
+ * erasure a plain lookup answers the unsigned 404 of a name that never existed. The registrar signs, with its log key
+ * (the pinned [UsernameConfiguration.registrarKey], as for a hold notice), the text
+ *
+ *     "oah-registry/retired/v1\nzone <zone>\nhandle <handle>\ngenesis_hash <64 lowercase hex>\n"
+ *
+ * The app builds these bytes itself from its own name and genesis hash, and never uses the server's text.
+ */
+object UsernameRetired {
+    /** The first line of a retired statement: its domain tag. */
+    const val TAG = "oah-registry/retired/v1"
+
+    /** The statement bytes for [handle] with [genesisHash], in [zone]. */
+    fun text(handle: String, genesisHash: String, zone: String = UsernameConfiguration.ZONE): String =
+        "$TAG\nzone $zone\nhandle $handle\ngenesis_hash $genesisHash\n"
+
+    /** The `retired` object of an answer with HTTP [status] and body [text], or null: not a 404 `handle.not_found` with one. */
+    fun answer(status: Int, text: String): UsernameRetiredAnswer? {
+        if (status != 404) return null
+        val body = runCatching { Json.parseToJsonElement(text) }.getOrNull() as? JsonObject ?: return null
+        if ((body["error"] as? JsonObject)?.get("code").text() != UsernameException.NOT_FOUND) return null
+        val retired = body["retired"] as? JsonObject ?: return null
+        return UsernameRetiredAnswer(retired["handle"].text(), retired["genesis_hash"].text(), retired["statement"].text(),
+            retired["signature"].text())
+    }
+
+    /**
+     * True when [answer] proves that [binding]'s name, with its genesis, was retired and erased: its handle and
+     * genesis hash are the binding's, its statement is the exact text that the app builds ([text], in [zone]), and its
+     * signature (strict base64url, 64 bytes) is the registrar's Ed25519 signature of those bytes under [registrarKey].
+     * Anything else proves nothing, and the name stays.
+     */
+    fun proves(answer: UsernameRetiredAnswer, binding: UsernameBinding, registrarKey: String,
+               zone: String = UsernameConfiguration.ZONE): Boolean {
+        if (!canAsk(binding)) return false
+        val text = text(binding.handle, binding.genesisHash, zone)
+        if (answer.handle != binding.handle || answer.genesisHash != binding.genesisHash || answer.statement != text) return false
+        val signature = answer.signature?.let(UsernameBase64::decode) ?: return false
+        return UsernameRegistrar.isSigned(text.toByteArray(Charsets.UTF_8), signature, registrarKey)
+    }
+
+    /** The binding can ask for its statement: a lowercase label and a genesis hash of 64 lowercase hex digits. */
+    internal fun canAsk(binding: UsernameBinding): Boolean = UsernameTombstone.isLabel(binding.handle) && HEX64.matches(binding.genesisHash)
+}
+
+/**
  * One free name per phone per 12 months (registry README, "Claim-slot safety"). The platforms date a phone
  * mark by its UTC month only, and the registry keeps the mark in force while `month(now) <= month(mark) + 12`
  * (`mark_in_force`). So the phone is free again at the first instant of the 13th month after the month of
@@ -207,15 +260,17 @@ sealed interface UsernameNameStatus {
     /** The registry holds the name, and the notice passed its check. */
     data class Held(val hold: UsernameHold) : UsernameNameStatus
     /**
-     * The chain ends in a tombstone of this name that the registrar countersigned
-     * ([UsernameTombstone.endsRetired]); the erasure runs at the next epoch. [UsernameRegistry.retire] then
-     * forgets the name and signs nothing.
+     * The registrar signed the retire of this name: the chain ends in a tombstone of this name that the registrar
+     * countersigned ([UsernameTombstone.endsRetired]; the erasure runs at the next epoch), or, after a 404, the
+     * registrar's retired statement for this name and genesis ([UsernameRetired.proves]; the epoch erased it).
+     * [UsernameRegistry.retire] then forgets the name and signs nothing.
      */
     data object Retired : UsernameNameStatus
     /**
-     * The registry answered 404: erased, or never registered there. The answer is not signed, so the name
-     * stays on this phone. [UsernameRegistry.retire] forgets it only when this phone saved a retire in an
-     * earlier try (its reply was lost, then the epoch erased the name).
+     * The registry answered 404, also when asked with the genesis hash, with no valid retired statement: erased,
+     * or never registered there. The answer is not signed, so the name stays on this phone.
+     * [UsernameRegistry.retire] forgets it only when this phone saved a retire in an earlier try (its reply was
+     * lost, then the epoch erased the name).
      */
     data object NotFound : UsernameNameStatus
 }

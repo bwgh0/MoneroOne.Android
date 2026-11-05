@@ -50,6 +50,19 @@ internal class FakeRegistryApi : UsernameRegistryApi {
         refusals[handle]?.let { (status, body) -> throw UsernameRegistryAnswer.failure(status, body, handle, registrarKey) }
         return (found[handle] ?: handles[handle]?.let { rows -> HeldName(rows.map { HeldRecord(it) }) }).also { afterRecords?.invoke() }
     }
+    /**
+     * Answers of `GET /v1/handles/{h}?genesis=`, by handle: (HTTP status, body), read as in the HTTP client
+     * ([UsernameRetired.answer]). A handle with none gets a plain 404.
+     */
+    val retiredAnswers = mutableMapOf<String, Pair<Int, String>>()
+    /** The genesis lookup cannot reach the registry (the first lookup can). */
+    var retiredUnreachable = false
+    override suspend fun retired(handle: String, genesisHash: String): UsernameRetiredAnswer? {
+        reach()
+        calls += "lookup $handle?genesis=$genesisHash"
+        if (retiredUnreachable) throw IOException("test registry unreachable")
+        return retiredAnswers[handle]?.let { (status, body) -> UsernameRetired.answer(status, body) }
+    }
     /** 32 bytes in lowercase hex, as the registry sends them. */
     override suspend fun nonce(handle: String, subaddress: String): String { reach(); calls += "nonce"; return "%064x".format(++nonces) }
     override suspend fun claim(pending: PendingUsernameClaim, device: DeviceProof): Pair<String, String> {
