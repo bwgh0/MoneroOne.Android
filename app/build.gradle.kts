@@ -52,11 +52,12 @@ fun usernameSetting(name: String): String =
     buildConfigString(providers.gradleProperty(name).orElse(usernameStaging.getValue(name)).get())
 
 // The Google Cloud project number for Play Integrity, from the Gradle property or the environment
-// variable PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER. Empty by default: a release build then claims no
-// username, and a debug build sends the development device proof.
-fun playIntegrityCloudProjectNumber(): String {
+// variable PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER. A release build falls back to the number of the
+// monero-one project, which is linked in Play Console. A debug build has no fallback: without the
+// property it sends the development device proof.
+fun playIntegrityCloudProjectNumber(fallback: String = ""): String {
     val name = "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER"
-    val value = providers.gradleProperty(name).orElse(providers.environmentVariable(name)).orElse("").get().trim()
+    val value = providers.gradleProperty(name).orElse(providers.environmentVariable(name)).orElse(fallback).get().trim()
     require(value.all { it in '0'..'9' }) { "$name must hold digits only" }
     return "\"" + value + "\""
 }
@@ -103,6 +104,9 @@ android {
             usernameFields.forEach { (name, field) ->
                 buildConfigField("String", field, buildConfigString(usernameProduction.getValue(name)))
             }
+            buildConfigField(
+                "String", "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER", playIntegrityCloudProjectNumber(fallback = "957847406346")
+            )
         }
         debug {
             isMinifyEnabled = false
